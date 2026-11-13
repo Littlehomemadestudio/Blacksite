@@ -1,6 +1,13 @@
 package studio.oracle
 
 import android.os.Bundle
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import kotlinx.coroutines.launch
+import studio.oracle.data.GeminiApi
+import studio.oracle.data.GeminiConnectionResult
+import studio.oracle.security.SecureKeyStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
@@ -59,7 +66,7 @@ private fun OracleApp() {
                         "Library" -> ModuleScreen("DOCUMENT INTELLIGENCE", "Your files, indexed and ready.", Icons.Default.FolderOpen, listOf("Import PDF or document", "Ask across your library", "Source-linked answers", "Collections & knowledge graph"))
                         "Automations" -> ModuleScreen("AUTOMATION STUDIO", "Design workflows. Inspect every run.", Icons.Default.AccountTree, listOf("Visual workflow canvas", "Triggers and actions", "Run history", "Local-first execution"))
                         "Memory" -> ModuleScreen("AUDIO MEMORY", "Capture, transcribe, retrieve.", Icons.Default.GraphicEq, listOf("Record with explicit permission", "Transcription archive", "Decisions and action items", "Semantic search"))
-                        "Settings" -> ModuleScreen("SYSTEM SETTINGS", "Model, credentials, privacy and workspace.", Icons.Default.Settings, listOf("Gemini API connection", "Model configuration", "Encrypted local key storage", "Privacy & data controls"))
+                        "Settings" -> SettingsScreen()
                         else -> OverviewScreen { active = it }
                     }
                 }
@@ -254,6 +261,110 @@ private fun ModuleScreen(title: String, subtitle: String, icon: ImageVector, fea
         }
         Spacer(Modifier.weight(1f))
         Text("MODULE IN ACTIVE DEVELOPMENT", color = Muted, fontSize = 9.sp, letterSpacing = 1.1.sp)
+    }
+}
+
+@Composable
+private fun SettingsScreen() {
+    val context = LocalContext.current
+    val store = remember { SecureKeyStore(context) }
+    val api = remember { GeminiApi() }
+    val scope = rememberCoroutineScope()
+    var keyInput by remember { mutableStateOf("") }
+    var showKey by remember { mutableStateOf(false) }
+    var stored by remember { mutableStateOf(store.hasKey()) }
+    var busy by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf(if (stored) "Encrypted Gemini credential found on this device." else "No Gemini key connected.") }
+    var success by remember { mutableStateOf(stored) }
+
+    Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        Text("MODEL CONNECTION", color = Accent, fontSize = 9.sp, letterSpacing = 1.7.sp)
+        Text("Bring your own intelligence.", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+        Text("Connect Gemini directly. Your key is encrypted with Android Keystore and stays on this device.", color = Muted, fontSize = 11.sp, lineHeight = 17.sp)
+        Surface(color = Panel, shape = RoundedCornerShape(11.dp), border = BorderStroke(1.dp, Line)) {
+            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Key, null, tint = Accent, modifier = Modifier.size(17.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("GEMINI API KEY", color = Paper, fontSize = 10.sp, letterSpacing = 1.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.weight(1f))
+                    if (stored) Text("ENCRYPTED", color = Accent, fontSize = 8.sp, letterSpacing = 1.sp)
+                }
+                OutlinedTextField(
+                    value = keyInput,
+                    onValueChange = { keyInput = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text(if (stored) "Key saved · enter a new key to replace" else "Paste your Gemini API key", color = Muted, fontSize = 11.sp) },
+                    visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showKey = !showKey }) {
+                            Icon(if (showKey) Icons.Default.VisibilityOff else Icons.Default.Visibility, null, tint = Muted)
+                        }
+                    },
+                    shape = RoundedCornerShape(8.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Accent, unfocusedBorderColor = Line)
+                )
+                Button(
+                    onClick = {
+                        scope.launch {
+                            busy = true
+                            status = "Verifying key with Google Gemini…"
+                            val candidate = keyInput.trim().ifBlank { runCatching { store.read().orEmpty() }.getOrDefault("") }
+                            when (val result = api.validateKey(candidate)) {
+                                is GeminiConnectionResult.Connected -> {
+                                    if (keyInput.isNotBlank()) {
+                                        runCatching { store.save(candidate) }
+                                            .onSuccess { stored = true; keyInput = "" }
+                                            .onFailure { status = "Verified, but secure storage failed. Try again."; success = false }
+                                    }
+                                    if (keyInput.isBlank() || stored) { status = result.message; success = true }
+                                }
+                                is GeminiConnectionResult.Failed -> { status = result.message; success = false }
+                            }
+                            busy = false
+                        }
+                    },
+                    enabled = !busy && (keyInput.isNotBlank() || stored),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Ink, disabledContainerColor = Raised)
+                ) {
+                    if (busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Ink)
+                    else Icon(Icons.Default.VerifiedUser, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (busy) "VERIFYING…" else "VERIFY & SECURE KEY", fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(if (success) Icons.Default.CheckCircle else Icons.Default.Info, null,
+                        tint = if (success) Accent else Muted, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(7.dp))
+                    Text(status, color = if (success) Accent else Muted, fontSize = 10.sp)
+                }
+                if (stored) {
+                    TextButton(onClick = {
+                        store.clear()
+                        stored = false
+                        success = false
+                        status = "Stored key removed from this device."
+                    }) {
+                        Icon(Icons.Default.DeleteOutline, null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text("REMOVE STORED KEY", fontSize = 9.sp)
+                    }
+                }
+            }
+        }
+        Surface(color = Panel, shape = RoundedCornerShape(10.dp), border = BorderStroke(1.dp, Line)) {
+            Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("PRIVACY BY DESIGN", color = Accent, fontSize = 9.sp, letterSpacing = 1.2.sp)
+                Text("• API key encrypted using AES-GCM; encryption key held by Android Keystore.", color = Muted, fontSize = 10.sp)
+                Text("• Key is sent only to Google's Gemini API over HTTPS when you invoke a model action.", color = Muted, fontSize = 10.sp)
+                Text("• No key is embedded in the APK, source code, analytics, or logs.", color = Muted, fontSize = 10.sp)
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        Text("ORACLE / MODEL GATEWAY", color = Muted, fontSize = 8.sp, letterSpacing = 1.3.sp)
     }
 }
 
