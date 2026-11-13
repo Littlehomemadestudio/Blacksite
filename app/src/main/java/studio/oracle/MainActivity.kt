@@ -7,6 +7,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import kotlinx.coroutines.launch
 import studio.oracle.data.GeminiApi
 import studio.oracle.data.GeminiConnectionResult
+import studio.oracle.data.GeminiReplyResult
 import studio.oracle.security.SecureKeyStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -214,30 +215,127 @@ private fun EngineCard(number: String, title: String, detail: String, icon: Imag
 
 @Composable
 private fun AgentScreen(prompt: String, onPrompt: (String) -> Unit) {
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Text("AGENT CONSOLE", color = Accent, fontSize = 9.sp, letterSpacing = 1.7.sp)
-        Spacer(Modifier.height(8.dp))
-        Text("Think beyond the prompt.", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-        Text("Plan tasks, use tools, and keep every action inspectable.", color = Muted, fontSize = 11.sp)
-        Spacer(Modifier.height(18.dp))
-        Surface(Modifier.weight(1f).fillMaxWidth(), color = Panel, shape = RoundedCornerShape(10.dp), border = BorderStroke(1.dp, Line)) {
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("ORACLE / READY", color = Accent, fontSize = 9.sp, letterSpacing = 1.2.sp)
-                Text("Your workspace is ready for its first instruction.", color = Muted, fontSize = 12.sp)
-                Text("Connect a Gemini API key in Settings to start an agent session.", color = Paper, fontSize = 12.sp)
+    val context = LocalContext.current
+    val store = remember { SecureKeyStore(context) }
+    val api = remember { GeminiApi() }
+    val scope = rememberCoroutineScope()
+    var messages by remember { mutableStateOf(listOf<Pair<String, String>>()) }
+    var busy by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("READY / LOCAL SESSION") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var lastPrompt by remember { mutableStateOf("") }
+    var model by remember { mutableStateOf("gemini-2.5-flash") }
+
+    Column(Modifier.fillMaxSize().padding(horizontal = 13.dp, vertical = 10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("AGENT CONSOLE", color = Accent, fontSize = 9.sp, letterSpacing = 1.7.sp)
+                Text("Think beyond the prompt.", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                Text("Gemini operator · explicit user-directed requests", color = Muted, fontSize = 10.sp)
+            }
+            Surface(color = Raised, shape = RoundedCornerShape(7.dp)) {
+                Text(model.uppercase(), color = Accent, modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), fontSize = 8.sp, fontFamily = FontFamily.Monospace)
             }
         }
-        Spacer(Modifier.height(12.dp))
-        OutlinedTextField(value = prompt, onValueChange = onPrompt, modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Tell ORACLE what to do…", color = Muted) }, shape = RoundedCornerShape(10.dp),
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Accent, unfocusedBorderColor = Line))
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            listOf("Plan a project", "Explain a document", "Break down a goal").forEach { suggestion ->
+                Surface(onClick = { onPrompt(suggestion) }, color = Panel, shape = RoundedCornerShape(7.dp), border = BorderStroke(1.dp, Line)) {
+                    Text(suggestion, color = Muted, modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp), fontSize = 9.sp)
+                }
+            }
+        }
+        Spacer(Modifier.height(9.dp))
+        Surface(Modifier.weight(1f).fillMaxWidth(), color = Panel, shape = RoundedCornerShape(10.dp), border = BorderStroke(1.dp, Line)) {
+            if (messages.isEmpty()) {
+                Column(Modifier.fillMaxSize().padding(15.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(Modifier.size(48.dp).background(Accent.copy(alpha = .12f), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.AutoAwesome, null, tint = Accent, modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(Modifier.height(13.dp))
+                    Text("ORACLE IS READY", color = Accent, fontSize = 10.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
+                    Text("Give your first instruction. ORACLE will reason through it and return a practical plan.", color = Muted, fontSize = 11.sp, lineHeight = 17.sp)
+                    Spacer(Modifier.height(9.dp))
+                    Text("No device actions are performed silently. This session sends only your submitted prompt and visible conversation to Gemini.", color = Muted, fontSize = 9.sp, lineHeight = 14.sp)
+                }
+            } else {
+                LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 8.dp)) {
+                    items(messages.size) { index ->
+                        val (role, text) = messages[index]
+                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.size(6.dp).background(if (role == "assistant") Accent else Violet, RoundedCornerShape(50)))
+                                Spacer(Modifier.width(6.dp))
+                                Text(if (role == "assistant") "ORACLE" else "YOU", color = if (role == "assistant") Accent else Violet, fontSize = 8.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Surface(color = if (role == "assistant") Raised else Ink, shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, Line)) {
+                                Text(text, modifier = Modifier.fillMaxWidth().padding(11.dp), color = Paper, fontSize = 12.sp, lineHeight = 19.sp)
+                            }
+                        }
+                    }
+                    if (busy) item {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(Modifier.size(14.dp), color = Accent, strokeWidth = 2.dp)
+                            Spacer(Modifier.width(9.dp))
+                            Text("ORACLE IS THINKING…", color = Muted, fontSize = 9.sp, letterSpacing = 1.sp)
+                        }
+                    }
+                }
+            }
+        }
+        if (error != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(error!!, color = Color(0xFFFF8B83), fontSize = 10.sp)
+            TextButton(onClick = { onPrompt(lastPrompt) }, enabled = !busy) { Text("RESTORE PROMPT TO RETRY", color = Accent, fontSize = 9.sp) }
+        }
         Spacer(Modifier.height(8.dp))
-        Button(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Ink, disabledContainerColor = Raised),
-            shape = RoundedCornerShape(8.dp)) {
-            Text("RUN AGENT", fontWeight = FontWeight.Bold)
-            Spacer(Modifier.width(8.dp))
-            Icon(Icons.Default.ArrowUpward, null, modifier = Modifier.size(16.dp))
+        OutlinedTextField(
+            value = prompt, onValueChange = onPrompt, modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Ask ORACLE anything…", color = Muted, fontSize = 12.sp) },
+            minLines = 2, maxLines = 5, shape = RoundedCornerShape(9.dp),
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Accent, unfocusedBorderColor = Line)
+        )
+        Spacer(Modifier.height(7.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(status, modifier = Modifier.weight(1f), color = Muted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+            TextButton(onClick = { messages = emptyList(); error = null; status = "SESSION CLEARED" }, enabled = !busy) {
+                Text("CLEAR", color = Muted, fontSize = 9.sp)
+            }
+            Button(
+                onClick = {
+                    val submitted = prompt.trim()
+                    lastPrompt = submitted
+                    onPrompt("")
+                    error = null
+                    messages = messages + ("user" to submitted)
+                    busy = true
+                    status = "SENDING TO GEMINI"
+                    scope.launch {
+                        val key = runCatching { store.read().orEmpty() }.getOrDefault("")
+                        when (val result = api.generate(key, submitted, messages, model)) {
+                            is studio.oracle.data.GeminiReplyResult.Success -> {
+                                messages = messages + ("assistant" to result.text)
+                                status = "COMPLETED / ${result.model.uppercase()}"
+                            }
+                            is studio.oracle.data.GeminiReplyResult.Failed -> {
+                                error = result.message
+                                messages = messages.dropLast(1)
+                                onPrompt(lastPrompt)
+                                status = "REQUEST FAILED"
+                            }
+                        }
+                        busy = false
+                    }
+                },
+                enabled = !busy && prompt.isNotBlank(),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Ink, disabledContainerColor = Raised)
+            ) {
+                Icon(Icons.Default.ArrowUpward, null, modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(if (busy) "WORKING" else "RUN", fontWeight = FontWeight.Bold, fontSize = 10.sp)
+            }
         }
     }
 }
