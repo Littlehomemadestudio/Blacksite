@@ -4,10 +4,19 @@ import android.os.Bundle
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import studio.oracle.data.AgentConversationPolicy
+import studio.oracle.data.AgentRepository
+import studio.oracle.data.AgentTurn
 import studio.oracle.data.GeminiApi
+import studio.oracle.data.GeminiModel
+import studio.oracle.data.GeminiModelsResult
+import studio.oracle.data.ModelPreferences
+import studio.oracle.data.local.AgentMessageEntity
+import studio.oracle.data.local.OracleDatabase
 import studio.oracle.data.GeminiConnectionResult
-import studio.oracle.data.GeminiReplyResult
 import studio.oracle.security.SecureKeyStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,6 +25,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -27,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -216,15 +228,86 @@ private fun EngineCard(number: String, title: String, detail: String, icon: Imag
 @Composable
 private fun AgentScreen(prompt: String, onPrompt: (String) -> Unit) {
     val context = LocalContext.current
-    val store = remember { SecureKeyStore(context) }
+    val keyStore = remember { SecureKeyStore(context) }
     val api = remember { GeminiApi() }
+    val repository = remember(context) {
+        AgentRepository(OracleDatabase.get(context).agentDao())
+    }
+    val modelPreferences = remember(context) { ModelPreferences(context) }
     val scope = rememberCoroutineScope()
-    var messages by remember { mutableStateOf(listOf<Pair<String, String>>()) }
+
+    val sessions by repository.sessions.collectAsState(initial = emptyList())
+    val model by modelPreferences.selectedModel.collectAsState(initial = ModelPreferences.DEFAULT_MODEL)
+    var activeSessionId by remember { mutableStateOf<String?>(null) }
+    var messages by remember { mutableStateOf(emptyList<AgentMessageEntity>()) }
+    var availableModels by remember {
+        mutableStateOf(listOf(GeminiModel(ModelPreferences.DEFAULT_MODEL, "Gemini 2.5 Flash")))
+    }
+    var modelMenuExpanded by remember { mutableStateOf(false) }
+    var syncingModels by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
+    var requestJob by remember { mutableStateOf<Job?>(null) }
     var status by remember { mutableStateOf("READY / LOCAL SESSION") }
     var error by remember { mutableStateOf<String?>(null) }
-    var lastPrompt by remember { mutableStateOf("") }
-    var model by remember { mutableStateOf("gemini-2.5-flash") }
+    var failedPrompt by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        activeSessionId = repository.ensureSession(model)
+    }
+    LaunchedEffect(sessions) {
+        val current = activeSessionId
+        if (current == null && sessions.isNotEmpty()) {
+            activeSessionId = sessions.first().id
+        } else if (current != null && sessions.none { it.id == current }) {
+            activeSessionId = sessions.firstOrNull()?.id
+        }
+    }
+    LaunchedEffect(activeSessionId) {
+        val id = activeSessionId
+        if (id == null) {
+            messages = emptyList()
+        } else {
+            repository.messages(id).collect { messages = it }
+        }
+    }
+
+    fun refreshModels() {
+        if (syncingModels) return
+        scope.launch {
+            syncingModels = true
+            error = null
+            status = "LOADING AVAILABLE GEMINI MODELS"
+            try {
+                val key = keyStore.read().orEmpty()
+                when (val result = api.listModels(key)) {
+                    is GeminiModelsResult.Success -> {
+                        availableModels = result.models
+                        status = if (result.models.isEmpty()) {
+                            "NO GENERATECONTENT MODELS AVAILABLE"
+                        } else {
+                            "LOADED " + result.models.size + " MODELS"
+                        }
+                        if (result.models.isEmpty()) {
+                            error = "This key exposes no models that support generateContent."
+                        }
+                    }
+                    is GeminiModelsResult.Failed -> {
+                        error = result.message
+                        status = "MODEL DISCOVERY FAILED"
+                    }
+                }
+            } catch (_: Exception) {
+                error = "Could not load models. Check the stored key and network connection."
+                status = "MODEL DISCOVERY FAILED"
+            } finally {
+                syncingModels = false
+            }
+        }
+    }
+
+    val menuModels = remember(availableModels, model) {
+        (availableModels + GeminiModel(model, model)).distinctBy { it.name }
+    }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 13.dp, vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -233,44 +316,168 @@ private fun AgentScreen(prompt: String, onPrompt: (String) -> Unit) {
                 Text("Think beyond the prompt.", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                 Text("Gemini operator · explicit user-directed requests", color = Muted, fontSize = 10.sp)
             }
-            Surface(color = Raised, shape = RoundedCornerShape(7.dp)) {
-                Text(model.uppercase(), color = Accent, modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+            Column(horizontalAlignment = Alignment.End) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box {
+                        TextButton(onClick = { modelMenuExpanded = true }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 2.dp)) {
+                            Text(model, color = Accent, fontSize = 9.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Icon(Icons.Default.ExpandMore, null, tint = Accent, modifier = Modifier.size(15.dp))
+                        }
+                        DropdownMenu(
+                            expanded = modelMenuExpanded,
+                            onDismissRequest = { modelMenuExpanded = false }
+                        ) {
+                            menuModels.forEach { candidate ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text(candidate.displayName, fontSize = 12.sp)
+                                            Text(candidate.name, color = Muted, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                                        }
+                                    },
+                                    onClick = {
+                                        modelMenuExpanded = false
+                                        scope.launch {
+                                            modelPreferences.setSelectedModel(candidate.name)
+                                            activeSessionId?.let { repository.updateModel(it, candidate.name) }
+                                            status = "MODEL SELECTED / " + candidate.name
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    IconButton(onClick = { refreshModels() }, enabled = !syncingModels, modifier = Modifier.size(34.dp)) {
+                        if (syncingModels) {
+                            CircularProgressIndicator(Modifier.size(14.dp), color = Accent, strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Refresh, "Refresh available Gemini models", tint = Muted, modifier = Modifier.size(17.dp))
+                        }
+                    }
+                }
+                Text("MODEL GATEWAY", color = Muted, fontSize = 7.sp, letterSpacing = 1.sp)
             }
         }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(7.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            LazyRow(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                items(sessions, key = { it.id }) { session ->
+                    val selected = session.id == activeSessionId
+                    Surface(
+                        onClick = { if (!busy) activeSessionId = session.id },
+                        color = if (selected) Raised else Panel,
+                        shape = RoundedCornerShape(7.dp),
+                        border = BorderStroke(1.dp, if (selected) Accent.copy(alpha = .55f) else Line)
+                    ) {
+                        Text(
+                            session.title,
+                            modifier = Modifier.widthIn(max = 150.dp).padding(horizontal = 9.dp, vertical = 7.dp),
+                            color = if (selected) Paper else Muted,
+                            fontSize = 9.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+            TextButton(
+                onClick = {
+                    scope.launch {
+                        val id = repository.createSession(model)
+                        activeSessionId = id
+                        error = null
+                        failedPrompt = null
+                        status = "NEW LOCAL THREAD"
+                    }
+                },
+                enabled = !busy,
+                contentPadding = PaddingValues(horizontal = 7.dp, vertical = 2.dp)
+            ) {
+                Icon(Icons.Default.Add, null, tint = Accent, modifier = Modifier.size(14.dp))
+                Text("NEW", color = Accent, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             listOf("Plan a project", "Explain a document", "Break down a goal").forEach { suggestion ->
-                Surface(onClick = { onPrompt(suggestion) }, color = Panel, shape = RoundedCornerShape(7.dp), border = BorderStroke(1.dp, Line)) {
+                Surface(
+                    onClick = { onPrompt(suggestion) },
+                    color = Panel,
+                    shape = RoundedCornerShape(7.dp),
+                    border = BorderStroke(1.dp, Line)
+                ) {
                     Text(suggestion, color = Muted, modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp), fontSize = 9.sp)
                 }
             }
         }
         Spacer(Modifier.height(9.dp))
-        Surface(Modifier.weight(1f).fillMaxWidth(), color = Panel, shape = RoundedCornerShape(10.dp), border = BorderStroke(1.dp, Line)) {
+        Surface(
+            Modifier.weight(1f).fillMaxWidth(),
+            color = Panel,
+            shape = RoundedCornerShape(10.dp),
+            border = BorderStroke(1.dp, Line)
+        ) {
             if (messages.isEmpty()) {
-                Column(Modifier.fillMaxSize().padding(15.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    Modifier.fillMaxSize().padding(15.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Box(Modifier.size(48.dp).background(Accent.copy(alpha = .12f), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
                         Icon(Icons.Default.AutoAwesome, null, tint = Accent, modifier = Modifier.size(24.dp))
                     }
                     Spacer(Modifier.height(13.dp))
                     Text("ORACLE IS READY", color = Accent, fontSize = 10.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(6.dp))
-                    Text("Give your first instruction. ORACLE will reason through it and return a practical plan.", color = Muted, fontSize = 11.sp, lineHeight = 17.sp)
+                    Text(
+                        "Give your first instruction. ORACLE will reason through it and return a practical plan.",
+                        color = Muted, fontSize = 11.sp, lineHeight = 17.sp
+                    )
                     Spacer(Modifier.height(9.dp))
-                    Text("No device actions are performed silently. This session sends only your submitted prompt and visible conversation to Gemini.", color = Muted, fontSize = 9.sp, lineHeight = 14.sp)
+                    Text(
+                        "Threads are stored locally. Only the prompt and conversation context you submit are sent to Gemini.",
+                        color = Muted, fontSize = 9.sp, lineHeight = 14.sp
+                    )
                 }
             } else {
-                LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 8.dp)) {
-                    items(messages.size) { index ->
-                        val (role, text) = messages[index]
+                LazyColumn(
+                    Modifier.fillMaxSize().padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 8.dp)
+                ) {
+                    items(messages, key = { it.id }) { message ->
                         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.size(6.dp).background(if (role == "assistant") Accent else Violet, RoundedCornerShape(50)))
+                                Box(
+                                    Modifier.size(6.dp).background(
+                                        if (message.role == "assistant") Accent else Violet,
+                                        RoundedCornerShape(50)
+                                    )
+                                )
                                 Spacer(Modifier.width(6.dp))
-                                Text(if (role == "assistant") "ORACLE" else "YOU", color = if (role == "assistant") Accent else Violet, fontSize = 8.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    if (message.role == "assistant") "ORACLE" else "YOU",
+                                    color = if (message.role == "assistant") Accent else Violet,
+                                    fontSize = 8.sp,
+                                    letterSpacing = 1.2.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
-                            Surface(color = if (role == "assistant") Raised else Ink, shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, Line)) {
-                                Text(text, modifier = Modifier.fillMaxWidth().padding(11.dp), color = Paper, fontSize = 12.sp, lineHeight = 19.sp)
+                            Surface(
+                                color = if (message.role == "assistant") Raised else Ink,
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, Line)
+                            ) {
+                                Text(
+                                    message.content,
+                                    modifier = Modifier.fillMaxWidth().padding(11.dp),
+                                    color = Paper,
+                                    fontSize = 12.sp,
+                                    lineHeight = 19.sp
+                                )
                             }
                         }
                     }
@@ -287,54 +494,119 @@ private fun AgentScreen(prompt: String, onPrompt: (String) -> Unit) {
         if (error != null) {
             Spacer(Modifier.height(6.dp))
             Text(error!!, color = Color(0xFFFF8B83), fontSize = 10.sp)
-            TextButton(onClick = { onPrompt(lastPrompt) }, enabled = !busy) { Text("RESTORE PROMPT TO RETRY", color = Accent, fontSize = 9.sp) }
+            if (failedPrompt != null) {
+                TextButton(onClick = { onPrompt(failedPrompt.orEmpty()) }, enabled = !busy) {
+                    Text("RESTORE PROMPT TO RETRY", color = Accent, fontSize = 9.sp)
+                }
+            }
         }
         Spacer(Modifier.height(8.dp))
         OutlinedTextField(
-            value = prompt, onValueChange = onPrompt, modifier = Modifier.fillMaxWidth(),
+            value = prompt,
+            onValueChange = onPrompt,
+            modifier = Modifier.fillMaxWidth(),
             placeholder = { Text("Ask ORACLE anything…", color = Muted, fontSize = 12.sp) },
-            minLines = 2, maxLines = 5, shape = RoundedCornerShape(9.dp),
+            minLines = 2,
+            maxLines = 5,
+            shape = RoundedCornerShape(9.dp),
             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Accent, unfocusedBorderColor = Line)
         )
         Spacer(Modifier.height(7.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(status, modifier = Modifier.weight(1f), color = Muted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
-            TextButton(onClick = { messages = emptyList(); error = null; status = "SESSION CLEARED" }, enabled = !busy) {
-                Text("CLEAR", color = Muted, fontSize = 9.sp)
-            }
-            Button(
-                onClick = {
-                    val submitted = prompt.trim()
-                    lastPrompt = submitted
-                    onPrompt("")
-                    error = null
-                    messages = messages + ("user" to submitted)
-                    busy = true
-                    status = "SENDING TO GEMINI"
-                    scope.launch {
-                        val key = runCatching { store.read().orEmpty() }.getOrDefault("")
-                        when (val result = api.generate(key, submitted, messages, model)) {
-                            is studio.oracle.data.GeminiReplyResult.Success -> {
-                                messages = messages + ("assistant" to result.text)
-                                status = "COMPLETED / ${result.model.uppercase()}"
-                            }
-                            is studio.oracle.data.GeminiReplyResult.Failed -> {
-                                error = result.message
-                                messages = messages.dropLast(1)
-                                onPrompt(lastPrompt)
+            if (busy) {
+                TextButton(onClick = { requestJob?.cancel() }) {
+                    Text("CANCEL", color = Color(0xFFFF8B83), fontSize = 9.sp)
+                }
+            } else {
+                TextButton(
+                    onClick = {
+                        val submitted = prompt.trim()
+                        val selectedSession = activeSessionId
+                        val existingTurns = messages.map { AgentTurn(it.role, it.content) }
+                        val retrying = failedPrompt == submitted &&
+                            existingTurns.lastOrNull()?.let { it.role == "user" && it.content == submitted } == true
+                        val history = if (retrying) existingTurns.dropLast(1) else existingTurns
+                        onPrompt("")
+                        error = null
+                        busy = true
+                        status = "SENDING TO GEMINI"
+                        requestJob = scope.launch {
+                            try {
+                                val sessionId = selectedSession ?: repository.createSession(model).also {
+                                    activeSessionId = it
+                                }
+                                val key = keyStore.read().orEmpty()
+                                if (key.isBlank()) {
+                                    error = "Connect a Gemini API key in Settings before running ORACLE."
+                                    failedPrompt = submitted
+                                    onPrompt(submitted)
+                                    status = "KEY REQUIRED"
+                                    return@launch
+                                }
+                                if (!retrying) repository.appendMessage(sessionId, "user", submitted, model)
+                                when (val result = api.generate(
+                                    key,
+                                    submitted,
+                                    AgentConversationPolicy.context(history),
+                                    model
+                                )) {
+                                    is studio.oracle.data.GeminiReplyResult.Success -> {
+                                        repository.appendMessage(sessionId, "assistant", result.text, result.model)
+                                        failedPrompt = null
+                                        status = "COMPLETED / " + result.model.uppercase()
+                                    }
+                                    is studio.oracle.data.GeminiReplyResult.Failed -> {
+                                        error = result.message
+                                        failedPrompt = submitted
+                                        onPrompt(submitted)
+                                        status = "REQUEST FAILED"
+                                    }
+                                }
+                            } catch (cancelled: CancellationException) {
+                                error = "Request cancelled. Your local thread and submitted prompt were retained."
+                                failedPrompt = submitted
+                                onPrompt(submitted)
+                                status = "REQUEST CANCELLED"
+                                throw cancelled
+                            } catch (_: Exception) {
+                                error = "The request could not be completed. Your local prompt was retained."
+                                failedPrompt = submitted
+                                onPrompt(submitted)
                                 status = "REQUEST FAILED"
+                            } finally {
+                                busy = false
+                                requestJob = null
                             }
                         }
-                        busy = false
+                    },
+                    enabled = !busy && prompt.isNotBlank(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Accent,
+                        contentColor = Ink,
+                        disabledContainerColor = Raised
+                    )
+                ) {
+                    Icon(Icons.Default.ArrowUpward, null, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("RUN", fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                }
+            }
+            TextButton(
+                onClick = {
+                    activeSessionId?.let { id ->
+                        scope.launch {
+                            repository.clearMessages(id)
+                            error = null
+                            failedPrompt = null
+                            status = "THREAD CLEARED"
+                        }
                     }
                 },
-                enabled = !busy && prompt.isNotBlank(),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Ink, disabledContainerColor = Raised)
+                enabled = !busy && activeSessionId != null
             ) {
-                Icon(Icons.Default.ArrowUpward, null, modifier = Modifier.size(15.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(if (busy) "WORKING" else "RUN", fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                Text("CLEAR", color = Muted, fontSize = 9.sp)
             }
         }
     }
@@ -474,6 +746,6 @@ private fun StatusBar() {
         Spacer(Modifier.width(6.dp))
         Text("ORACLE CORE", color = Muted, fontSize = 8.sp, letterSpacing = 1.sp)
         Spacer(Modifier.weight(1f))
-        Text("GEMINI  /  NOT CONNECTED", color = Muted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+        Text("LOCAL-FIRST  /  GEMINI ON DEMAND", color = Muted, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
     }
 }
