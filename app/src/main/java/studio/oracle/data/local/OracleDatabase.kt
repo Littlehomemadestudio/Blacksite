@@ -12,6 +12,9 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.Transaction
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "agent_sessions")
@@ -41,6 +44,43 @@ data class AgentMessageEntity(
     val role: String,
     val content: String,
     val createdAt: Long
+)
+
+@Entity(
+    tableName = "documents",
+    indices = [Index(value = ["importedAt"])]
+)
+data class DocumentEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val fileName: String,
+    val mimeType: String,
+    val storagePath: String,
+    val sizeBytes: Long,
+    val pageCount: Int,
+    val extractedCharacters: Int,
+    val importedAt: Long
+)
+
+@Entity(
+    tableName = "document_chunks",
+    foreignKeys = [
+        ForeignKey(
+            entity = DocumentEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["documentId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index(value = ["documentId"]), Index(value = ["pageNumber"])]
+)
+data class DocumentChunkEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val documentId: String,
+    val ordinal: Int,
+    val pageNumber: Int?,
+    val sectionLabel: String,
+    val content: String
 )
 
 @Dao
@@ -79,15 +119,82 @@ interface AgentDao {
     suspend fun deleteSession(sessionId: String)
 }
 
+@Dao
+interface DocumentDao {
+    @Query("SELECT * FROM documents ORDER BY importedAt DESC")
+    fun observeDocuments(): Flow<List<DocumentEntity>>
+
+    @Query("SELECT * FROM documents ORDER BY importedAt DESC")
+    suspend fun documentsSnapshot(): List<DocumentEntity>
+
+    @Query("SELECT * FROM documents WHERE id = :id LIMIT 1")
+    suspend fun findDocument(id: String): DocumentEntity?
+
+    @Query("SELECT * FROM document_chunks WHERE documentId = :documentId ORDER BY ordinal ASC")
+    suspend fun chunksForDocument(documentId: String): List<DocumentChunkEntity>
+
+    @Query("SELECT * FROM document_chunks ORDER BY documentId, ordinal")
+    suspend fun allChunks(): List<DocumentChunkEntity>
+
+    @Insert
+    suspend fun insertDocument(document: DocumentEntity)
+
+    @Insert
+    suspend fun insertChunks(chunks: List<DocumentChunkEntity>)
+
+    @Transaction
+    suspend fun saveDocumentWithChunks(document: DocumentEntity, chunks: List<DocumentChunkEntity>) {
+        insertDocument(document)
+        insertChunks(chunks)
+    }
+
+    @Query("DELETE FROM documents WHERE id = :documentId")
+    suspend fun deleteDocument(documentId: String)
+}
+
 @Database(
-    entities = [AgentSessionEntity::class, AgentMessageEntity::class],
-    version = 1,
+    entities = [
+        AgentSessionEntity::class,
+        AgentMessageEntity::class,
+        DocumentEntity::class,
+        DocumentChunkEntity::class
+    ],
+    version = 2,
     exportSchema = false
 )
 abstract class OracleDatabase : RoomDatabase() {
     abstract fun agentDao(): AgentDao
+    abstract fun documentDao(): DocumentDao
 
     companion object {
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS documents (" +
+                        "id TEXT NOT NULL, title TEXT NOT NULL, fileName TEXT NOT NULL, " +
+                        "mimeType TEXT NOT NULL, storagePath TEXT NOT NULL, sizeBytes INTEGER NOT NULL, " +
+                        "pageCount INTEGER NOT NULL, extractedCharacters INTEGER NOT NULL, " +
+                        "importedAt INTEGER NOT NULL, PRIMARY KEY(id))"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_documents_importedAt ON documents(importedAt)"
+                )
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS document_chunks (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, documentId TEXT NOT NULL, " +
+                        "ordinal INTEGER NOT NULL, pageNumber INTEGER, sectionLabel TEXT NOT NULL, " +
+                        "content TEXT NOT NULL, FOREIGN KEY(documentId) REFERENCES documents(id) " +
+                        "ON UPDATE NO ACTION ON DELETE CASCADE)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_document_chunks_documentId ON document_chunks(documentId)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_document_chunks_pageNumber ON document_chunks(pageNumber)"
+                )
+            }
+        }
+
         @Volatile
         private var instance: OracleDatabase? = null
 
@@ -97,7 +204,10 @@ abstract class OracleDatabase : RoomDatabase() {
                     context.applicationContext,
                     OracleDatabase::class.java,
                     "oracle_studio.db"
-                ).build().also { instance = it }
+                )
+                    .addMigrations(MIGRATION_1_2)
+                    .build()
+                    .also { instance = it }
             }
     }
 }
