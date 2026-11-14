@@ -342,9 +342,11 @@ private fun AgentScreen(
                     Text("ORACLE", color = OracleText, fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.1.sp)
                     Text("INTELLIGENCE WORKSPACE", color = OracleMuted, fontSize = 8.sp, letterSpacing = 1.15.sp)
                 }
-                WorkbenchIconButton("☰", "Open conversations", onClick = { uiScope.launch { drawer.open() } })
-                WorkbenchIconButton("▤", "Open document library", onClick = onLibrary)
-                WorkbenchIconButton("⚙", "Open settings", onClick = onSettings)
+                WorkbenchIconButton(Icons.Default.Menu, "Open conversations", onClick = { uiScope.launch { drawer.open() } })
+                Spacer(Modifier.width(7.dp))
+                WorkbenchIconButton(Icons.Default.FolderOpen, "Open document library", onClick = onLibrary)
+                Spacer(Modifier.width(7.dp))
+                WorkbenchIconButton(Icons.Default.Settings, "Open settings", onClick = onSettings)
             }
 
             // Main conversation surface.
@@ -467,7 +469,7 @@ private fun AgentScreen(
                         modifier = Modifier.weight(1f),
                         placeholder = { Text("Message ORACLE…", color = OracleMuted, fontSize = 14.sp) },
                         minLines = 1, maxLines = 5,
-                        shape = RoundedCornerShape(0.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color.Transparent, unfocusedBorderColor = Color.Transparent,
                             focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
@@ -634,7 +636,7 @@ private fun AgentScreen(
 }
 
 @Composable
-private fun WorkbenchIconButton(label: String, description: String, onClick: () -> Unit) {
+private fun WorkbenchIconButton(icon: ImageVector, description: String, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         modifier = Modifier.size(38.dp).semantics { contentDescription = description },
@@ -643,7 +645,7 @@ private fun WorkbenchIconButton(label: String, description: String, onClick: () 
         border = BorderStroke(1.dp, OracleLine)
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Text(label, color = OracleText, fontSize = 17.sp, fontWeight = FontWeight.Medium)
+            Icon(icon, contentDescription = description, tint = OracleText, modifier = Modifier.size(17.dp))
         }
     }
 }
