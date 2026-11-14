@@ -44,14 +44,14 @@ import studio.oracle.data.local.DocumentEntity
 import studio.oracle.data.local.OracleDatabase
 import studio.oracle.security.SecureKeyStore
 
-private val LibraryInk = Color(0xFF101113)
-private val LibraryPanel = Color(0xFF17191C)
-private val LibraryRaised = Color(0xFF202328)
-private val LibraryLine = Color(0xFF2A2D32)
-private val LibraryPaper = Color(0xFFE9E9E7)
-private val LibraryMuted = Color(0xFF858A93)
-private val LibraryAccent = Color(0xFFC6F36B)
-private val LibraryViolet = Color(0xFFB5A4FF)
+private val LibraryInk = Color(0xFF101317)
+private val LibraryPanel = Color(0xFF171C22)
+private val LibraryRaised = Color(0xFF202730)
+private val LibraryLine = Color(0xFF2B343F)
+private val LibraryPaper = Color(0xFFE9E7E1)
+private val LibraryMuted = Color(0xFF929BA5)
+private val LibraryAccent = Color(0xFFE17A52)
+private val LibraryViolet = Color(0xFFB49AF4)
 
 @Composable
 fun LibraryScreen() {
