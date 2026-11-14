@@ -49,6 +49,7 @@ These planned modules are not presented as working features in the app.
 
 ## Document library scope and limits
 - Supported imports: PDF with selectable text, UTF-8 plain text, and Markdown. Maximum file size is 20 MB; PDFs are limited to 400 pages; extracted text is capped at 1.5 million characters per file.
-- Scanned/image-only PDFs are detected when no text can be extracted and are not indexed. OCR, images, DOC/DOCX, spreadsheets, and presentations are not supported yet.
+- PDFs with no selectable text are rejected; image-only pages in mixed PDFs are skipped. OCR, standalone images, DOC/DOCX, spreadsheets, and presentations are not supported yet.
+- The reader displays extracted text and citation labels; it is not yet a rendered PDF page viewer.
 - Retrieval currently uses on-device lexical keyword matching, not embeddings or semantic vector search. PDF answers cite original page numbers; text and Markdown answers cite indexed sections.
 - Clearing a thread removes its messages locally. Uninstalling the app removes its app-private data.
