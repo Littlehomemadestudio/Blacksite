@@ -831,7 +831,7 @@ private fun SettingsScreen() {
                     if (busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Ink)
                     else Icon(Icons.Default.VerifiedUser, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(if (busy) "VERIFYING…" else "VERIFY & SECURE KEY", fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                    Text(if (busy) "WORKING…" else "VERIFY & SECURE KEY", fontWeight = FontWeight.Bold, fontSize = 10.sp)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(if (success) Icons.Default.CheckCircle else Icons.Default.Info, null,
@@ -844,6 +844,7 @@ private fun SettingsScreen() {
                         onClick = {
                             scope.launch {
                                 busy = true
+                                status = "Removing encrypted Gemini credential…"
                                 try {
                                     withContext(Dispatchers.IO) { store.clear() }
                                     stored = false
