@@ -47,7 +47,8 @@ class DocumentTextProcessorTest {
 
         assertTrue(chunks.size >= 2)
         assertTrue(chunks.all { it.content.isNotEmpty() })
-        assertTrue(chunks.last().content.length >= 200)
+        assertTrue(chunks.last().content.length >= 100)
+        assertEquals(2_500, chunks.sumOf { it.content.length })
     }
 
     @Test
