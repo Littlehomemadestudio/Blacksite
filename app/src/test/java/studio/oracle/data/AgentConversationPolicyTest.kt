@@ -19,7 +19,7 @@ class AgentConversationPolicyTest {
     fun titleNormalizesWhitespaceAndTruncates() {
         val title = AgentConversationPolicy.titleFor("  Build   a\n\tbetter   workspace  ", maxLength = 18)
 
-        assertEquals("Build a better wo", title)
+        assertEquals("Build a better wor", title)
     }
 
     @Test
