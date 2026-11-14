@@ -110,26 +110,30 @@ private fun OracleApp() {
 
                 OracleSection.LIBRARY -> Column(Modifier.fillMaxSize()) {
                     Row(
-                        Modifier.fillMaxWidth().height(54.dp),
+                        Modifier.fillMaxWidth().height(64.dp).background(OracleCanvas).padding(horizontal = 18.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = { section = OracleSection.AGENT }) {
-                            Icon(Icons.Default.ArrowBack, "Back to ORACLE")
+                        WorkbenchIconButton(Icons.Default.ArrowBack, "Back to ORACLE chat") { section = OracleSection.AGENT }
+                        Spacer(Modifier.width(12.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("ORACLE", color = OracleText, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.8.sp)
+                            Text("LIBRARY", color = OracleAccent, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
                         }
-                        Text("Document Library", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                     }
                     LibraryScreen()
                 }
 
                 OracleSection.SETTINGS -> Column(Modifier.fillMaxSize()) {
                     Row(
-                        Modifier.fillMaxWidth().height(54.dp),
+                        Modifier.fillMaxWidth().height(64.dp).background(OracleCanvas).padding(horizontal = 18.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = { section = OracleSection.AGENT }) {
-                            Icon(Icons.Default.ArrowBack, "Back to ORACLE")
+                        WorkbenchIconButton(Icons.Default.ArrowBack, "Back to ORACLE chat") { section = OracleSection.AGENT }
+                        Spacer(Modifier.width(12.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("ORACLE", color = OracleText, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.8.sp)
+                            Text("SETTINGS", color = OracleAccent, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
                         }
-                        Text("Settings", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                     }
                     SettingsScreen()
                 }
