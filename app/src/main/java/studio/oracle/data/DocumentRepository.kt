@@ -156,10 +156,11 @@ class DocumentRepository(
 
     suspend fun search(query: String, limit: Int = 12): List<DocumentSearchHit> =
         withContext(Dispatchers.IO) {
-            val terms = DocumentTextProcessor.tokenize(query)
+            val terms = DocumentTextProcessor.tokenize(query).take(8)
             if (terms.isEmpty()) return@withContext emptyList()
             val documentsById = dao.documentsSnapshot().associateBy { it.id }
-            dao.allChunks()
+            terms.flatMap { dao.chunksMatching(it) }
+                .distinctBy { it.id }
                 .mapNotNull { chunk ->
                     val document = documentsById[chunk.documentId] ?: return@mapNotNull null
                     val score = DocumentTextProcessor.score(query, chunk.content)
@@ -219,7 +220,7 @@ class DocumentRepository(
 
     private fun extractPdf(file: File): List<ExtractedPage> {
         PDFBoxResourceLoader.init(appContext)
-        PDDocument.load(file, MemoryUsageSetting.setupTempFileOnly()).use { pdf ->
+        PDDocument.load(file, MemoryUsageSetting.setupTempFileOnly(MAX_PDF_SCRATCH_BYTES)).use { pdf ->
             if (pdf.numberOfPages > MAX_PDF_PAGES) {
                 throw DocumentImportException("PDF exceeds the 400-page import limit.")
             }
@@ -286,5 +287,6 @@ class DocumentRepository(
         const val MAX_FILE_BYTES = 20L * 1024L * 1024L
         const val MAX_EXTRACTED_CHARACTERS = 1_500_000
         const val MAX_PDF_PAGES = 400
+        const val MAX_PDF_SCRATCH_BYTES = 100L * 1024L * 1024L
     }
 }
