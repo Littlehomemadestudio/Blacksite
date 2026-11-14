@@ -402,7 +402,7 @@ private fun AgentScreen(
                     Spacer(Modifier.weight(1f))
                     Text("●", color = Color(0xFF36A852), fontSize = 8.sp)
                     Spacer(Modifier.width(4.dp))
-                    Text("LOCAL", color = Color(0xFF54708A), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    Text("LOCAL DATA", color = Color(0xFF54708A), fontSize = 9.sp, fontWeight = FontWeight.Bold)
                 }
                 HorizontalDivider(color = Color(0xFFB5C9DD))
                 Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -556,7 +556,7 @@ private fun AgentScreen(
                                         } catch (_: Exception) {
                                             error = "The stored Gemini key could not be decrypted. Remove it in Settings and reconnect."
                                             failedPrompt = submitted
-                                            failedPromptPersisted = false
+                                            failedPromptPersisted = userMessagePersisted
                                             status = "CREDENTIAL ERROR"
                                             onPrompt(submitted)
                                             return@launch
@@ -564,7 +564,7 @@ private fun AgentScreen(
                                         if (key.isBlank()) {
                                             error = "Add your Gemini API key in Settings to start chatting."
                                             failedPrompt = submitted
-                                            failedPromptPersisted = false
+                                            failedPromptPersisted = userMessagePersisted
                                             status = "GEMINI KEY REQUIRED"
                                             onPrompt(submitted)
                                             return@launch
