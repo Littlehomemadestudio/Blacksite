@@ -133,9 +133,12 @@ fun LibraryScreen() {
     fun sendLibraryQuestion() {
         if (asking) return
         showAskConfirmation = false
+        val approvedQuestion = query.trim().take(300)
+        val approvedHits = confirmationHits.take(6)
+        val approvedModel = model
         answer = null
         answerError = null
-        answerSources = confirmationHits
+        answerSources = approvedHits
         askJob = scope.launch {
             asking = true
             status = "SENDING APPROVED EXCERPTS TO GEMINI"
@@ -153,16 +156,16 @@ fun LibraryScreen() {
                     appendLine("Do not invent sources, page numbers, quotations, or facts. If the excerpts do not answer the question, say what is missing.")
                     appendLine()
                     appendLine("QUESTION:")
-                    appendLine(query.trim().take(300))
+                    appendLine(approvedQuestion)
                     appendLine()
                     appendLine("RETRIEVED EXCERPTS:")
-                    confirmationHits.forEachIndexed { index, hit ->
+                    approvedHits.forEachIndexed { index, hit ->
                         appendLine("[S${index + 1}] ${hit.document.title} · ${hit.chunk.sectionLabel}")
                         appendLine(hit.chunk.content)
                         appendLine()
                     }
                 }
-                when (val result = api.generate(key, prompt, emptyList(), model)) {
+                when (val result = api.generate(key, prompt, emptyList(), approvedModel)) {
                     is GeminiReplyResult.Success -> {
                         answer = result.text
                         status = "ANSWER READY · ${result.model}"
@@ -257,7 +260,7 @@ fun LibraryScreen() {
                 Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                     OutlinedTextField(
                         value = query,
-                        onValueChange = { query = it; searchHits = emptyList() },
+                        onValueChange = { query = it.take(300); searchHits = emptyList(); answer = null; answerError = null; answerSources = emptyList() },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Search passages, concepts, or names…", color = LibraryMuted, fontSize = 11.sp) },
                         leadingIcon = { Icon(Icons.Default.Search, null, tint = LibraryMuted, modifier = Modifier.size(17.dp)) },
