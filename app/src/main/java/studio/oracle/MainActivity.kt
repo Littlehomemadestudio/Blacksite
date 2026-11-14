@@ -172,105 +172,427 @@ private fun AgentScreen(prompt: String, onPrompt: (String) -> Unit, onSettings: 
     }
 
     var toolsExpanded by remember { mutableStateOf(false) }
-    val drawer=rememberDrawerState(DrawerValue.Closed)
-    val uiScope=rememberCoroutineScope()
-    val glass=Brush.verticalGradient(listOf(Color.White.copy(.99f),Color(0xFFF1F4FA).copy(.97f)))
-    ModalNavigationDrawer(drawerState=drawer,scrimColor=Color(0x330F172A),drawerContent={
-      ModalDrawerSheet(Modifier.fillMaxHeight().width(305.dp),drawerContainerColor=Color(0xFFF8F9FC),drawerShape=RoundedCornerShape(topEnd=25.dp,bottomEnd=25.dp)) {
-       Column(Modifier.fillMaxSize().padding(horizontal=15.dp)) {
-        Spacer(Modifier.height(18.dp))
-        Row(verticalAlignment=Alignment.CenterVertically) {
-         Box(Modifier.size(38.dp).background(Brush.linearGradient(listOf(Color(0xFF3B82F6),Color(0xFF8B5CF6))),RoundedCornerShape(13.dp)),contentAlignment=Alignment.Center) { Icon(Icons.Default.AutoAwesome,null,tint=Color.White) }
-         Spacer(Modifier.width(10.dp)); Text("ORACLE",fontSize=18.sp,fontWeight=FontWeight.Bold)
-         Spacer(Modifier.weight(1f)); IconButton(onClick={uiScope.launch{drawer.close()}}){Icon(Icons.Default.Close,"Close")}
-        }
-        Spacer(Modifier.height(18.dp))
-        Surface(onClick={uiScope.launch{activeSessionId=repository.createSession(model);error=null;failedPrompt=null;drawer.close()}},color=Color.White,shape=RoundedCornerShape(15.dp),border=BorderStroke(1.dp,Line),shadowElevation=2.dp) {
-         Row(Modifier.fillMaxWidth().padding(14.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.Add,null,tint=Accent);Spacer(Modifier.width(10.dp));Text("New chat",fontWeight=FontWeight.SemiBold)}
-        }
-        Spacer(Modifier.height(22.dp));Text("RECENT",fontSize=10.sp,color=Muted,fontWeight=FontWeight.SemiBold,letterSpacing=1.2.sp);Spacer(Modifier.height(8.dp))
-        LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)) {
-         items(sessions,key={it.id}) { session ->
-          val selected=session.id==activeSessionId
-          Row(Modifier.fillMaxWidth().background(if(selected)Color(0xFFEAF0FF)else Color.Transparent,RoundedCornerShape(11.dp)).clickable{activeSessionId=session.id;error=null;failedPrompt=null;uiScope.launch{drawer.close()}}.padding(12.dp),verticalAlignment=Alignment.CenterVertically) {
-           Icon(Icons.Default.ChatBubbleOutline,null,tint=if(selected)Accent else Muted,modifier=Modifier.size(17.dp));Spacer(Modifier.width(10.dp))
-           Text(session.title.ifBlank{"New chat"},fontSize=13.sp,color=if(selected)Color(0xFF1D4ED8)else Paper,maxLines=1,overflow=TextOverflow.Ellipsis)
-          }
-         }
-        }
-        HorizontalDivider(color=Line)
-        Row(Modifier.fillMaxWidth().clickable{onSettings();uiScope.launch{drawer.close()}}.padding(vertical=15.dp),verticalAlignment=Alignment.CenterVertically) { Icon(Icons.Default.Settings,null,tint=Muted);Spacer(Modifier.width(12.dp));Text("Settings",fontSize=13.sp) }
-       }
-      }
-    }) {
-     Column(Modifier.fillMaxSize().background(Color(0xFFF8F9FB))) {
-      Row(Modifier.fillMaxWidth().height(58.dp).background(Color.White.copy(.94f)).padding(horizontal=9.dp),verticalAlignment=Alignment.CenterVertically) {
-       IconButton(onClick={uiScope.launch{drawer.open()}}){Icon(Icons.Default.Menu,"Chat history",tint=Paper)}
-       Column(Modifier.weight(1f)){Text("ORACLE",fontSize=15.sp,fontWeight=FontWeight.Bold,letterSpacing=.8.sp);Text("Gemini",fontSize=10.sp,color=Muted)}
-       IconButton(onClick={uiScope.launch{activeSessionId=repository.createSession(model);error=null;failedPrompt=null}},enabled=!busy){Icon(Icons.Default.Edit,"New chat",tint=Paper)}
-      }
-      HorizontalDivider(color=Color(0xFFEDEFF3))
-      Box(Modifier.weight(1f).fillMaxWidth()) {
-       if(messages.isEmpty()) Column(Modifier.fillMaxSize().padding(24.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally) {
-        Box(Modifier.size(58.dp).background(Brush.linearGradient(listOf(Color(0xFFDBEAFE),Color(0xFFEDE9FE))),RoundedCornerShape(20.dp)),contentAlignment=Alignment.Center){Icon(Icons.Default.AutoAwesome,null,tint=Color(0xFF4F6FE8),modifier=Modifier.size(28.dp))}
-        Spacer(Modifier.height(22.dp));Text("What can I help with?",fontSize=25.sp,fontWeight=FontWeight.SemiBold,color=Color(0xFF25272B))
-       } else LazyColumn(Modifier.fillMaxSize().padding(horizontal=17.dp),verticalArrangement=Arrangement.spacedBy(20.dp),contentPadding=PaddingValues(top=20.dp,bottom=24.dp)) {
-        items(messages,key={it.id}) { m ->
-         if(m.role=="user") Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
-          Surface(color=Color(0xFFF0F2F5),shape=RoundedCornerShape(22.dp),modifier=Modifier.widthIn(max=310.dp)){Text(m.content,Modifier.padding(horizontal=16.dp,vertical=12.dp),fontSize=15.sp,lineHeight=23.sp,color=Paper)}
-         } else Text(m.content,Modifier.fillMaxWidth(),fontSize=15.sp,lineHeight=24.sp,color=Color(0xFF25272B))
-        }
-        if(busy)item{Row(verticalAlignment=Alignment.CenterVertically){CircularProgressIndicator(Modifier.size(17.dp),color=Accent,strokeWidth=2.dp);Spacer(Modifier.width(10.dp));Text("Thinking",fontSize=13.sp,color=Muted)}}
-       }
-      }
-      if(error!=null) Text(error!!,Modifier.padding(horizontal=18.dp,vertical=4.dp),color=Color(0xFFB42318),fontSize=12.sp)
-      Surface(Modifier.fillMaxWidth().padding(start=12.dp,end=12.dp,bottom=10.dp).animateContentSize(),shape=RoundedCornerShape(27.dp),color=Glass,border=BorderStroke(1.dp,Color(0xFFE3E7EF)),shadowElevation=8.dp) {
-       Column(Modifier.background(glass).padding(horizontal=12.dp,vertical=8.dp)) {
-        OutlinedTextField(value=prompt,onValueChange=onPrompt,modifier=Modifier.fillMaxWidth(),placeholder={Text("Message ORACLE",color=Color(0xFF9298A3),fontSize=16.sp)},minLines=1,maxLines=6,shape=RoundedCornerShape(18.dp),colors=OutlinedTextFieldDefaults.colors(focusedBorderColor=Color.Transparent,unfocusedBorderColor=Color.Transparent,focusedContainerColor=Color.Transparent,unfocusedContainerColor=Color.Transparent,focusedTextColor=Paper,unfocusedTextColor=Paper,cursorColor=Accent))
-        Row(verticalAlignment=Alignment.CenterVertically) {
-         IconButton(onClick={toolsExpanded=!toolsExpanded},modifier=Modifier.size(40.dp)){Icon(Icons.Default.Add,"Expand tools",tint=Color(0xFF626A76))}
-         TextButton(onClick={toolsExpanded=!toolsExpanded},contentPadding=PaddingValues(horizontal=6.dp)){Text("Tools",fontSize=12.sp,color=Color(0xFF626A76));Icon(if(toolsExpanded)Icons.Default.ExpandLess else Icons.Default.ExpandMore,null,tint=Muted,modifier=Modifier.size(16.dp))}
-         Spacer(Modifier.weight(1f))
-         if(busy) IconButton(onClick={requestJob?.cancel()}){Icon(Icons.Default.StopCircle,"Stop",tint=Color(0xFFDC5555))}
-         else IconButton(onClick={
-          val submitted=prompt.trim();if(submitted.isBlank())return@IconButton
-          val selected=activeSessionId;val turns=messages.map{AgentTurn(it.role,it.content)}
-          val retry=failedPrompt==submitted&&turns.lastOrNull()?.let{it.role=="user"&&it.content==submitted}==true
-          val history=if(retry)turns.dropLast(1)else turns
-          onPrompt("");error=null;busy=true
-          requestJob=scope.launch {
-           try {
-            val sid=selected?:repository.createSession(model).also{activeSessionId=it};val key=keyStore.read().orEmpty()
-            if(key.isBlank()){error="Add your Gemini API key in Settings to start chatting.";failedPrompt=submitted;onPrompt(submitted);return@launch}
-            if(!retry)repository.appendMessage(sid,"user",submitted,model)
-            when(val result=api.generate(key,submitted,AgentConversationPolicy.context(history),model)){
-             is studio.oracle.data.GeminiReplyResult.Success->{repository.appendMessage(sid,"assistant",result.text,result.model);failedPrompt=null}
-             is studio.oracle.data.GeminiReplyResult.Failed->{error=result.message;failedPrompt=submitted}
+    val drawer = rememberDrawerState(DrawerValue.Closed)
+    val uiScope = rememberCoroutineScope()
+    val xpBlue = Color(0xFF0A58CA)
+    val xpDeep = Color(0xFF003C9D)
+    val xpPale = Color(0xFFEAF3FF)
+    val xpSilver = Color(0xFFE8E8E8)
+    val xpLine = Color(0xFF7F9DB9)
+
+    ModalNavigationDrawer(
+        drawerState = drawer,
+        scrimColor = Color(0x66000000),
+        drawerContent = {
+            ModalDrawerSheet(
+                modifier = Modifier.fillMaxHeight().width(292.dp),
+                drawerContainerColor = Color(0xFFECE9D8),
+                drawerShape = RoundedCornerShape(0.dp)
+            ) {
+                Column(Modifier.fillMaxSize().padding(7.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .background(Brush.horizontalGradient(listOf(Color(0xFF3A82E6), Color(0xFF0750B8), Color(0xFF003B91))))
+                            .padding(horizontal = 10.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(Modifier.size(34.dp).background(Color(0xFFFFD45B), RoundedCornerShape(3.dp)), contentAlignment = Alignment.Center) {
+                            Text("O", color = Color(0xFF174A91), fontSize = 24.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Serif)
+                        }
+                        Spacer(Modifier.width(9.dp))
+                        Column {
+                            Text("ORACLE", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = .7.sp)
+                            Text("Personal intelligence", color = Color(0xFFDCEBFF), fontSize = 10.sp)
+                        }
+                        Spacer(Modifier.weight(1f))
+                        XPWindowButton("×", onClick = { uiScope.launch { drawer.close() } }, close = true)
+                    }
+                    Spacer(Modifier.height(9.dp))
+                    XPButton("＋   New conversation", Modifier.fillMaxWidth(), onClick = {
+                        uiScope.launch {
+                            activeSessionId = repository.createSession(model)
+                            error = null
+                            failedPrompt = null
+                            drawer.close()
+                        }
+                    }, primary = true)
+                    Spacer(Modifier.height(13.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("CHAT HISTORY", color = Color(0xFF53677D), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp)
+                        Spacer(Modifier.weight(1f))
+                        Text("${sessions.size}", color = Color(0xFF65798D), fontSize = 10.sp)
+                    }
+                    Spacer(Modifier.height(5.dp))
+                    HorizontalDivider(color = Color(0xFFB6C6D5))
+                    LazyColumn(
+                        Modifier.weight(1f).fillMaxWidth().background(Color(0xFFF8FAFC))
+                            .border(BorderStroke(1.dp, Color(0xFF9DB4C9))),
+                        contentPadding = PaddingValues(vertical = 4.dp)
+                    ) {
+                        items(sessions, key = { it.id }) { session ->
+                            val selected = session.id == activeSessionId
+                            Row(
+                                Modifier.fillMaxWidth()
+                                    .background(if (selected) Color(0xFFD8E9FC) else Color.Transparent)
+                                    .clickable {
+                                        activeSessionId = session.id
+                                        error = null
+                                        failedPrompt = null
+                                        uiScope.launch { drawer.close() }
+                                    }
+                                    .padding(horizontal = 9.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.ChatBubbleOutline, null,
+                                    tint = if (selected) Color(0xFF0756B8) else Color(0xFF667D92),
+                                    modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(9.dp))
+                                Text(
+                                    session.title.ifBlank { "New conversation" },
+                                    color = Color(0xFF24384B), fontSize = 12.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    XPButton("⚙   Settings", Modifier.fillMaxWidth(), onClick = {
+                        onSettings()
+                        uiScope.launch { drawer.close() }
+                    })
+                    Spacer(Modifier.height(5.dp))
+                }
             }
-           }catch(cancelled:CancellationException){throw cancelled}catch(_:Exception){error="Something went wrong. Check your connection and try again.";failedPrompt=submitted}
-           finally{busy=false;requestJob=null}
-          }
-         },enabled=prompt.isNotBlank()){Icon(Icons.Default.ArrowUpward,"Send",tint=Color.White,modifier=Modifier.background(if(prompt.isBlank())Color(0xFFB8C0CC)else Accent,CircleShape).padding(9.dp))}
         }
-        AnimatedVisibility(visible=toolsExpanded,enter=fadeIn()+slideInVertically{-it/3},exit=fadeOut()+slideOutVertically{-it/3}) {
-         Column(Modifier.fillMaxWidth().padding(top=7.dp,bottom=5.dp)) {
-          HorizontalDivider(color=Color(0xFFE8EBF0))
-          Row(verticalAlignment=Alignment.CenterVertically) {
-           Icon(Icons.Default.AutoAwesome,null,tint=Accent,modifier=Modifier.size(17.dp));Spacer(Modifier.width(8.dp));Text("Model",fontSize=13.sp,fontWeight=FontWeight.Medium);Spacer(Modifier.weight(1f))
-           Box {
-            TextButton(onClick={modelMenuExpanded=true}){Text(menuModels.firstOrNull{it.name==model}?.displayName?:model,color=Accent,fontSize=12.sp,maxLines=1,overflow=TextOverflow.Ellipsis);Icon(Icons.Default.ExpandMore,null,tint=Accent)}
-            DropdownMenu(expanded=modelMenuExpanded,onDismissRequest={modelMenuExpanded=false}){menuModels.forEach{candidate->DropdownMenuItem(text={Text(candidate.displayName)},onClick={modelMenuExpanded=false;scope.launch{modelPreferences.setSelectedModel(candidate.name);activeSessionId?.let{repository.updateModel(it,candidate.name)}}})}}
-           }
-           IconButton(onClick={ refreshModels() },enabled=!syncingModels){Icon(Icons.Default.Refresh,"Refresh models",tint=Muted)}
-          }
-          Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){listOf("Search","Reason","Attach").forEach{label->Surface(color=Color(0xFFF3F5F9),shape=RoundedCornerShape(20.dp),border=BorderStroke(1.dp,Color(0xFFE7EAF0))){Text(label,Modifier.padding(horizontal=12.dp,vertical=8.dp),fontSize=11.sp,color=Color(0xFF687080))}}}
-         }
+    ) {
+        Column(Modifier.fillMaxSize().background(Color(0xFF7BA7D8)).padding(5.dp)) {
+            // Luna-style application title bar.
+            Row(
+                Modifier.fillMaxWidth().height(43.dp)
+                    .background(Brush.horizontalGradient(listOf(Color(0xFF3D8CEB), Color(0xFF1265C7), Color(0xFF0750A9), Color(0xFF003B87))))
+                    .padding(start = 8.dp, end = 5.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.size(27.dp).background(Color(0xFFFFD45B), RoundedCornerShape(3.dp)), contentAlignment = Alignment.Center) {
+                    Text("O", color = Color(0xFF174A91), fontSize = 20.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Serif)
+                }
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("ORACLE Studio", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text("Personal intelligence workspace", color = Color(0xFFD9E9FF), fontSize = 9.sp)
+                }
+                XPWindowButton("—", onClick = { uiScope.launch { drawer.open() } })
+                Spacer(Modifier.width(3.dp))
+                XPWindowButton("□", onClick = { toolsExpanded = !toolsExpanded })
+                Spacer(Modifier.width(3.dp))
+                XPWindowButton("×", onClick = { requestJob?.cancel(); onPrompt("") }, close = true)
+            }
+
+            // Classic menu / toolbar strip.
+            Row(
+                Modifier.fillMaxWidth().height(34.dp)
+                    .background(Color(0xFFECE9D8))
+                    .border(BorderStroke(1.dp, Color.White))
+                    .padding(horizontal = 5.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                XPMenuItem("Chats", onClick = { uiScope.launch { drawer.open() } })
+                XPMenuItem("New", onClick = {
+                    uiScope.launch {
+                        activeSessionId = repository.createSession(model)
+                        error = null
+                        failedPrompt = null
+                    }
+                })
+                Spacer(Modifier.weight(1f))
+                Text(
+                    if (busy) "WORKING…" else "READY",
+                    color = if (busy) Color(0xFF0756B8) else Color(0xFF54708A),
+                    fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = .7.sp,
+                    modifier = Modifier.padding(horizontal = 7.dp)
+                )
+            }
+
+            // Main conversation surface.
+            Column(
+                Modifier.weight(1f).fillMaxWidth()
+                    .background(Color(0xFFFDFDFD))
+                    .border(BorderStroke(1.dp, Color(0xFF557FA9))
+                )
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().height(30.dp)
+                        .background(Color(0xFFDCEBFA))
+                        .padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Forum, null, tint = Color(0xFF245B91), modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(7.dp))
+                    Text(
+                        sessions.firstOrNull { it.id == activeSessionId }?.title?.ifBlank { "Conversation" } ?: "Conversation",
+                        color = Color(0xFF294C70), fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text("●", color = Color(0xFF36A852), fontSize = 8.sp)
+                    Spacer(Modifier.width(4.dp))
+                    Text("LOCAL", color = Color(0xFF54708A), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+                HorizontalDivider(color = Color(0xFFB5C9DD))
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    if (messages.isEmpty()) {
+                        Column(
+                            Modifier.fillMaxSize().padding(24.dp),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(
+                                Modifier.size(62.dp).background(
+                                    Brush.verticalGradient(listOf(Color(0xFFFFF2B8), Color(0xFFE6B94E))),
+                                    RoundedCornerShape(5.dp)
+                                ).border(BorderStroke(1.dp, Color(0xFFB38A2E)), RoundedCornerShape(5.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("O", color = Color(0xFF174A91), fontSize = 42.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Serif)
+                            }
+                            Spacer(Modifier.height(14.dp))
+                            Text("Welcome to ORACLE", color = Color(0xFF25496D), fontSize = 20.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.SansSerif)
+                            Spacer(Modifier.height(5.dp))
+                            Text("Your workspace is ready.", color = Color(0xFF63788C), fontSize = 12.sp)
+                        }
+                    } else {
+                        LazyColumn(
+                            Modifier.fillMaxSize().padding(horizontal = 13.dp),
+                            verticalArrangement = Arrangement.spacedBy(15.dp),
+                            contentPadding = PaddingValues(top = 15.dp, bottom = 18.dp)
+                        ) {
+                            items(messages, key = { it.id }) { message ->
+                                if (message.role == "user") {
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                        Surface(
+                                            color = Color(0xFFE7F1FC),
+                                            shape = RoundedCornerShape(4.dp),
+                                            border = BorderStroke(1.dp, Color(0xFFB5CDE5)),
+                                            modifier = Modifier.widthIn(max = 310.dp)
+                                        ) {
+                                            Text(
+                                                message.content,
+                                                Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                                color = Color(0xFF1D344B), fontSize = 14.sp, lineHeight = 21.sp
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                                        Box(
+                                            Modifier.size(24.dp).background(Color(0xFFFFE7A0), RoundedCornerShape(3.dp))
+                                                .border(BorderStroke(1.dp, Color(0xFFC6A34E)), RoundedCornerShape(3.dp)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text("O", color = Color(0xFF174A91), fontSize = 17.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Serif)
+                                        }
+                                        Spacer(Modifier.width(9.dp))
+                                        Text(
+                                            message.content, Modifier.weight(1f).padding(top = 2.dp),
+                                            color = Color(0xFF202B36), fontSize = 14.sp, lineHeight = 22.sp
+                                        )
+                                    }
+                                }
+                            }
+                            if (busy) item {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    CircularProgressIndicator(Modifier.size(15.dp), color = Color(0xFF1768C4), strokeWidth = 2.dp)
+                                    Spacer(Modifier.width(9.dp))
+                                    Text("ORACLE is working…", color = Color(0xFF58718B), fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (error != null) {
+                Text(error!!, Modifier.fillMaxWidth().background(Color(0xFFFFE4E1)).padding(7.dp),
+                    color = Color(0xFF9E2921), fontSize = 11.sp)
+                if (failedPrompt != null) {
+                    TextButton(onClick = { onPrompt(failedPrompt.orEmpty()) }, enabled = !busy) { Text("Restore prompt") }
+                }
+            }
+
+            // XP taskbar-like composer: recessed white editor, raised classic buttons.
+            Column(
+                Modifier.fillMaxWidth().padding(top = 5.dp)
+                    .background(Color(0xFFECE9D8))
+                    .border(BorderStroke(1.dp, Color.White))
+                    .padding(6.dp)
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 76.dp)
+                        .background(Color.White)
+                        .border(BorderStroke(1.dp, Color(0xFF7F9DB9)))
+                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    OutlinedTextField(
+                        value = prompt, onValueChange = onPrompt,
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text("Type a message…", color = Color(0xFF8797A6), fontSize = 14.sp) },
+                        minLines = 1, maxLines = 5,
+                        shape = RoundedCornerShape(0.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color.Transparent, unfocusedBorderColor = Color.Transparent,
+                            focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
+                            focusedTextColor = Color(0xFF172B40), unfocusedTextColor = Color(0xFF172B40),
+                            cursorColor = Color(0xFF0756B8)
+                        )
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    XPButton("Send", Modifier.width(65.dp).height(39.dp), enabled = prompt.isNotBlank() && !busy, primary = true, onClick = {
+                        val submitted = prompt.trim()
+                        if (submitted.isBlank()) return@XPButton
+                        val selected = activeSessionId
+                        val turns = messages.map { AgentTurn(it.role, it.content) }
+                        val retry = failedPrompt == submitted && turns.lastOrNull()?.let { it.role == "user" && it.content == submitted } == true
+                        val history = if (retry) turns.dropLast(1) else turns
+                        onPrompt("")
+                        error = null
+                        busy = true
+                        requestJob = scope.launch {
+                            try {
+                                val sid = selected ?: repository.createSession(model).also { activeSessionId = it }
+                                val key = keyStore.read().orEmpty()
+                                if (key.isBlank()) {
+                                    error = "Add your Gemini API key in Settings to start chatting."
+                                    failedPrompt = submitted
+                                    onPrompt(submitted)
+                                    return@launch
+                                }
+                                if (!retry) repository.appendMessage(sid, "user", submitted, model)
+                                when (val result = api.generate(key, submitted, AgentConversationPolicy.context(history), model)) {
+                                    is studio.oracle.data.GeminiReplyResult.Success -> {
+                                        repository.appendMessage(sid, "assistant", result.text, result.model)
+                                        failedPrompt = null
+                                    }
+                                    is studio.oracle.data.GeminiReplyResult.Failed -> {
+                                        error = result.message
+                                        failedPrompt = submitted
+                                    }
+                                }
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                error = "Something went wrong. Check your connection and try again."
+                                failedPrompt = submitted
+                            } finally {
+                                busy = false
+                                requestJob = null
+                            }
+                        }
+                    })
+                }
+                Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                    XPButton(if (toolsExpanded) "Tools  ▲" else "Tools  ▼", onClick = { toolsExpanded = !toolsExpanded })
+                    Spacer(Modifier.weight(1f))
+                    Text("ORACLE STUDIO", color = Color(0xFF708398), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = .5.sp)
+                }
+                AnimatedVisibility(
+                    visible = toolsExpanded,
+                    enter = fadeIn() + slideInVertically { -it / 4 },
+                    exit = fadeOut() + slideOutVertically { -it / 4 }
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(top = 7.dp)
+                            .background(Color(0xFFF7F7F2))
+                            .border(BorderStroke(1.dp, Color(0xFFB8C7D5)))
+                            .padding(horizontal = 8.dp, vertical = 5.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Memory, null, tint = Color(0xFF245B91), modifier = Modifier.size(17.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Model", color = Color(0xFF354D64), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.weight(1f))
+                            Box {
+                                XPButton(menuModels.firstOrNull { it.name == model }?.displayName ?: model, onClick = { modelMenuExpanded = true })
+                                DropdownMenu(expanded = modelMenuExpanded, onDismissRequest = { modelMenuExpanded = false }) {
+                                    menuModels.forEach { candidate ->
+                                        DropdownMenuItem(
+                                            text = { Text(candidate.displayName, fontSize = 13.sp) },
+                                            onClick = {
+                                                modelMenuExpanded = false
+                                                scope.launch {
+                                                    modelPreferences.setSelectedModel(candidate.name)
+                                                    activeSessionId?.let { repository.updateModel(it, candidate.name) }
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.width(4.dp))
+                            XPButton(if (syncingModels) "…" else "Refresh", onClick = { refreshModels() }, enabled = !syncingModels)
+                        }
+                    }
+                }
+            }
         }
-       }
-      }
-     }
     }
-   }
+
+@Composable
+private fun XPButton(
+    label: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    primary: Boolean = false,
+    onClick: () -> Unit
+) {
+    val face = if (primary) Color(0xFFE0EDFC) else Color(0xFFF4F2E9)
+    val edge = if (primary) Color(0xFF7A9CC5) else Color(0xFF9B9A91)
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.heightIn(min = 31.dp),
+        shape = RoundedCornerShape(3.dp),
+        color = face,
+        border = BorderStroke(1.dp, edge),
+        shadowElevation = if (enabled) 1.dp else 0.dp
+    ) {
+        Box(
+            Modifier.defaultMinSize(minWidth = 48.dp).padding(horizontal = 9.dp, vertical = 5.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(label, color = if (enabled) Color(0xFF24394D) else Color(0xFF9AA3AC),
+                fontSize = 11.sp, fontWeight = if (primary) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun XPWindowButton(label: String, onClick: () -> Unit, close: Boolean = false) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.size(width = 25.dp, height = 22.dp),
+        shape = RoundedCornerShape(4.dp),
+        color = if (close) Color(0xFFE36A5C) else Color(0xFF5A9CE8),
+        border = BorderStroke(1.dp, if (close) Color(0xFFFFB5A9) else Color(0xFFB9D8FA)),
+        shadowElevation = 1.dp
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(label, color = Color.White, fontSize = if (label == "×") 17.sp else 13.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun XPMenuItem(label: String, onClick: () -> Unit) {
+    Text(
+        label,
+        Modifier.clickable(onClick = onClick).padding(horizontal = 9.dp, vertical = 6.dp),
+        color = Color(0xFF263B50), fontSize = 11.sp
+    )
+}
+
 @Composable
 private fun SettingsScreen() {
     val context = LocalContext.current
