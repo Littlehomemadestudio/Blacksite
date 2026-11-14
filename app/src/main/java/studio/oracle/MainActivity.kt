@@ -29,6 +29,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -537,6 +538,7 @@ private fun AgentScreen(prompt: String, onPrompt: (String) -> Unit, onSettings: 
             }
         }
     }
+}
 
 @Composable
 private fun XPButton(
