@@ -1,6 +1,6 @@
 # ORACLE STUDIO
 
-**Your intelligence workspace.** A native Android application combining a Gemini operator, document intelligence, visual automations, and searchable audio memory in an original Cursor-inspired workbench.
+**Your intelligence workspace.** A native Android application combining a Gemini operator and local document intelligence in an original Windows XP Luna-inspired desktop workspace. Automation and audio-memory modules remain planned rather than simulated.
 
 ## Product principles
 - Native Android, offline-first local workspace, Gemini API key supplied by the user.
@@ -19,12 +19,13 @@ gradle --no-daemon testDebugUnitTest assembleDebug
 Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions runs the unit tests and builds/uploads the debug APK on every push to `main`.
 
 ## Implemented
-- Native Compose dark workbench shell with navigation, workspace header, module surfaces, and status bar.
+- Native Jetpack Compose workspace with a handcrafted Luna-style title/menu treatment, chat-first layout, session drawer, and responsive classic controls.
+- Document Library is reachable directly from the chat toolbar and returns to the agent with Android back navigation.
 - Gemini API key validation and AES-GCM encryption backed by Android Keystore. No API key is embedded in source or APK.
 - Live Gemini Agent console using `generateContent`, with visible request status and API/network errors.
 - Persistent agent threads and message history in Room; thread titles are generated locally from the first user prompt.
 - Selected Gemini model stored in DataStore. The Agent can refresh the models exposed to the connected key using Google's models endpoint and choose a model that supports `generateContent`.
-- Cancellable OkHttp requests: pressing **CANCEL** cancels the in-flight network call. Failed/cancelled prompts remain in the local thread and can be retried.
+- Cancellable OkHttp requests: an explicit **Cancel** control cancels the in-flight network call. Failed/cancelled prompts remain in the local thread and retry without duplicating the saved user turn.
 - Bounded conversation context (last 12 messages) and explicit disclosure of what conversation text is sent to Gemini.
 - Unit tests for conversation context, session naming, document chunk boundaries, PDF page citations, stable text sections, and English/Persian keyword ranking.
 - Document library imports selectable PDF, TXT, and Markdown files from Android's document picker; originals are copied into app-private storage.
@@ -45,6 +46,7 @@ These planned modules are not presented as working features in the app.
 - The key is sent in an HTTPS header only to Google's Gemini API when a user invokes validation, model discovery, or generation.
 - Agent threads and messages are stored in the app-private Room database. They are not uploaded automatically. They are included in a Gemini request only when the user submits a prompt.
 - The Room database (agent conversations, document metadata, and extracted document text) is app-private but is **not encrypted at the database layer**. Imported originals are also app-private files, not encrypted files. Do not store highly sensitive content until encrypted local-data storage is implemented.
+- Microphone permission is not requested because audio recording and transcription are not implemented yet.
 - Library Q&A is opt-in: tapping **ASK GEMINI** first displays the matched passages and asks for confirmation. Only the question and up to six retrieved excerpts are sent to the selected Gemini model; the original file and remaining library are not uploaded.
 
 ## Document library scope and limits
