@@ -61,13 +61,15 @@ class DocumentRepository(
             }
 
             val id = UUID.randomUUID().toString()
-            temporaryFile = File(documentsDirectory, ".$id.importing")
-            storedFile = File(documentsDirectory, "$id.${format.extension}")
+            val temp = File(documentsDirectory, ".$id.importing")
+            val destination = File(documentsDirectory, "$id.${format.extension}")
+            temporaryFile = temp
+            storedFile = destination
 
             val input = appContext.contentResolver.openInputStream(uri)
                 ?: throw DocumentImportException("Android could not open this document.")
             input.use { source ->
-                FileOutputStream(temporaryFile).use { output ->
+                FileOutputStream(temp).use { output ->
                     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                     var total = 0L
                     while (true) {
@@ -83,14 +85,14 @@ class DocumentRepository(
                 }
             }
 
-            if (!temporaryFile.renameTo(storedFile)) {
-                temporaryFile.copyTo(storedFile, overwrite = true)
-                temporaryFile.delete()
+            if (!temp.renameTo(destination)) {
+                temp.copyTo(destination, overwrite = true)
+                temp.delete()
             }
 
             val pages = when (format) {
-                SupportedFormat.PDF -> extractPdf(storedFile)
-                SupportedFormat.TEXT, SupportedFormat.MARKDOWN -> extractText(storedFile)
+                SupportedFormat.PDF -> extractPdf(destination)
+                SupportedFormat.TEXT, SupportedFormat.MARKDOWN -> extractText(destination)
             }
             val extractedCharacters = pages.sumOf { it.text.length }
             if (extractedCharacters == 0) {
@@ -113,7 +115,7 @@ class DocumentRepository(
                 fileName = safeName,
                 mimeType = format.mimeType,
                 storagePath = "documents/$id.${format.extension}",
-                sizeBytes = storedFile.length(),
+                sizeBytes = destination.length(),
                 pageCount = pages.size,
                 extractedCharacters = extractedCharacters,
                 importedAt = System.currentTimeMillis()
