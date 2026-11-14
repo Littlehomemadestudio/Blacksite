@@ -271,7 +271,6 @@ private fun AgentScreen(prompt: String, onPrompt: (String) -> Unit, onSettings: 
      }
     }
    }
-}
 @Composable
 private fun SettingsScreen() {
     val context = LocalContext.current
