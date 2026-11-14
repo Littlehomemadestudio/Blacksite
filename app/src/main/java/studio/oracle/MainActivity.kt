@@ -20,6 +20,7 @@ import studio.oracle.data.GeminiConnectionResult
 import studio.oracle.security.SecureKeyStore
 import studio.oracle.ui.LibraryScreen
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -69,25 +70,75 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private enum class OracleSection { AGENT, LIBRARY, SETTINGS }
+
 @Composable
 private fun OracleApp() {
- var prompt by remember { mutableStateOf("") }
- var settings by remember { mutableStateOf(false) }
- MaterialTheme(colorScheme=lightColorScheme(background=Color(0xFFF8F9FB),surface=Color.White,surfaceVariant=Panel,primary=Accent,secondary=Violet,onBackground=Paper,onSurface=Paper,onSurfaceVariant=Muted)) {
-  Surface(Modifier.fillMaxSize(),color=Color(0xFFF8F9FB)) {
-   if(settings) Column(Modifier.fillMaxSize()) {
-    Row(Modifier.fillMaxWidth().height(54.dp),verticalAlignment=Alignment.CenterVertically) {
-     IconButton(onClick={settings=false}) { Icon(Icons.Default.ArrowBack,"Back") }
-     Text("Settings",fontSize=17.sp,fontWeight=FontWeight.SemiBold)
+    var prompt by remember { mutableStateOf("") }
+    var section by remember { mutableStateOf(OracleSection.AGENT) }
+
+    BackHandler(enabled = section != OracleSection.AGENT) {
+        section = OracleSection.AGENT
     }
-    SettingsScreen()
-   } else AgentScreen(prompt,{prompt=it},onSettings={settings=true})
-  }
- }
+
+    MaterialTheme(
+        colorScheme = lightColorScheme(
+            background = Color(0xFFF8F9FB),
+            surface = Color.White,
+            surfaceVariant = Panel,
+            primary = Accent,
+            secondary = Violet,
+            onBackground = Paper,
+            onSurface = Paper,
+            onSurfaceVariant = Muted
+        )
+    ) {
+        Surface(Modifier.fillMaxSize(), color = Color(0xFFF8F9FB)) {
+            when (section) {
+                OracleSection.AGENT -> AgentScreen(
+                    prompt = prompt,
+                    onPrompt = { prompt = it },
+                    onSettings = { section = OracleSection.SETTINGS },
+                    onLibrary = { section = OracleSection.LIBRARY }
+                )
+
+                OracleSection.LIBRARY -> Column(Modifier.fillMaxSize()) {
+                    Row(
+                        Modifier.fillMaxWidth().height(54.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { section = OracleSection.AGENT }) {
+                            Icon(Icons.Default.ArrowBack, "Back to ORACLE")
+                        }
+                        Text("Document Library", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    LibraryScreen()
+                }
+
+                OracleSection.SETTINGS -> Column(Modifier.fillMaxSize()) {
+                    Row(
+                        Modifier.fillMaxWidth().height(54.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { section = OracleSection.AGENT }) {
+                            Icon(Icons.Default.ArrowBack, "Back to ORACLE")
+                        }
+                        Text("Settings", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    SettingsScreen()
+                }
+            }
+        }
+    }
 }
 
 @Composable
-private fun AgentScreen(prompt: String, onPrompt: (String) -> Unit, onSettings: () -> Unit) {
+private fun AgentScreen(
+    prompt: String,
+    onPrompt: (String) -> Unit,
+    onSettings: () -> Unit,
+    onLibrary: () -> Unit
+) {
     val context = LocalContext.current
     val keyStore = remember { SecureKeyStore(context) }
     val api = remember { GeminiApi() }
@@ -111,6 +162,7 @@ private fun AgentScreen(prompt: String, onPrompt: (String) -> Unit, onSettings: 
     var status by remember { mutableStateOf("READY / LOCAL SESSION") }
     var error by remember { mutableStateOf<String?>(null) }
     var failedPrompt by remember { mutableStateOf<String?>(null) }
+    var failedPromptPersisted by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         activeSessionId = repository.ensureSession(model)
@@ -214,6 +266,8 @@ private fun AgentScreen(prompt: String, onPrompt: (String) -> Unit, onSettings: 
                             activeSessionId = repository.createSession(model)
                             error = null
                             failedPrompt = null
+                            failedPromptPersisted = false
+                            status = "READY / LOCAL SESSION"
                             drawer.close()
                         }
                     }, primary = true)
@@ -239,6 +293,8 @@ private fun AgentScreen(prompt: String, onPrompt: (String) -> Unit, onSettings: 
                                         activeSessionId = session.id
                                         error = null
                                         failedPrompt = null
+                                        failedPromptPersisted = false
+                                        status = "READY / LOCAL SESSION"
                                         uiScope.launch { drawer.close() }
                                     }
                                     .padding(horizontal = 9.dp, vertical = 10.dp),
@@ -287,7 +343,7 @@ private fun AgentScreen(prompt: String, onPrompt: (String) -> Unit, onSettings: 
                 Spacer(Modifier.width(3.dp))
                 XPWindowButton("□", onClick = { toolsExpanded = !toolsExpanded })
                 Spacer(Modifier.width(3.dp))
-                XPWindowButton("×", onClick = { requestJob?.cancel(); onPrompt("") }, close = true)
+                XPWindowButton("×", onClick = { onPrompt("") }, close = true)
             }
 
             // Classic menu / toolbar strip.
@@ -299,18 +355,26 @@ private fun AgentScreen(prompt: String, onPrompt: (String) -> Unit, onSettings: 
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 XPMenuItem("Chats", onClick = { uiScope.launch { drawer.open() } })
+                XPMenuItem("Library", onClick = onLibrary)
                 XPMenuItem("New", onClick = {
                     uiScope.launch {
                         activeSessionId = repository.createSession(model)
                         error = null
                         failedPrompt = null
+                        failedPromptPersisted = false
+                        status = "READY / LOCAL SESSION"
                     }
                 })
                 Spacer(Modifier.weight(1f))
                 Text(
-                    if (busy) "WORKING…" else "READY",
-                    color = if (busy) Color(0xFF0756B8) else Color(0xFF54708A),
-                    fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = .7.sp,
+                    if (busy) "WORKING…" else status,
+                    color = when {
+                        busy -> Color(0xFF0756B8)
+                        status.contains("FAILED") || status.contains("CANCELLED") || status.contains("ERROR") -> Color(0xFF9E2921)
+                        else -> Color(0xFF54708A)
+                    },
+                    fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = .45.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(horizontal = 7.dp)
                 )
             }
@@ -449,48 +513,105 @@ private fun AgentScreen(prompt: String, onPrompt: (String) -> Unit, onSettings: 
                         )
                     )
                     Spacer(Modifier.width(5.dp))
-                    XPButton("Send", Modifier.width(65.dp).height(39.dp), enabled = prompt.isNotBlank() && !busy, primary = true, onClick = {
-                        val submitted = prompt.trim()
-                        if (submitted.isBlank()) return@XPButton
-                        val selected = activeSessionId
-                        val turns = messages.map { AgentTurn(it.role, it.content) }
-                        val retry = failedPrompt == submitted && turns.lastOrNull()?.let { it.role == "user" && it.content == submitted } == true
-                        val history = if (retry) turns.dropLast(1) else turns
-                        onPrompt("")
-                        error = null
-                        busy = true
-                        requestJob = scope.launch {
-                            try {
-                                val sid = selected ?: repository.createSession(model).also { activeSessionId = it }
-                                val key = keyStore.read().orEmpty()
-                                if (key.isBlank()) {
-                                    error = "Add your Gemini API key in Settings to start chatting."
-                                    failedPrompt = submitted
-                                    onPrompt(submitted)
-                                    return@launch
+                    if (busy) {
+                        XPButton(
+                            "Cancel",
+                            Modifier.width(65.dp).height(39.dp),
+                            onClick = { requestJob?.cancel() }
+                        )
+                    } else {
+                        XPButton(
+                            "Send",
+                            Modifier.width(65.dp).height(39.dp),
+                            enabled = prompt.isNotBlank(),
+                            primary = true,
+                            onClick = {
+                                val submitted = prompt.trim()
+                                if (submitted.isBlank()) return@XPButton
+                                val selected = activeSessionId
+                                val turns = messages.map { AgentTurn(it.role, it.content) }
+                                val submission = AgentConversationPolicy.submissionHistory(
+                                    turns = turns,
+                                    prompt = submitted,
+                                    failedPrompt = failedPrompt,
+                                    failedPromptPersisted = failedPromptPersisted
+                                )
+                                val retry = submission.isRetry
+                                val history = submission.history
+                                if (!retry) {
+                                    failedPrompt = null
+                                    failedPromptPersisted = false
                                 }
-                                if (!retry) repository.appendMessage(sid, "user", submitted, model)
-                                when (val result = api.generate(key, submitted, AgentConversationPolicy.context(history), model)) {
-                                    is studio.oracle.data.GeminiReplyResult.Success -> {
-                                        repository.appendMessage(sid, "assistant", result.text, result.model)
-                                        failedPrompt = null
-                                    }
-                                    is studio.oracle.data.GeminiReplyResult.Failed -> {
-                                        error = result.message
+                                onPrompt("")
+                                error = null
+                                status = "SENDING TO GEMINI"
+                                busy = true
+                                requestJob = scope.launch {
+                                    var userMessagePersisted = retry
+                                    try {
+                                        val sid = selected
+                                            ?: repository.createSession(model).also { activeSessionId = it }
+                                        val key = try {
+                                            keyStore.read().orEmpty()
+                                        } catch (_: Exception) {
+                                            error = "The stored Gemini key could not be decrypted. Remove it in Settings and reconnect."
+                                            failedPrompt = submitted
+                                            failedPromptPersisted = false
+                                            status = "CREDENTIAL ERROR"
+                                            onPrompt(submitted)
+                                            return@launch
+                                        }
+                                        if (key.isBlank()) {
+                                            error = "Add your Gemini API key in Settings to start chatting."
+                                            failedPrompt = submitted
+                                            failedPromptPersisted = false
+                                            status = "GEMINI KEY REQUIRED"
+                                            onPrompt(submitted)
+                                            return@launch
+                                        }
+                                        if (!retry) {
+                                            repository.appendMessage(sid, "user", submitted, model)
+                                            userMessagePersisted = true
+                                            failedPromptPersisted = true
+                                        }
+                                        when (val result = api.generate(
+                                            key,
+                                            submitted,
+                                            AgentConversationPolicy.context(history),
+                                            model
+                                        )) {
+                                            is studio.oracle.data.GeminiReplyResult.Success -> {
+                                                repository.appendMessage(sid, "assistant", result.text, result.model)
+                                                failedPrompt = null
+                                                failedPromptPersisted = false
+                                                status = "RESPONSE SAVED"
+                                            }
+                                            is studio.oracle.data.GeminiReplyResult.Failed -> {
+                                                error = result.message
+                                                failedPrompt = submitted
+                                                failedPromptPersisted = userMessagePersisted
+                                                status = "REQUEST FAILED"
+                                            }
+                                        }
+                                    } catch (cancelled: CancellationException) {
                                         failedPrompt = submitted
+                                        failedPromptPersisted = userMessagePersisted
+                                        onPrompt(submitted)
+                                        status = "REQUEST CANCELLED"
+                                        throw cancelled
+                                    } catch (_: Exception) {
+                                        error = "Something went wrong. Check your connection and try again."
+                                        failedPrompt = submitted
+                                        failedPromptPersisted = userMessagePersisted
+                                        status = "REQUEST FAILED"
+                                    } finally {
+                                        busy = false
+                                        requestJob = null
                                     }
                                 }
-                            } catch (cancelled: CancellationException) {
-                                throw cancelled
-                            } catch (_: Exception) {
-                                error = "Something went wrong. Check your connection and try again."
-                                failedPrompt = submitted
-                            } finally {
-                                busy = false
-                                requestJob = null
                             }
-                        }
-                    })
+                        )
+                    }
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                     XPButton(if (toolsExpanded) "Tools  ▲" else "Tools  ▼", onClick = { toolsExpanded = !toolsExpanded })
@@ -641,17 +762,41 @@ private fun SettingsScreen() {
                         scope.launch {
                             busy = true
                             status = "Verifying key with Google Gemini…"
-                            val candidate = keyInput.trim().ifBlank { runCatching { store.read().orEmpty() }.getOrDefault("") }
+                            val enteredKey = keyInput.trim()
+                            val candidate = if (enteredKey.isNotBlank()) {
+                                enteredKey
+                            } else {
+                                try {
+                                    store.read().orEmpty()
+                                } catch (_: Exception) {
+                                    status = "Stored key could not be decrypted. Remove it and reconnect."
+                                    success = false
+                                    busy = false
+                                    return@launch
+                                }
+                            }
                             when (val result = api.validateKey(candidate)) {
                                 is GeminiConnectionResult.Connected -> {
-                                    if (keyInput.isNotBlank()) {
-                                        runCatching { store.save(candidate) }
-                                            .onSuccess { stored = true; keyInput = "" }
-                                            .onFailure { status = "Verified, but secure storage failed. Try again."; success = false }
+                                    if (enteredKey.isNotBlank()) {
+                                        try {
+                                            store.save(candidate)
+                                            stored = true
+                                            keyInput = ""
+                                            status = result.message
+                                            success = true
+                                        } catch (_: Exception) {
+                                            status = "Verified, but secure storage failed. The previous saved key was not replaced."
+                                            success = false
+                                        }
+                                    } else {
+                                        status = result.message
+                                        success = true
                                     }
-                                    if (keyInput.isBlank() || stored) { status = result.message; success = true }
                                 }
-                                is GeminiConnectionResult.Failed -> { status = result.message; success = false }
+                                is GeminiConnectionResult.Failed -> {
+                                    status = result.message
+                                    success = false
+                                }
                             }
                             busy = false
                         }
