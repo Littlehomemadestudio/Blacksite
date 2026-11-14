@@ -6,7 +6,7 @@
 - Native Android, offline-first local workspace, Gemini API key supplied by the user.
 - API credentials are encrypted at rest with AES-GCM; the encryption key is held by Android Keystore.
 - Planned agent actions must be transparent, permission-gated, auditable, and explicitly confirmed before external or destructive effects.
-- Source-grounded document answers, searchable recordings, and inspectable automation runs.
+- Source-grounded document answers; future automation runs and audio recordings are intended to remain local and inspectable.
 - Original ORACLE identity and visual system; Cursor is a design-quality reference, not an asset or UI source.
 
 ## Build
@@ -54,4 +54,4 @@ These planned modules are not presented as working features in the app.
 - PDFs with no selectable text are rejected; image-only pages in mixed PDFs are skipped. OCR, standalone images, DOC/DOCX, spreadsheets, and presentations are not supported yet.
 - The reader displays extracted text and citation labels; it is not yet a rendered PDF page viewer.
 - Retrieval currently uses on-device lexical keyword matching, not embeddings or semantic vector search. PDF answers cite original page numbers; text and Markdown answers cite indexed sections.
-- Clearing a thread removes its messages locally. Uninstalling the app removes its app-private data.
+- User-facing thread deletion and full workspace export are not available yet. Uninstalling the app removes its app-private data.
