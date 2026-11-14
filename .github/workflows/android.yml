@@ -7,6 +7,12 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
+# Keep the release asset tied to the newest main-branch commit; stale builds
+# must not finish later and overwrite a newer APK.
+concurrency:
+  group: oracle-android-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
