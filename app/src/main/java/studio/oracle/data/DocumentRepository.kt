@@ -224,14 +224,16 @@ class DocumentRepository(
             val output = mutableListOf<ExtractedPage>()
             var remaining = MAX_EXTRACTED_CHARACTERS
             for (page in 1..pdf.numberOfPages) {
-                if (remaining <= 0) break
-                val stripper = PDFTextStripper().apply {
-                    startPage = page
-                    endPage = page
-                    sortByPosition = true
+                val pageText = if (remaining > 0) {
+                    val stripper = PDFTextStripper().apply {
+                        startPage = page
+                        endPage = page
+                        sortByPosition = true
+                    }
+                    stripper.getText(pdf).take(remaining).also { remaining -= it.length }
+                } else {
+                    ""
                 }
-                val pageText = stripper.getText(pdf).take(remaining)
-                remaining -= pageText.length
                 output += ExtractedPage(
                     pageNumber = page,
                     label = "Page $page",
