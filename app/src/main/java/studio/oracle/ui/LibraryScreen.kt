@@ -1,5 +1,6 @@
 package studio.oracle.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -69,6 +70,10 @@ fun LibraryScreen() {
     var searchHits by remember { mutableStateOf(emptyList<DocumentSearchHit>()) }
     var selectedDocumentId by remember { mutableStateOf<String?>(null) }
     var selectedChunks by remember { mutableStateOf(emptyList<DocumentChunkEntity>()) }
+
+    BackHandler(enabled = selectedDocumentId != null) {
+        selectedDocumentId = null
+    }
     var status by remember { mutableStateOf("LOCAL INDEX READY") }
     var importing by remember { mutableStateOf(false) }
     var asking by remember { mutableStateOf(false) }
