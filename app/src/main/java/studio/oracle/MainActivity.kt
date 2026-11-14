@@ -484,8 +484,10 @@ private fun AgentScreen(
             if (error != null) {
                 Text(error!!, Modifier.fillMaxWidth().background(Color(0xFFFFE4E1)).padding(7.dp),
                     color = Color(0xFF9E2921), fontSize = 11.sp)
-                if (failedPrompt != null) {
-                    TextButton(onClick = { onPrompt(failedPrompt.orEmpty()) }, enabled = !busy) { Text("Restore prompt") }
+                if (failedPrompt != null && prompt != failedPrompt) {
+                    TextButton(onClick = { onPrompt(failedPrompt.orEmpty()) }, enabled = !busy) {
+                        Text("Restore prompt")
+                    }
                 }
             }
 
