@@ -43,7 +43,13 @@ class SecureKeyStore(context: Context) {
     }
 
     fun clear() {
-        prefs.edit().remove(KEY_CIPHERTEXT).apply()
+        check(prefs.edit().remove(KEY_CIPHERTEXT).commit()) {
+            "Could not remove the encrypted API key."
+        }
+        // Remove the non-exportable key as well; a future credential gets a fresh alias.
+        runCatching {
+            KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }.deleteEntry(alias)
+        }
     }
 
     private fun getOrCreateSecretKey(): SecretKey {
