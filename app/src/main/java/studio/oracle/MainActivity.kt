@@ -742,8 +742,8 @@ private fun SettingsScreen() {
     var showKey by remember { mutableStateOf(false) }
     var stored by remember { mutableStateOf(store.hasKey()) }
     var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf(if (stored) "Encrypted Gemini credential found on this device." else "No Gemini key connected.") }
-    var success by remember { mutableStateOf(stored) }
+    var status by remember { mutableStateOf(if (stored) "Encrypted Gemini key found. Verify to test the connection." else "No Gemini key connected.") }
+    var success by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
         Text("MODEL CONNECTION", color = Accent, fontSize = 9.sp, letterSpacing = 1.7.sp)
