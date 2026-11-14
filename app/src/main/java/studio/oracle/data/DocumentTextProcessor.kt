@@ -58,8 +58,8 @@ object DocumentTextProcessor {
 
                 if (end >= normalized.length) break
                 var next = (end - OVERLAP_CHARS).coerceAtLeast(start + 1)
-                while (next < normalized.length && !normalized[next].isWhitespace()) next++
-                start = if (next < normalized.length) next + 1 else end
+                while (next < end && !normalized[next].isWhitespace()) next++
+                start = if (next < end) next + 1 else end
             }
         }
         return output
