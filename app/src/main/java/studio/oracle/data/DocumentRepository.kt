@@ -232,13 +232,11 @@ class DocumentRepository(
                 }
                 val pageText = stripper.getText(pdf).take(remaining)
                 remaining -= pageText.length
-                if (pageText.isNotBlank()) {
-                    output += ExtractedPage(
-                        pageNumber = page,
-                        label = "Page $page",
-                        text = pageText
-                    )
-                }
+                output += ExtractedPage(
+                    pageNumber = page,
+                    label = "Page $page",
+                    text = pageText
+                )
             }
             return output
         }
@@ -247,7 +245,7 @@ class DocumentRepository(
     private fun sanitizeFileName(name: String, extension: String): String {
         val safe = name.substringAfterLast('/').replace(Regex("[\\\\:*?\"<>|\\p{Cntrl}]"), "_")
             .trim().take(120).ifBlank { "Imported document.$extension" }
-        return if (safe.substringAfterLast('.', "").isBlank()) "$safe.$extension" else safe
+        return safe.substringBeforeLast('.', safe).ifBlank { "Imported document" } + ".$extension"
     }
 
     private enum class SupportedFormat(val extension: String, val mimeType: String) {
