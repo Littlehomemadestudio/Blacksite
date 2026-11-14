@@ -18,6 +18,7 @@ import studio.oracle.data.local.AgentMessageEntity
 import studio.oracle.data.local.OracleDatabase
 import studio.oracle.data.GeminiConnectionResult
 import studio.oracle.security.SecureKeyStore
+import studio.oracle.ui.LibraryScreen
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
@@ -76,7 +77,7 @@ private fun OracleApp() {
                     WorkspaceHeader(active)
                     when (active) {
                         "Agent" -> AgentScreen(prompt, { prompt = it })
-                        "Library" -> ModuleScreen("DOCUMENT INTELLIGENCE", "Your files, indexed and ready.", Icons.Default.FolderOpen, listOf("Import PDF or document", "Ask across your library", "Source-linked answers", "Collections & knowledge graph"))
+                        "Library" -> LibraryScreen()
                         "Automations" -> ModuleScreen("AUTOMATION STUDIO", "Design workflows. Inspect every run.", Icons.Default.AccountTree, listOf("Visual workflow canvas", "Triggers and actions", "Run history", "Local-first execution"))
                         "Memory" -> ModuleScreen("AUDIO MEMORY", "Capture, transcribe, retrieve.", Icons.Default.GraphicEq, listOf("Record with explicit permission", "Transcription archive", "Decisions and action items", "Semantic search"))
                         "Settings" -> SettingsScreen()
