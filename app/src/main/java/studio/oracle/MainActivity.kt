@@ -57,15 +57,23 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val Ink=Color(0xFF202124)
-private val Panel=Color(0xFFF7F8FA)
-private val Raised=Color(0xFFEFF1F5)
-private val Line=Color(0xFFE5E7EB)
-private val Paper=Color(0xFF202124)
-private val Muted=Color(0xFF777D87)
-private val Accent=Color(0xFF2563EB)
-private val Violet=Color(0xFF8B5CF6)
-private val Glass=Color(0xDFFFFFFF)
+private val OracleCanvas = Color(0xFF101317)
+private val OraclePanel = Color(0xFF171C22)
+private val OracleRaised = Color(0xFF202730)
+private val OracleLine = Color(0xFF2B343F)
+private val OracleText = Color(0xFFE9E7E1)
+private val OracleMuted = Color(0xFF929BA5)
+private val OracleAccent = Color(0xFFE17A52)
+private val OracleAccentSoft = Color(0xFF33231E)
+private val Ink = OracleText
+private val Panel = OraclePanel
+private val Raised = OracleRaised
+private val Line = OracleLine
+private val Paper = OracleText
+private val Muted = OracleMuted
+private val Accent = OracleAccent
+private val Violet = Color(0xFFB49AF4)
+private val Glass = OracleRaised
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,18 +94,13 @@ private fun OracleApp() {
     }
 
     MaterialTheme(
-        colorScheme = lightColorScheme(
-            background = Color(0xFFF8F9FB),
-            surface = Color.White,
-            surfaceVariant = Panel,
-            primary = Accent,
-            secondary = Violet,
-            onBackground = Paper,
-            onSurface = Paper,
-            onSurfaceVariant = Muted
+        colorScheme = darkColorScheme(
+            background = OracleCanvas, surface = OraclePanel, surfaceVariant = OracleRaised,
+            primary = OracleAccent, secondary = Violet, onBackground = OracleText,
+            onSurface = OracleText, onSurfaceVariant = OracleMuted
         )
     ) {
-        Surface(Modifier.fillMaxSize(), color = Color(0xFFF8F9FB)) {
+        Surface(Modifier.fillMaxSize(), color = OracleCanvas) {
             when (section) {
                 OracleSection.AGENT -> AgentScreen(
                     prompt = prompt,
@@ -242,24 +245,24 @@ private fun AgentScreen(
         scrimColor = Color(0x66000000),
         drawerContent = {
             ModalDrawerSheet(
-                modifier = Modifier.fillMaxHeight().width(292.dp),
-                drawerContainerColor = Color(0xFFECE9D8),
-                drawerShape = RoundedCornerShape(0.dp)
+                modifier = Modifier.fillMaxHeight().width(304.dp),
+                drawerContainerColor = OraclePanel,
+                drawerShape = RoundedCornerShape(topEnd = 22.dp, bottomEnd = 22.dp)
             ) {
-                Column(Modifier.fillMaxSize().padding(7.dp)) {
+                Column(Modifier.fillMaxSize().background(OraclePanel).padding(12.dp)) {
                     Row(
                         Modifier.fillMaxWidth()
-                            .background(Brush.horizontalGradient(listOf(Color(0xFF3A82E6), Color(0xFF0750B8), Color(0xFF003B91))))
-                            .padding(horizontal = 10.dp, vertical = 12.dp),
+                            .background(OracleRaised, RoundedCornerShape(14.dp))
+                            .padding(horizontal = 13.dp, vertical = 15.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(Modifier.size(34.dp).background(Color(0xFFFFD45B), RoundedCornerShape(3.dp)), contentAlignment = Alignment.Center) {
-                            Text("O", color = Color(0xFF174A91), fontSize = 24.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Serif)
+                        Box(Modifier.size(36.dp).background(OracleAccent, RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
+                            Text("O", color = OracleCanvas, fontSize = 23.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Serif)
                         }
                         Spacer(Modifier.width(9.dp))
                         Column {
-                            Text("ORACLE", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = .7.sp)
-                            Text("Personal intelligence", color = Color(0xFFDCEBFF), fontSize = 10.sp)
+                            Text("ORACLE", color = OracleText, fontSize = 15.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
+                            Text("INTELLIGENCE WORKSPACE", color = OracleMuted, fontSize = 8.sp, letterSpacing = 1.1.sp)
                         }
                         Spacer(Modifier.weight(1f))
                         XPWindowButton("×", onClick = { uiScope.launch { drawer.close() } }, close = true, description = "Close chat history")
@@ -277,22 +280,21 @@ private fun AgentScreen(
                     }, primary = true)
                     Spacer(Modifier.height(13.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("CHAT HISTORY", color = Color(0xFF53677D), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp)
+                        Text("RECENT THREADS", color = OracleMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
                         Spacer(Modifier.weight(1f))
                         Text("${sessions.size}", color = Color(0xFF65798D), fontSize = 10.sp)
                     }
                     Spacer(Modifier.height(5.dp))
-                    HorizontalDivider(color = Color(0xFFB6C6D5))
+                    HorizontalDivider(color = OracleLine)
                     LazyColumn(
-                        Modifier.weight(1f).fillMaxWidth().background(Color(0xFFF8FAFC))
-                            .border(BorderStroke(1.dp, Color(0xFF9DB4C9))),
+                        Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp),
                         contentPadding = PaddingValues(vertical = 4.dp)
                     ) {
                         items(sessions, key = { it.id }) { session ->
                             val selected = session.id == activeSessionId
                             Row(
                                 Modifier.fillMaxWidth()
-                                    .background(if (selected) Color(0xFFD8E9FC) else Color.Transparent)
+                                    .background(if (selected) OracleAccentSoft else Color.Transparent, RoundedCornerShape(10.dp))
                                     .clickable {
                                         activeSessionId = session.id
                                         error = null
@@ -305,12 +307,12 @@ private fun AgentScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(Icons.Default.ChatBubbleOutline, null,
-                                    tint = if (selected) Color(0xFF0756B8) else Color(0xFF667D92),
+                                    tint = if (selected) OracleAccent else OracleMuted,
                                     modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(9.dp))
                                 Text(
                                     session.title.ifBlank { "New conversation" },
-                                    color = Color(0xFF24384B), fontSize = 12.sp,
+                                    color = if (selected) OracleText else OracleMuted, fontSize = 12.sp,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                                     maxLines = 1, overflow = TextOverflow.Ellipsis
                                 )
@@ -327,60 +329,22 @@ private fun AgentScreen(
             }
         }
     ) {
-        Column(Modifier.fillMaxSize().background(Color(0xFF7BA7D8)).padding(5.dp)) {
-            // Luna-style application title bar.
+        Column(Modifier.fillMaxSize().background(OracleCanvas)) {
             Row(
-                Modifier.fillMaxWidth().height(43.dp)
-                    .background(Brush.horizontalGradient(listOf(Color(0xFF3D8CEB), Color(0xFF1265C7), Color(0xFF0750A9), Color(0xFF003B87))))
-                    .padding(start = 8.dp, end = 5.dp),
+                Modifier.fillMaxWidth().height(64.dp).background(OracleCanvas).padding(horizontal = 18.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(Modifier.size(27.dp).background(Color(0xFFFFD45B), RoundedCornerShape(3.dp)), contentAlignment = Alignment.Center) {
-                    Text("O", color = Color(0xFF174A91), fontSize = 20.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Serif)
+                Box(Modifier.size(38.dp).background(OracleAccent, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                    Text("O", color = OracleCanvas, fontSize = 24.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Serif)
                 }
-                Spacer(Modifier.width(8.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("ORACLE Studio", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Text("Personal intelligence workspace", color = Color(0xFFD9E9FF), fontSize = 9.sp)
+                Spacer(Modifier.width(11.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("ORACLE", color = OracleText, fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.1.sp)
+                    Text("INTELLIGENCE WORKSPACE", color = OracleMuted, fontSize = 8.sp, letterSpacing = 1.15.sp)
                 }
-                XPWindowButton("—", onClick = { uiScope.launch { drawer.open() } }, description = "Open chat history")
-                Spacer(Modifier.width(3.dp))
-                XPWindowButton("□", onClick = { toolsExpanded = !toolsExpanded }, description = "Toggle model tools")
-                Spacer(Modifier.width(3.dp))
-                XPWindowButton("×", onClick = { onPrompt("") }, close = true, description = "Clear message draft")
-            }
-
-            // Classic menu / toolbar strip.
-            Row(
-                Modifier.fillMaxWidth().height(34.dp)
-                    .background(Color(0xFFECE9D8))
-                    .border(BorderStroke(1.dp, Color.White))
-                    .padding(horizontal = 5.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                XPMenuItem("Chats", onClick = { uiScope.launch { drawer.open() } })
-                XPMenuItem("Library", onClick = onLibrary)
-                XPMenuItem("New", onClick = {
-                    uiScope.launch {
-                        activeSessionId = repository.createSession(model)
-                        error = null
-                        failedPrompt = null
-                        failedPromptPersisted = false
-                        status = "READY / LOCAL SESSION"
-                    }
-                })
-                Spacer(Modifier.weight(1f))
-                Text(
-                    if (busy) "WORKING…" else status,
-                    color = when {
-                        busy -> Color(0xFF0756B8)
-                        status.contains("FAILED") || status.contains("CANCELLED") || status.contains("ERROR") -> Color(0xFF9E2921)
-                        else -> Color(0xFF54708A)
-                    },
-                    fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = .45.sp,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 7.dp)
-                )
+                WorkbenchIconButton("☰", "Open conversations", onClick = { uiScope.launch { drawer.open() } })
+                WorkbenchIconButton("▤", "Open document library", onClick = onLibrary)
+                WorkbenchIconButton("⚙", "Open settings", onClick = onSettings)
             }
 
             // Main conversation surface.
@@ -391,89 +355,85 @@ private fun AgentScreen(
                 )
             ) {
                 Row(
-                    Modifier.fillMaxWidth().height(30.dp)
-                        .background(Color(0xFFDCEBFA))
-                        .padding(horizontal = 10.dp),
+                    Modifier.fillMaxWidth().height(48.dp).background(OracleCanvas).padding(horizontal = 22.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Forum, null, tint = Color(0xFF245B91), modifier = Modifier.size(14.dp))
+                    Icon(Icons.Default.Forum, null, tint = OracleAccent, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(7.dp))
                     Text(
                         sessions.firstOrNull { it.id == activeSessionId }?.title?.ifBlank { "Conversation" } ?: "Conversation",
-                        color = Color(0xFF294C70), fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                        color = OracleText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                         maxLines = 1, overflow = TextOverflow.Ellipsis
                     )
                     Spacer(Modifier.weight(1f))
-                    Text("●", color = Color(0xFF36A852), fontSize = 8.sp)
+                    Text("●", color = Color(0xFF70B78A), fontSize = 8.sp)
                     Spacer(Modifier.width(4.dp))
-                    Text("LOCAL DATA", color = Color(0xFF54708A), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    Text("LOCAL SESSION", color = OracleMuted, fontSize = 8.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)
                 }
-                HorizontalDivider(color = Color(0xFFB5C9DD))
+                HorizontalDivider(color = OracleLine)
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     if (messages.isEmpty()) {
                         Column(
-                            Modifier.fillMaxSize().padding(24.dp),
+                            Modifier.fillMaxSize().padding(horizontal = 30.dp, vertical = 26.dp),
                             verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            horizontalAlignment = Alignment.Start
                         ) {
                             Box(
-                                Modifier.size(62.dp).background(
-                                    Brush.verticalGradient(listOf(Color(0xFFFFF2B8), Color(0xFFE6B94E))),
-                                    RoundedCornerShape(5.dp)
-                                ).border(BorderStroke(1.dp, Color(0xFFB38A2E)), RoundedCornerShape(5.dp)),
+                                Modifier.size(52.dp).background(OracleAccent, RoundedCornerShape(16.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("O", color = Color(0xFF174A91), fontSize = 42.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Serif)
+                                Text("O", color = OracleCanvas, fontSize = 36.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Serif)
                             }
                             Spacer(Modifier.height(14.dp))
-                            Text("Welcome to ORACLE", color = Color(0xFF25496D), fontSize = 20.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.SansSerif)
-                            Spacer(Modifier.height(5.dp))
-                            Text("Your workspace is ready.", color = Color(0xFF63788C), fontSize = 12.sp)
+                            Text("A clearer way to think.", color = OracleText, fontSize = 25.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.7).sp)
+                            Spacer(Modifier.height(8.dp))
+                            Text("Ask a question, shape an idea, or bring a document into the conversation.", color = OracleMuted, fontSize = 13.sp, lineHeight = 20.sp)
+                            Spacer(Modifier.height(22.dp))
+                            Text("READY WHEN YOU ARE", color = OracleAccent, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.7.sp)
                         }
                     } else {
                         LazyColumn(
-                            Modifier.fillMaxSize().padding(horizontal = 13.dp),
-                            verticalArrangement = Arrangement.spacedBy(15.dp),
-                            contentPadding = PaddingValues(top = 15.dp, bottom = 18.dp)
+                            Modifier.fillMaxSize().padding(horizontal = 22.dp),
+                            verticalArrangement = Arrangement.spacedBy(19.dp),
+                            contentPadding = PaddingValues(top = 20.dp, bottom = 24.dp)
                         ) {
                             items(messages, key = { it.id }) { message ->
                                 if (message.role == "user") {
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                                         Surface(
-                                            color = Color(0xFFE7F1FC),
-                                            shape = RoundedCornerShape(4.dp),
-                                            border = BorderStroke(1.dp, Color(0xFFB5CDE5)),
+                                            color = OracleRaised,
+                                            shape = RoundedCornerShape(topStart = 17.dp, topEnd = 17.dp, bottomStart = 17.dp, bottomEnd = 5.dp),
+                                            border = BorderStroke(1.dp, OracleLine),
                                             modifier = Modifier.widthIn(max = 310.dp)
                                         ) {
                                             Text(
                                                 message.content,
                                                 Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                                                color = Color(0xFF1D344B), fontSize = 14.sp, lineHeight = 21.sp
+                                                color = OracleText, fontSize = 14.sp, lineHeight = 22.sp
                                             )
                                         }
                                     }
                                 } else {
                                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                                         Box(
-                                            Modifier.size(24.dp).background(Color(0xFFFFE7A0), RoundedCornerShape(3.dp))
-                                                .border(BorderStroke(1.dp, Color(0xFFC6A34E)), RoundedCornerShape(3.dp)),
+                                            Modifier.size(28.dp).background(OracleAccentSoft, RoundedCornerShape(9.dp)),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text("O", color = Color(0xFF174A91), fontSize = 17.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Serif)
+                                            Text("O", color = OracleAccent, fontSize = 18.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Serif)
                                         }
                                         Spacer(Modifier.width(9.dp))
                                         Text(
                                             message.content, Modifier.weight(1f).padding(top = 2.dp),
-                                            color = Color(0xFF202B36), fontSize = 14.sp, lineHeight = 22.sp
+                                            color = OracleText, fontSize = 14.sp, lineHeight = 23.sp
                                         )
                                     }
                                 }
                             }
                             if (busy) item {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    CircularProgressIndicator(Modifier.size(15.dp), color = Color(0xFF1768C4), strokeWidth = 2.dp)
+                                    CircularProgressIndicator(Modifier.size(15.dp), color = OracleAccent, strokeWidth = 2.dp)
                                     Spacer(Modifier.width(9.dp))
-                                    Text("ORACLE is working…", color = Color(0xFF58718B), fontSize = 11.sp)
+                                    Text("ORACLE is thinking…", color = OracleMuted, fontSize = 11.sp)
                                 }
                             }
                         }
@@ -482,8 +442,8 @@ private fun AgentScreen(
             }
 
             if (error != null) {
-                Text(error!!, Modifier.fillMaxWidth().background(Color(0xFFFFE4E1)).padding(7.dp),
-                    color = Color(0xFF9E2921), fontSize = 11.sp)
+                Text(error!!, Modifier.fillMaxWidth().background(Color(0xFF3A2423), RoundedCornerShape(10.dp)).padding(11.dp),
+                    color = Color(0xFFFFB8AE), fontSize = 11.sp)
                 if (failedPrompt != null && prompt != failedPrompt) {
                     TextButton(onClick = { onPrompt(failedPrompt.orEmpty()) }, enabled = !busy) {
                         Text("Restore prompt")
@@ -493,29 +453,28 @@ private fun AgentScreen(
 
             // XP taskbar-like composer: recessed white editor, raised classic buttons.
             Column(
-                Modifier.fillMaxWidth().padding(top = 5.dp)
-                    .background(Color(0xFFECE9D8))
-                    .border(BorderStroke(1.dp, Color.White))
-                    .padding(6.dp)
+                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)
+                    .background(OraclePanel, RoundedCornerShape(19.dp))
+                    .border(BorderStroke(1.dp, OracleLine), RoundedCornerShape(19.dp))
+                    .padding(9.dp)
             ) {
                 Row(
-                    Modifier.fillMaxWidth().heightIn(min = 76.dp)
-                        .background(Color.White)
-                        .border(BorderStroke(1.dp, Color(0xFF7F9DB9)))
-                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                    Modifier.fillMaxWidth().heightIn(min = 66.dp)
+                        .background(OraclePanel, RoundedCornerShape(13.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
                     OutlinedTextField(
                         value = prompt, onValueChange = onPrompt,
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("Type a message…", color = Color(0xFF8797A6), fontSize = 14.sp) },
+                        placeholder = { Text("Message ORACLE…", color = OracleMuted, fontSize = 14.sp) },
                         minLines = 1, maxLines = 5,
                         shape = RoundedCornerShape(0.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color.Transparent, unfocusedBorderColor = Color.Transparent,
                             focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
-                            focusedTextColor = Color(0xFF172B40), unfocusedTextColor = Color(0xFF172B40),
-                            cursorColor = Color(0xFF0756B8)
+                            focusedTextColor = OracleText, unfocusedTextColor = OracleText,
+                            cursorColor = OracleAccent
                         )
                     )
                     Spacer(Modifier.width(5.dp))
@@ -622,12 +581,12 @@ private fun AgentScreen(
                     }
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                    XPButton(if (toolsExpanded) "Tools  ▲" else "Tools  ▼", onClick = { toolsExpanded = !toolsExpanded })
+                    XPButton(if (toolsExpanded) "⌃  Controls" else "＋  Model & tools", onClick = { toolsExpanded = !toolsExpanded })
                     Spacer(Modifier.weight(1f))
                     Text(
-                        "CHAT SENDS PROMPT + LAST 12 MESSAGES TO GOOGLE GEMINI",
-                        color = Color(0xFF708398),
-                        fontSize = 7.sp,
+                        "PROMPT + LAST 12 MESSAGES SHARED WITH GEMINI",
+                        color = OracleMuted,
+                        fontSize = 8.sp,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -640,14 +599,14 @@ private fun AgentScreen(
                 ) {
                     Column(
                         Modifier.fillMaxWidth().padding(top = 7.dp)
-                            .background(Color(0xFFF7F7F2))
-                            .border(BorderStroke(1.dp, Color(0xFFB8C7D5)))
-                            .padding(horizontal = 8.dp, vertical = 5.dp)
+                            .background(OracleRaised, RoundedCornerShape(13.dp))
+                            .border(BorderStroke(1.dp, OracleLine), RoundedCornerShape(13.dp))
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Memory, null, tint = Color(0xFF245B91), modifier = Modifier.size(17.dp))
+                            Icon(Icons.Default.Memory, null, tint = OracleAccent, modifier = Modifier.size(17.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Model", color = Color(0xFF354D64), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("MODEL", color = OracleMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.3.sp)
                             Spacer(Modifier.weight(1f))
                             Box {
                                 XPButton(menuModels.firstOrNull { it.name == model }?.displayName ?: model, onClick = { modelMenuExpanded = true })
@@ -677,6 +636,21 @@ private fun AgentScreen(
 }
 
 @Composable
+private fun WorkbenchIconButton(label: String, description: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.size(38.dp).semantics { contentDescription = description },
+        shape = RoundedCornerShape(11.dp),
+        color = OraclePanel,
+        border = BorderStroke(1.dp, OracleLine)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(label, color = OracleText, fontSize = 17.sp, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
 private fun XPButton(
     label: String,
     modifier: Modifier = Modifier,
@@ -684,22 +658,22 @@ private fun XPButton(
     primary: Boolean = false,
     onClick: () -> Unit
 ) {
-    val face = if (primary) Color(0xFFE0EDFC) else Color(0xFFF4F2E9)
-    val edge = if (primary) Color(0xFF7A9CC5) else Color(0xFF9B9A91)
+    val face = if (primary) OracleAccent else OracleRaised
+    val edge = if (primary) OracleAccent else OracleLine
     Surface(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.heightIn(min = 31.dp),
-        shape = RoundedCornerShape(3.dp),
+        shape = RoundedCornerShape(10.dp),
         color = face,
         border = BorderStroke(1.dp, edge),
-        shadowElevation = if (enabled) 1.dp else 0.dp
+        shadowElevation = 0.dp
     ) {
         Box(
             Modifier.defaultMinSize(minWidth = 48.dp).padding(horizontal = 9.dp, vertical = 5.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text(label, color = if (enabled) Color(0xFF24394D) else Color(0xFF9AA3AC),
+            Text(label, color = if (enabled) (if (primary) OracleCanvas else OracleText) else OracleMuted,
                 fontSize = 11.sp, fontWeight = if (primary) FontWeight.Bold else FontWeight.Medium,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
@@ -715,13 +689,13 @@ private fun XPWindowButton(
 ) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.size(width = 25.dp, height = 22.dp).then(
+        modifier = Modifier.size(width = 36.dp, height = 36.dp).then(
             if (description != null) Modifier.semantics { contentDescription = description } else Modifier
         ),
-        shape = RoundedCornerShape(4.dp),
-        color = if (close) Color(0xFFE36A5C) else Color(0xFF5A9CE8),
-        border = BorderStroke(1.dp, if (close) Color(0xFFFFB5A9) else Color(0xFFB9D8FA)),
-        shadowElevation = 1.dp
+        shape = RoundedCornerShape(11.dp),
+        color = if (close) OracleAccentSoft else OraclePanel,
+        border = BorderStroke(1.dp, if (close) OracleAccent.copy(alpha = .35f) else OracleLine),
+        shadowElevation = 0.dp
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(label, color = Color.White, fontSize = if (label == "×") 17.sp else 13.sp, fontWeight = FontWeight.Bold)
