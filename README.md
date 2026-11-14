@@ -27,9 +27,12 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Cancellable OkHttp requests: pressing **CANCEL** cancels the in-flight network call. Failed/cancelled prompts remain in the local thread and can be retried.
 - Bounded conversation context (last 12 messages) and explicit disclosure of what conversation text is sent to Gemini.
 - Unit tests for conversation context bounds and local thread-title normalization.
+- Document library imports selectable PDF, TXT, and Markdown files from Android's document picker; originals are copied into app-private storage.
+- PDF text extraction preserves page numbers. TXT/Markdown are segmented into stable section citations; extracted text is chunked and indexed in Room.
+- Offline keyword retrieval across imported passages, document reader, and a Gemini library Q&A flow that shows the exact matched source passages before sending them.
 
 ## In progress / not yet available
-- Document picker, PDF/office extraction, OCR, indexing, reader, citations, summaries, flashcards, quizzes, and knowledge graph.
+- Office document extraction, image OCR, scanned-PDF OCR, document summaries, flashcards, quizzes, semantic embeddings, and knowledge graph.
 - Multi-project workspace management beyond persistent Agent threads.
 - Visual workflow authoring, triggers, local action execution, approval gates, and run history.
 - Audio recording, transcription, searchable archive, and task/decision extraction.
@@ -41,5 +44,11 @@ These planned modules are not presented as working features in the app.
 - The API key is stored locally as AES-GCM ciphertext; its non-exportable encryption key is managed by Android Keystore.
 - The key is sent in an HTTPS header only to Google's Gemini API when a user invokes validation, model discovery, or generation.
 - Agent threads and messages are stored in the app-private Room database. They are not uploaded automatically. They are included in a Gemini request only when the user submits a prompt.
-- The Room conversation database is currently app-private but is **not encrypted at the database layer**. Do not store highly sensitive content until encrypted local-data storage is implemented.
+- The Room database (agent conversations, document metadata, and extracted document text) is app-private but is **not encrypted at the database layer**. Imported originals are also app-private files, not encrypted files. Do not store highly sensitive content until encrypted local-data storage is implemented.
+- Library Q&A is opt-in: tapping **ASK GEMINI** first displays the matched passages and asks for confirmation. Only the question and up to six retrieved excerpts are sent to the selected Gemini model; the original file and remaining library are not uploaded.
+
+## Document library scope and limits
+- Supported imports: PDF with selectable text, UTF-8 plain text, and Markdown. Maximum file size is 20 MB; PDFs are limited to 400 pages; extracted text is capped at 1.5 million characters per file.
+- Scanned/image-only PDFs are detected when no text can be extracted and are not indexed. OCR, images, DOC/DOCX, spreadsheets, and presentations are not supported yet.
+- Retrieval currently uses on-device lexical keyword matching, not embeddings or semantic vector search. PDF answers cite original page numbers; text and Markdown answers cite indexed sections.
 - Clearing a thread removes its messages locally. Uninstalling the app removes its app-private data.
