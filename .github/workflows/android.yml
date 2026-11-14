@@ -7,14 +7,13 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
-# Keep the release asset tied to the newest main-branch commit; stale builds
-# must not finish later and overwrite a newer APK.
+# Only the newest build for a branch may publish the rolling APK release.
 concurrency:
   group: oracle-android-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -51,22 +50,34 @@ jobs:
       - name: Upload CI artifact
         uses: actions/upload-artifact@v4
         with:
-          name: oracle-studio-debug-apk-zip
+          name: oracle-studio-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
+
+  release:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified APK
+        uses: actions/download-artifact@v4
+        with:
+          name: oracle-studio-debug-apk
+          path: dist
       - name: Publish direct APK download
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-latest
           name: ORACLE Studio — Latest Android APK
           body: |
             Automatically built from the latest successful main-branch commit.
-            Download the `app-debug.apk` asset directly. This is the APK file, not the zipped Actions artifact.
+            Download app-debug.apk directly. This is the APK file, not the zipped Actions artifact.
           target_commitish: main
           prerelease: true
           make_latest: false
-          files: app/build/outputs/apk/debug/app-debug.apk
+          files: dist/app-debug.apk
           overwrite_files: true
           fail_on_unmatched_files: true
