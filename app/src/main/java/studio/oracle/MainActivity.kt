@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -258,7 +260,7 @@ private fun AgentScreen(
                             Text("Personal intelligence", color = Color(0xFFDCEBFF), fontSize = 10.sp)
                         }
                         Spacer(Modifier.weight(1f))
-                        XPWindowButton("×", onClick = { uiScope.launch { drawer.close() } }, close = true)
+                        XPWindowButton("×", onClick = { uiScope.launch { drawer.close() } }, close = true, description = "Close chat history")
                     }
                     Spacer(Modifier.height(9.dp))
                     XPButton("＋   New conversation", Modifier.fillMaxWidth(), onClick = {
@@ -339,11 +341,11 @@ private fun AgentScreen(
                     Text("ORACLE Studio", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     Text("Personal intelligence workspace", color = Color(0xFFD9E9FF), fontSize = 9.sp)
                 }
-                XPWindowButton("—", onClick = { uiScope.launch { drawer.open() } })
+                XPWindowButton("—", onClick = { uiScope.launch { drawer.open() } }, description = "Open chat history")
                 Spacer(Modifier.width(3.dp))
-                XPWindowButton("□", onClick = { toolsExpanded = !toolsExpanded })
+                XPWindowButton("□", onClick = { toolsExpanded = !toolsExpanded }, description = "Toggle model tools")
                 Spacer(Modifier.width(3.dp))
-                XPWindowButton("×", onClick = { onPrompt("") }, close = true)
+                XPWindowButton("×", onClick = { onPrompt("") }, close = true, description = "Clear message draft")
             }
 
             // Classic menu / toolbar strip.
@@ -692,10 +694,17 @@ private fun XPButton(
 }
 
 @Composable
-private fun XPWindowButton(label: String, onClick: () -> Unit, close: Boolean = false) {
+private fun XPWindowButton(
+    label: String,
+    onClick: () -> Unit,
+    close: Boolean = false,
+    description: String? = null
+) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.size(width = 25.dp, height = 22.dp),
+        modifier = Modifier.size(width = 25.dp, height = 22.dp).then(
+            if (description != null) Modifier.semantics { contentDescription = description } else Modifier
+        ),
         shape = RoundedCornerShape(4.dp),
         color = if (close) Color(0xFFE36A5C) else Color(0xFF5A9CE8),
         border = BorderStroke(1.dp, if (close) Color(0xFFFFB5A9) else Color(0xFFB9D8FA)),
@@ -751,7 +760,11 @@ private fun SettingsScreen() {
                     visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         IconButton(onClick = { showKey = !showKey }) {
-                            Icon(if (showKey) Icons.Default.VisibilityOff else Icons.Default.Visibility, null, tint = Muted)
+                            Icon(
+                                if (showKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                if (showKey) "Hide API key" else "Show API key",
+                                tint = Muted
+                            )
                         }
                     },
                     shape = RoundedCornerShape(8.dp),
