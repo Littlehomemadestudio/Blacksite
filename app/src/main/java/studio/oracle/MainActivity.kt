@@ -261,7 +261,7 @@ private fun AgentScreen(prompt: String, onPrompt: (String) -> Unit, onSettings: 
             TextButton(onClick={modelMenuExpanded=true}){Text(menuModels.firstOrNull{it.name==model}?.displayName?:model,color=Accent,fontSize=12.sp,maxLines=1,overflow=TextOverflow.Ellipsis);Icon(Icons.Default.ExpandMore,null,tint=Accent)}
             DropdownMenu(expanded=modelMenuExpanded,onDismissRequest={modelMenuExpanded=false}){menuModels.forEach{candidate->DropdownMenuItem(text={Text(candidate.displayName)},onClick={modelMenuExpanded=false;scope.launch{modelPreferences.setSelectedModel(candidate.name);activeSessionId?.let{repository.updateModel(it,candidate.name)}}})}}
            }
-           IconButton(onClick={refreshModels},enabled=!syncingModels){Icon(Icons.Default.Refresh,"Refresh models",tint=Muted)}
+           IconButton(onClick={ refreshModels() },enabled=!syncingModels){Icon(Icons.Default.Refresh,"Refresh models",tint=Muted)}
           }
           Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){listOf("Search","Reason","Attach").forEach{label->Surface(color=Color(0xFFF3F5F9),shape=RoundedCornerShape(20.dp),border=BorderStroke(1.dp,Color(0xFFE7EAF0))){Text(label,Modifier.padding(horizontal=12.dp,vertical=8.dp),fontSize=11.sp,color=Color(0xFF687080))}}}
          }
@@ -271,7 +271,6 @@ private fun AgentScreen(prompt: String, onPrompt: (String) -> Unit, onSettings: 
      }
     }
    }
-  }
 }
 @Composable
 private fun SettingsScreen() {
