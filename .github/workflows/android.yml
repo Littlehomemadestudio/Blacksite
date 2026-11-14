@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -33,10 +33,34 @@ jobs:
         run: gradle --no-daemon testDebugUnitTest
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
-      - name: Upload APK
+      - name: Verify APK alignment and signature
+        run: |
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -v 4 "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee /tmp/oracle-apk-badging.txt
+          grep -q "package: name='studio.oracle'" /tmp/oracle-apk-badging.txt
+          grep -q "sdkVersion:'26'" /tmp/oracle-apk-badging.txt
+      - name: Upload CI artifact
         uses: actions/upload-artifact@v4
         with:
-          name: oracle-studio-debug-apk
+          name: oracle-studio-debug-apk-zip
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
+      - name: Publish direct APK download
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-latest
+          name: ORACLE Studio — Latest Android APK
+          body: |
+            Automatically built from the latest successful main-branch commit.
+            Download the `app-debug.apk` asset directly. This is the APK file, not the zipped Actions artifact.
+          target_commitish: main
+          prerelease: true
+          make_latest: false
+          files: app/build/outputs/apk/debug/app-debug.apk
+          overwrite_files: true
+          fail_on_unmatched_files: true
