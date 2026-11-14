@@ -240,7 +240,7 @@ fun LibraryScreen() {
                     onClick = {
                         picker.launch(arrayOf("application/pdf", "text/plain", "text/markdown", "text/x-markdown"))
                     },
-                    enabled = !importing,
+                    enabled = !importing && !asking,
                     shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(horizontal = 11.dp, vertical = 9.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = LibraryAccent, contentColor = LibraryInk)
@@ -260,6 +260,7 @@ fun LibraryScreen() {
                 Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                     OutlinedTextField(
                         value = query,
+                        enabled = !asking,
                         onValueChange = { query = it.take(300); searchHits = emptyList(); answer = null; answerError = null; answerSources = emptyList() },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Search passages, concepts, or names…", color = LibraryMuted, fontSize = 11.sp) },
@@ -276,7 +277,7 @@ fun LibraryScreen() {
                     Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                         OutlinedButton(
                             onClick = { runLocalSearch() },
-                            enabled = query.isNotBlank(),
+                            enabled = query.isNotBlank() && !asking,
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(7.dp),
                             contentPadding = PaddingValues(vertical = 8.dp),
