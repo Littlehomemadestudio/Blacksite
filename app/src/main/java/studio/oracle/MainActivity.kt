@@ -265,10 +265,10 @@ private fun AgentScreen(
                             Text("INTELLIGENCE WORKSPACE", color = OracleMuted, fontSize = 8.sp, letterSpacing = 1.1.sp)
                         }
                         Spacer(Modifier.weight(1f))
-                        XPWindowButton("×", onClick = { uiScope.launch { drawer.close() } }, close = true, description = "Close chat history")
+                        WorkbenchWindowButton("×", onClick = { uiScope.launch { drawer.close() } }, close = true, description = "Close chat history")
                     }
                     Spacer(Modifier.height(9.dp))
-                    XPButton("＋   New conversation", Modifier.fillMaxWidth(), onClick = {
+                    WorkbenchButton("＋   New conversation", Modifier.fillMaxWidth(), onClick = {
                         uiScope.launch {
                             activeSessionId = repository.createSession(model)
                             error = null
@@ -282,7 +282,7 @@ private fun AgentScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("RECENT THREADS", color = OracleMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
                         Spacer(Modifier.weight(1f))
-                        Text("${sessions.size}", color = Color(0xFF65798D), fontSize = 10.sp)
+                        Text("${sessions.size}", color = OracleMuted, fontSize = 10.sp)
                     }
                     Spacer(Modifier.height(5.dp))
                     HorizontalDivider(color = OracleLine)
@@ -704,7 +704,7 @@ private fun XPWindowButton(
 }
 
 @Composable
-private fun XPMenuItem(label: String, onClick: () -> Unit) {
+private fun WorkbenchMenuItem(label: String, onClick: () -> Unit) {
     Text(
         label,
         Modifier.clickable(onClick = onClick).padding(horizontal = 9.dp, vertical = 6.dp),
