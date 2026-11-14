@@ -28,6 +28,7 @@ class DocumentTextProcessorTest {
         assertTrue(chunks.isNotEmpty())
         assertTrue(chunks.all { it.pageNumber == null })
         assertTrue(chunks.all { it.sectionLabel.isNotBlank() })
+        assertEquals(chunks.size, chunks.map { it.sectionLabel }.distinct().size)
     }
 
     @Test
