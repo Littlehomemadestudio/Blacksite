@@ -48,7 +48,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
@@ -234,11 +233,6 @@ private fun AgentScreen(
     var toolsExpanded by remember { mutableStateOf(false) }
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val uiScope = rememberCoroutineScope()
-    val xpBlue = Color(0xFF0A58CA)
-    val xpDeep = Color(0xFF003C9D)
-    val xpPale = Color(0xFFEAF3FF)
-    val xpSilver = Color(0xFFE8E8E8)
-    val xpLine = Color(0xFF7F9DB9)
 
     ModalNavigationDrawer(
         drawerState = drawer,
@@ -320,7 +314,7 @@ private fun AgentScreen(
                         }
                     }
                     Spacer(Modifier.height(8.dp))
-                    XPButton("⚙   Settings", Modifier.fillMaxWidth(), onClick = {
+                    WorkbenchButton("⚙   Settings", Modifier.fillMaxWidth(), onClick = {
                         onSettings()
                         uiScope.launch { drawer.close() }
                     })
@@ -451,7 +445,7 @@ private fun AgentScreen(
                 }
             }
 
-            // XP taskbar-like composer: recessed white editor, raised classic buttons.
+            // Composer and progressive-disclosure controls stay together at the bottom edge.
             Column(
                 Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)
                     .background(OraclePanel, RoundedCornerShape(19.dp))
@@ -479,20 +473,20 @@ private fun AgentScreen(
                     )
                     Spacer(Modifier.width(5.dp))
                     if (busy) {
-                        XPButton(
+                        WorkbenchButton(
                             "Cancel",
                             Modifier.width(65.dp).height(39.dp),
                             onClick = { requestJob?.cancel() }
                         )
                     } else {
-                        XPButton(
+                        WorkbenchButton(
                             "Send",
                             Modifier.width(65.dp).height(39.dp),
                             enabled = prompt.isNotBlank(),
                             primary = true,
                             onClick = {
                                 val submitted = prompt.trim()
-                                if (submitted.isBlank()) return@XPButton
+                                if (submitted.isBlank()) return@WorkbenchButton
                                 val selected = activeSessionId
                                 val turns = messages.map { AgentTurn(it.role, it.content) }
                                 val submission = AgentConversationPolicy.submissionHistory(
@@ -581,7 +575,7 @@ private fun AgentScreen(
                     }
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                    XPButton(if (toolsExpanded) "⌃  Controls" else "＋  Model & tools", onClick = { toolsExpanded = !toolsExpanded })
+                    WorkbenchButton(if (toolsExpanded) "⌃  Controls" else "＋  Model & tools", onClick = { toolsExpanded = !toolsExpanded })
                     Spacer(Modifier.weight(1f))
                     Text(
                         "PROMPT + LAST 12 MESSAGES SHARED WITH GEMINI",
@@ -609,7 +603,7 @@ private fun AgentScreen(
                             Text("MODEL", color = OracleMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.3.sp)
                             Spacer(Modifier.weight(1f))
                             Box {
-                                XPButton(menuModels.firstOrNull { it.name == model }?.displayName ?: model, onClick = { modelMenuExpanded = true })
+                                WorkbenchButton(menuModels.firstOrNull { it.name == model }?.displayName ?: model, onClick = { modelMenuExpanded = true })
                                 DropdownMenu(expanded = modelMenuExpanded, onDismissRequest = { modelMenuExpanded = false }) {
                                     menuModels.forEach { candidate ->
                                         DropdownMenuItem(
@@ -626,7 +620,7 @@ private fun AgentScreen(
                                 }
                             }
                             Spacer(Modifier.width(4.dp))
-                            XPButton(if (syncingModels) "…" else "Refresh", onClick = { refreshModels() }, enabled = !syncingModels)
+                            WorkbenchButton(if (syncingModels) "…" else "Refresh", onClick = { refreshModels() }, enabled = !syncingModels)
                         }
                     }
                 }
@@ -651,7 +645,7 @@ private fun WorkbenchIconButton(icon: ImageVector, description: String, onClick:
 }
 
 @Composable
-private fun XPButton(
+private fun WorkbenchButton(
     label: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
@@ -681,7 +675,7 @@ private fun XPButton(
 }
 
 @Composable
-private fun XPWindowButton(
+private fun WorkbenchWindowButton(
     label: String,
     onClick: () -> Unit,
     close: Boolean = false,
