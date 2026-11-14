@@ -618,7 +618,14 @@ private fun AgentScreen(
                 Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                     XPButton(if (toolsExpanded) "Tools  ▲" else "Tools  ▼", onClick = { toolsExpanded = !toolsExpanded })
                     Spacer(Modifier.weight(1f))
-                    Text("ORACLE STUDIO", color = Color(0xFF708398), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = .5.sp)
+                    Text(
+                        "CHAT SENDS PROMPT + LAST 12 MESSAGES TO GOOGLE GEMINI",
+                        color = Color(0xFF708398),
+                        fontSize = 7.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
                 AnimatedVisibility(
                     visible = toolsExpanded,
