@@ -26,4 +26,54 @@ class AgentConversationPolicyTest {
     fun blankPromptUsesNewThreadTitle() {
         assertEquals(AgentConversationPolicy.DEFAULT_TITLE, AgentConversationPolicy.titleFor(" \n "))
     }
+
+    @Test
+    fun retryReusesOnlyThePersistedFailedUserTurn() {
+        val turns = listOf(
+            AgentTurn("user", "previous question"),
+            AgentTurn("assistant", "previous answer"),
+            AgentTurn("user", "failed question")
+        )
+
+        val submission = AgentConversationPolicy.submissionHistory(
+            turns = turns,
+            prompt = "failed question",
+            failedPrompt = "failed question",
+            failedPromptPersisted = true
+        )
+
+        assertEquals(true, submission.isRetry)
+        assertEquals(turns.dropLast(1), submission.history)
+    }
+
+    @Test
+    fun identicalPromptIsNotARepeatWhenItWasNeverPersisted() {
+        val turns = listOf(AgentTurn("user", "same question"))
+
+        val submission = AgentConversationPolicy.submissionHistory(
+            turns = turns,
+            prompt = "same question",
+            failedPrompt = "same question",
+            failedPromptPersisted = false
+        )
+
+        assertEquals(false, submission.isRetry)
+        assertEquals(turns, submission.history)
+    }
+
+    @Test
+    fun aDifferentPromptDoesNotReuseThePreviousFailedTurn() {
+        val turns = listOf(AgentTurn("user", "failed question"))
+
+        val submission = AgentConversationPolicy.submissionHistory(
+            turns = turns,
+            prompt = "new question",
+            failedPrompt = "failed question",
+            failedPromptPersisted = true
+        )
+
+        assertEquals(false, submission.isRetry)
+        assertEquals(turns, submission.history)
+    }
+
 }
