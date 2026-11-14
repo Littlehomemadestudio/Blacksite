@@ -559,6 +559,8 @@ private fun AgentScreen(
                                             ?: repository.createSession(model).also { activeSessionId = it }
                                         val key = try {
                                             withContext(Dispatchers.IO) { keyStore.read().orEmpty() }
+                                        } catch (cancelled: CancellationException) {
+                                            throw cancelled
                                         } catch (_: Exception) {
                                             error = "The stored Gemini key could not be decrypted. Remove it in Settings and reconnect."
                                             failedPrompt = submitted
@@ -792,6 +794,8 @@ private fun SettingsScreen() {
                             } else {
                                 try {
                                     withContext(Dispatchers.IO) { store.read().orEmpty() }
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
                                 } catch (_: Exception) {
                                     status = "Stored key could not be decrypted. Remove it and reconnect."
                                     success = false
@@ -808,6 +812,8 @@ private fun SettingsScreen() {
                                             keyInput = ""
                                             status = result.message
                                             success = true
+                                        } catch (cancelled: CancellationException) {
+                                            throw cancelled
                                         } catch (_: Exception) {
                                             status = "Verified, but secure storage failed. The previous saved key was not replaced."
                                             success = false
@@ -853,6 +859,8 @@ private fun SettingsScreen() {
                                     keyInput = ""
                                     success = false
                                     status = "Stored key and its Keystore alias were removed from this device."
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
                                 } catch (_: Exception) {
                                     success = false
                                     status = "Could not remove the stored key. Try again."
