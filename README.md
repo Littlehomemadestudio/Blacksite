@@ -5,7 +5,7 @@
 ## Product principles
 - Native Android, offline-first local workspace, Gemini API key supplied by the user.
 - API credentials are encrypted at rest with AES-GCM; the encryption key is held by Android Keystore.
-- Transparent, permission-gated agent tools with run history and explicit confirmation for destructive or external actions.
+- Planned agent actions must be transparent, permission-gated, auditable, and explicitly confirmed before external or destructive effects.
 - Source-grounded document answers, searchable recordings, and inspectable automation runs.
 - Original ORACLE identity and visual system; Cursor is a design-quality reference, not an asset or UI source.
 
@@ -26,7 +26,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Persistent agent threads and message history in Room; thread titles are generated locally from the first user prompt.
 - Selected Gemini model stored in DataStore. The Agent can refresh the models exposed to the connected key using Google's models endpoint and choose a model that supports `generateContent`.
 - Cancellable OkHttp requests: an explicit **Cancel** control cancels the in-flight network call. Failed/cancelled prompts remain in the local thread and retry without duplicating the saved user turn.
-- Bounded conversation context (last 12 messages) and explicit disclosure of what conversation text is sent to Gemini.
+- Bounded conversation context (last 12 messages) with a send-point disclosure in the chat composer; Library Q&A displays the exact retrieved excerpts and requires confirmation before sending them.
 - Unit tests for conversation context, session naming, document chunk boundaries, PDF page citations, stable text sections, and English/Persian keyword ranking.
 - Document library imports selectable PDF, TXT, and Markdown files from Android's document picker; originals are copied into app-private storage.
 - PDF text extraction preserves page numbers. TXT/Markdown are segmented into stable section citations; extracted text is chunked and indexed in Room.
