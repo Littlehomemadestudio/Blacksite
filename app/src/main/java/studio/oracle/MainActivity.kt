@@ -296,6 +296,8 @@ private fun AgentScreen(prompt: String, onPrompt: (String) -> Unit) {
                         status = "MODEL DISCOVERY FAILED"
                     }
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (_: Exception) {
                 error = "Could not load models. Check the stored key and network connection."
                 status = "MODEL DISCOVERY FAILED"
@@ -438,7 +440,7 @@ private fun AgentScreen(prompt: String, onPrompt: (String) -> Unit) {
                     )
                     Spacer(Modifier.height(9.dp))
                     Text(
-                        "Threads are stored locally. Only the prompt and conversation context you submit are sent to Gemini.",
+                        "Submitting a prompt sends it plus the latest 12 messages in this thread to Gemini.",
                         color = Muted, fontSize = 9.sp, lineHeight = 14.sp
                     )
                 }
