@@ -330,7 +330,7 @@ fun LibraryScreen() {
                             }
                         }
                         answerError?.let { Text(it, color = Color(0xFFFF9B91), fontSize = 10.sp) }
-                        answer?.let { Text(it, color = LibraryPaper, fontSize = 11.sp, lineHeight = 17.sp) }
+                        answer?.let { Text(it, Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState()), color = LibraryPaper, fontSize = 11.sp, lineHeight = 17.sp) }
                         if (answerSources.isNotEmpty()) {
                             HorizontalDivider(color = LibraryLine)
                             Text("RETRIEVED SOURCES", color = LibraryMuted, fontSize = 8.sp, letterSpacing = 1.sp)
