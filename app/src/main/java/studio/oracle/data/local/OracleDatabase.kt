@@ -133,8 +133,8 @@ interface DocumentDao {
     @Query("SELECT * FROM document_chunks WHERE documentId = :documentId ORDER BY ordinal ASC")
     suspend fun chunksForDocument(documentId: String): List<DocumentChunkEntity>
 
-    @Query("SELECT * FROM document_chunks ORDER BY documentId, ordinal")
-    suspend fun allChunks(): List<DocumentChunkEntity>
+    @Query("SELECT * FROM document_chunks WHERE content LIKE '%' || :term || '%' ORDER BY id DESC LIMIT 500")
+    suspend fun chunksMatching(term: String): List<DocumentChunkEntity>
 
     @Insert
     suspend fun insertDocument(document: DocumentEntity)
