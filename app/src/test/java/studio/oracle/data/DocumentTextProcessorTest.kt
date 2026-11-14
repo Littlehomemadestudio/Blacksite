@@ -39,6 +39,18 @@ class DocumentTextProcessorTest {
     }
 
     @Test
+    fun longUnbrokenTokensAreSplitWithoutDroppingTheTail() {
+        val text = "x".repeat(2_500)
+        val chunks = DocumentTextProcessor.chunk(
+            listOf(ExtractedPage(pageNumber = null, label = "Document text", text = text))
+        )
+
+        assertTrue(chunks.size >= 2)
+        assertTrue(chunks.all { it.content.isNotEmpty() })
+        assertTrue(chunks.last().content.length >= 200)
+    }
+
+    @Test
     fun blankTextProducesNoChunksOrSearchTokens() {
         assertTrue(DocumentTextProcessor.chunk(listOf(ExtractedPage(null, "Document text", "  \n  "))).isEmpty())
         assertTrue(DocumentTextProcessor.tokenize("!? ...").isEmpty())
