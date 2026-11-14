@@ -47,8 +47,7 @@ object DocumentTextProcessor {
                 val body = normalized.substring(start, end).trim()
                 if (body.isNotEmpty()) {
                     val ordinal = output.size
-                    val label = page.pageNumber?.let { "Page $it" }
-                        ?: if (page.label.isNotBlank()) page.label else "Section ${ordinal + 1}"
+                    val label = page.pageNumber?.let { "Page $it" } ?: "Section ${ordinal + 1}"
                     output += DocumentChunkDraft(
                         ordinal = ordinal,
                         pageNumber = page.pageNumber,
