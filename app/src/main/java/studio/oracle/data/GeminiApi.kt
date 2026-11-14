@@ -226,12 +226,7 @@ private suspend fun Call.await(): Response = suspendCancellableCoroutine { conti
         }
 
         override fun onResponse(call: Call, response: Response) {
-            val token = continuation.tryResume(response)
-            if (token != null) {
-                continuation.completeResume(token)
-            } else {
-                response.close()
-            }
+            continuation.resume(response) { _, resource, _ -> resource.close() }
         }
     })
     continuation.invokeOnCancellation { cancel() }
