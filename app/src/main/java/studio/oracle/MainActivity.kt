@@ -7,8 +7,10 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import studio.oracle.data.AgentConversationPolicy
 import studio.oracle.data.AgentRepository
 import studio.oracle.data.AgentTurn
@@ -554,7 +556,7 @@ private fun AgentScreen(
                                         val sid = selected
                                             ?: repository.createSession(model).also { activeSessionId = it }
                                         val key = try {
-                                            keyStore.read().orEmpty()
+                                            withContext(Dispatchers.IO) { keyStore.read().orEmpty() }
                                         } catch (_: Exception) {
                                             error = "The stored Gemini key could not be decrypted. Remove it in Settings and reconnect."
                                             failedPrompt = submitted
@@ -787,7 +789,7 @@ private fun SettingsScreen() {
                                 enteredKey
                             } else {
                                 try {
-                                    store.read().orEmpty()
+                                    withContext(Dispatchers.IO) { store.read().orEmpty() }
                                 } catch (_: Exception) {
                                     status = "Stored key could not be decrypted. Remove it and reconnect."
                                     success = false
@@ -799,7 +801,7 @@ private fun SettingsScreen() {
                                 is GeminiConnectionResult.Connected -> {
                                     if (enteredKey.isNotBlank()) {
                                         try {
-                                            store.save(candidate)
+                                            withContext(Dispatchers.IO) { store.save(candidate) }
                                             stored = true
                                             keyInput = ""
                                             status = result.message
@@ -838,12 +840,26 @@ private fun SettingsScreen() {
                     Text(status, color = if (success) Accent else Muted, fontSize = 10.sp)
                 }
                 if (stored) {
-                    TextButton(onClick = {
-                        store.clear()
-                        stored = false
-                        success = false
-                        status = "Stored key removed from this device."
-                    }) {
+                    TextButton(
+                        onClick = {
+                            scope.launch {
+                                busy = true
+                                try {
+                                    withContext(Dispatchers.IO) { store.clear() }
+                                    stored = false
+                                    keyInput = ""
+                                    success = false
+                                    status = "Stored key and its Keystore alias were removed from this device."
+                                } catch (_: Exception) {
+                                    success = false
+                                    status = "Could not remove the stored key. Try again."
+                                } finally {
+                                    busy = false
+                                }
+                            }
+                        },
+                        enabled = !busy
+                    ) {
                         Icon(Icons.Default.DeleteOutline, null, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(5.dp))
                         Text("REMOVE STORED KEY", fontSize = 9.sp)
