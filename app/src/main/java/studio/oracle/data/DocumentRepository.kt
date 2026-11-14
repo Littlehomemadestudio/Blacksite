@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.io.MemoryUsageSetting
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
 import com.tom_roush.pdfbox.text.PDFTextStripper
@@ -17,6 +18,7 @@ import studio.oracle.data.local.DocumentEntity
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.Writer
 import java.util.Locale
 import java.util.UUID
 
@@ -217,7 +219,7 @@ class DocumentRepository(
 
     private fun extractPdf(file: File): List<ExtractedPage> {
         PDFBoxResourceLoader.init(appContext)
-        PDDocument.load(file).use { pdf ->
+        PDDocument.load(file, MemoryUsageSetting.setupTempFileOnly()).use { pdf ->
             if (pdf.numberOfPages > MAX_PDF_PAGES) {
                 throw DocumentImportException("PDF exceeds the 400-page import limit.")
             }
@@ -230,7 +232,10 @@ class DocumentRepository(
                         endPage = page
                         sortByPosition = true
                     }
-                    stripper.getText(pdf).take(remaining).also { remaining -= it.length }
+                    LimitedTextWriter(remaining).use { writer ->
+                        stripper.writeText(pdf, writer)
+                        writer.content()
+                    }.also { remaining -= it.length }
                 } else {
                     ""
                 }
@@ -242,6 +247,25 @@ class DocumentRepository(
             }
             return output
         }
+    }
+
+
+    private class LimitedTextWriter(limit: Int) : Writer() {
+        private val output = StringBuilder()
+        private var remaining = limit
+
+        override fun write(buffer: CharArray, offset: Int, length: Int) {
+            val count = minOf(length, remaining)
+            if (count > 0) {
+                output.append(buffer, offset, count)
+                remaining -= count
+            }
+        }
+
+        override fun flush() = Unit
+        override fun close() = Unit
+
+        fun content(): String = output.toString()
     }
 
     private fun sanitizeFileName(name: String, extension: String): String {
