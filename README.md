@@ -1,13 +1,13 @@
 # ORACLE STUDIO
 
-**Your intelligence workspace.** A native Android application combining a Gemini operator and local document intelligence in an original Windows XP Luna-inspired desktop workspace. Automation and audio-memory modules remain planned rather than simulated.
+**Your intelligence workspace.** A native Android application combining a Gemini operator and local document intelligence in a focused, chat-first technical workbench. Its visual language pairs Codex-like tool clarity with Linear-level typographic restraint and interaction polish. Automation and audio-memory modules remain planned rather than simulated.
 
 ## Product principles
 - Native Android, offline-first local workspace, Gemini API key supplied by the user.
 - API credentials are encrypted at rest with AES-GCM; the encryption key is held by Android Keystore.
 - Planned agent actions must be transparent, permission-gated, auditable, and explicitly confirmed before external or destructive effects.
 - Source-grounded document answers; future automation runs and audio recordings are intended to remain local and inspectable.
-- Original ORACLE identity and visual system; Cursor is a design-quality reference, not an asset or UI source.
+- Original ORACLE identity: graphite surfaces, warm oxide accents, editorial typography, precise spacing, and progressive disclosure. Codex and Linear are quality references, never templates to copy.
 
 ## Build
 Open this repository in Android Studio or run:
@@ -19,7 +19,7 @@ gradle --no-daemon testDebugUnitTest assembleDebug
 Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions runs the unit tests and builds/uploads the debug APK on every push to `main`.
 
 ## Implemented
-- Native Jetpack Compose workspace with a handcrafted Luna-style title/menu treatment, chat-first layout, session drawer, and responsive classic controls.
+- Native Jetpack Compose workspace with a handcrafted Codex × Linear-inspired chat workbench, persistent thread drawer, compact navigation, and expandable model controls beneath the composer.
 - Document Library is reachable directly from the chat toolbar and returns to the agent with Android back navigation.
 - Gemini API key validation and AES-GCM encryption backed by Android Keystore. No API key is embedded in source or APK.
 - Live Gemini Agent console using `generateContent`, with visible request status and API/network errors.
