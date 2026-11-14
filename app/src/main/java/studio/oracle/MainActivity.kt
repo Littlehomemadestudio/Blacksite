@@ -350,9 +350,7 @@ private fun AgentScreen(
             // Main conversation surface.
             Column(
                 Modifier.weight(1f).fillMaxWidth()
-                    .background(Color(0xFFFDFDFD))
-                    .border(BorderStroke(1.dp, Color(0xFF557FA9))
-                )
+                    .background(OracleCanvas)
             ) {
                 Row(
                     Modifier.fillMaxWidth().height(48.dp).background(OracleCanvas).padding(horizontal = 22.dp),
