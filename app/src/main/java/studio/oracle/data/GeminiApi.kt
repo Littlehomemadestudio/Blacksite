@@ -26,7 +26,9 @@ sealed interface GeminiReplyResult {
 
 data class GeminiModel(
     val name: String,
-    val displayName: String
+    val displayName: String,
+    val inputTokenLimit: Int? = null,
+    val outputTokenLimit: Int? = null
 )
 
 sealed interface GeminiModelsResult {
@@ -91,7 +93,9 @@ class GeminiApi(
                                 add(
                                     GeminiModel(
                                         name = name,
-                                        displayName = item.optString("displayName").ifBlank { name }
+                                        displayName = item.optString("displayName").ifBlank { name },
+                                        inputTokenLimit = item.optInt("inputTokenLimit").takeIf { item.has("inputTokenLimit") },
+                                        outputTokenLimit = item.optInt("outputTokenLimit").takeIf { item.has("outputTokenLimit") }
                                     )
                                 )
                             }
