@@ -9,8 +9,8 @@ import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-data class AgenticSettings(val thinkingLevel:String="high",val thinkingSummaries:String="auto",val maxOutputTokens:Int=8192,val temperature:Double=0.35,val googleSearch:Boolean=true,val hostedPython:Boolean=true,val urlContext:Boolean=true,val localTools:Boolean=true){
- fun validated()=copy(thinkingLevel=thinkingLevel.takeIf{it in setOf("minimal","low","medium","high","xhigh")}?:"high",thinkingSummaries=thinkingSummaries.takeIf{it in setOf("auto","none")}?:"auto",maxOutputTokens=maxOutputTokens.coerceIn(256,32768),temperature=temperature.coerceIn(0.0,2.0))
+data class AgenticSettings(val thinkingLevel:String="high",val thinkingSummaries:String="auto",val maxOutputTokens:Int=8192,val temperature:Double=0.35,val topP:Double=0.95,val topK:Int=40,val googleSearch:Boolean=true,val hostedPython:Boolean=true,val urlContext:Boolean=true,val localTools:Boolean=true){
+ fun validated()=copy(thinkingLevel=thinkingLevel.takeIf{it in setOf("minimal","low","medium","high","xhigh")}?:"high",thinkingSummaries=thinkingSummaries.takeIf{it in setOf("auto","none")}?:"auto",maxOutputTokens=maxOutputTokens.coerceIn(256,32768),temperature=temperature.coerceIn(0.0,2.0),topP=topP.coerceIn(0.0,1.0),topK=topK.coerceIn(1,100))
 }
 data class AgenticEvent(val kind:String,val title:String,val detail:String="",val code:String="")
 sealed interface AgenticResult{data class Success(val text:String,val model:String,val interactionId:String?):AgenticResult;data class Failed(val message:String):AgenticResult}
@@ -26,7 +26,7 @@ class GeminiAgenticRuntime(private val http:OkHttpClient=OkHttpClient.Builder().
   val tools=JSONArray().apply{if(cfg.googleSearch)put(JSONObject().put("type","google_search"));if(cfg.hostedPython)put(JSONObject().put("type","code_execution"));if(cfg.urlContext)put(JSONObject().put("type","url_context"));if(cfg.localTools){val a=executor.declarations();for(i in 0 until a.length())put(a.getJSONObject(i))}}
   var interactionId:String?=null;var input:Any=prompt;val transcript=StringBuilder()
   repeat(12){round->
-   val body=JSONObject().put("model",model).put("input",input).put("tools",tools).put("generation_config",JSONObject().put("thinking_level",cfg.thinkingLevel).put("thinking_summaries",cfg.thinkingSummaries).put("max_output_tokens",cfg.maxOutputTokens).put("temperature",cfg.temperature))
+   val body=JSONObject().put("model",model).put("input",input).put("tools",tools).put("generation_config",JSONObject().put("thinking_level",cfg.thinkingLevel).put("thinking_summaries",cfg.thinkingSummaries).put("max_output_tokens",cfg.maxOutputTokens).put("temperature",cfg.temperature).put("top_p",cfg.topP).put("top_k",cfg.topK))
    interactionId?.let{body.put("previous_interaction_id",it)}
    val request=Request.Builder().url("https://generativelanguage.googleapis.com/v1beta/interactions").header("x-goog-api-key",apiKey).header("Api-Revision","2026-05-20").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()
    val root=try{http.newCall(request).await().use{response->val raw=response.body?.string().orEmpty();if(!response.isSuccessful)return AgenticResult.Failed(apiError(response.code,raw));JSONObject(raw)}}catch(c:CancellationException){throw c}catch(e:IOException){return AgenticResult.Failed("Network error contacting Gemini Interactions API.")}catch(e:Exception){return AgenticResult.Failed(e.message?.take(240)?:"Could not read Gemini interaction.")}
