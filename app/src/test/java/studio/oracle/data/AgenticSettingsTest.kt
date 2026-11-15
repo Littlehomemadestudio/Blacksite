@@ -13,7 +13,7 @@ class AgenticSettingsTest {
             toolChoice = "invalid"
         ).validated()
 
-        assertEquals("high", settings.thinkingLevel)
+        assertEquals("medium", settings.thinkingLevel)
         assertEquals("auto", settings.thinkingSummaries)
         assertEquals(65536, settings.maxOutputTokens)
         assertEquals("auto", settings.toolChoice)
