@@ -50,11 +50,11 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 
 
 ### Agentic tools and execution
-- Google Search, URL context, and hosted Python are enabled as Gemini built-in tools when selected. Availability depends on the chosen model, API key, and Google account/project quota.
+- Tavily web search, Gemini URL Context, hosted Python, local Python and scoped phone-file tools can be enabled independently in the composer. Web search uses a separately encrypted Tavily API key; it does not depend on Gemini's Google Search grounding entitlement.
 - The app executes custom function calls and returns results to Gemini, allowing the model to continue through multiple tool rounds. The loop has a 12-round safety cap.
-- Phone file access uses Android's system folder picker and persisted Storage Access Framework permission. The agent can list and read files and create or append UTF-8 text files only beneath that granted folder. Paths are relative, traversal is rejected, reads are capped at 512 KB, and writes at 256 KB.
-- Creating or appending phone files requires a per-action approval dialog. The folder grant can be changed through the composer controls.
-- A bundled CPython 3.13 runtime is included through Chaquopy. Local Python execution is displayed in the conversation and requires per-run approval. The runner restricts imports to a standard-library allowlist, blocks filesystem/network/process APIs, caps source/output, and applies a line-execution budget. This is a constrained in-app Python environment, not Termux or a hostile-code security boundary.
+- Phone file access uses Android's system folder picker and persisted Storage Access Framework permission. The agent can list and read files and create or append UTF-8 text files only beneath that granted folder. Paths are relative, traversal is rejected, reads and writes are capped at 10 MB per operation.
+- Reading cloud-bound phone file contents, creating/appending files, and running local Python require an approval. The user can allow an action once or grant tool access for the active chat session. The folder grant can be changed through the composer controls.
+- A bundled CPython 3.13 runtime is included through Chaquopy. Local Python execution is displayed in the conversation and can be approved once for the active chat session. Normal Python built-ins, the supported standard library, network access and the app-private Python workspace are available. Android still limits the interpreter to the app UID; this is not an OS-level Termux shell, and some platform-dependent Python modules and binary wheels are unavailable.
 - Hosted Gemini code execution and local on-device Python are separate tools: the first runs in Google's hosted environment; the second runs on the device.
 - The Interactions API uses model-managed implicit context caching. The UI reports cached-token usage when returned by Google; explicit cache-object management is not available through this API.
 - Model capability and context limits vary by model. Unsupported model/API combinations return a visible error instead of silently falling back to a tool-less chat.
