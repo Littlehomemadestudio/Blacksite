@@ -17,8 +17,41 @@ import javax.crypto.spec.GCMParameterSpec
 class SecureKeyStore(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences("oracle_credentials", Context.MODE_PRIVATE)
     private val alias = "oracle.gemini.api.aes"
+    private val tavilyAlias = "oracle.tavily.api.aes"
 
     fun hasKey(): Boolean = prefs.contains(KEY_CIPHERTEXT)
+
+
+    fun hasTavilyKey(): Boolean = prefs.contains(TAVILY_KEY_CIPHERTEXT)
+
+    fun saveTavilyKey(apiKey: String) {
+        require(apiKey.isNotBlank()) { "Search API key cannot be empty." }
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateSecretKey(tavilyAlias))
+        val payload = cipher.iv + cipher.doFinal(apiKey.toByteArray(Charsets.UTF_8))
+        check(prefs.edit().putString(TAVILY_KEY_CIPHERTEXT, Base64.encodeToString(payload, Base64.NO_WRAP)).commit()) {
+            "Could not persist the encrypted search key."
+        }
+    }
+
+    fun readTavilyKey(): String? {
+        val encoded = prefs.getString(TAVILY_KEY_CIPHERTEXT, null) ?: return null
+        val payload = Base64.decode(encoded, Base64.NO_WRAP)
+        require(payload.size > GCM_IV_BYTES) { "Stored search credential is corrupted." }
+        val iv = payload.copyOfRange(0, GCM_IV_BYTES)
+        val ciphertext = payload.copyOfRange(GCM_IV_BYTES, payload.size)
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        cipher.init(Cipher.DECRYPT_MODE, getOrCreateSecretKey(tavilyAlias), GCMParameterSpec(GCM_TAG_BITS, iv))
+        return cipher.doFinal(ciphertext).toString(Charsets.UTF_8)
+    }
+
+    fun clearTavilyKey() {
+        check(prefs.edit().remove(TAVILY_KEY_CIPHERTEXT).commit()) {
+            "Could not remove the encrypted search key."
+        }
+        runCatching { KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }.deleteEntry(tavilyAlias) }
+    }
+
 
     fun save(apiKey: String) {
         require(apiKey.isNotBlank()) { "API key cannot be empty." }
@@ -52,13 +85,15 @@ class SecureKeyStore(context: Context) {
         }
     }
 
-    private fun getOrCreateSecretKey(): SecretKey {
+    private fun getOrCreateSecretKey(): SecretKey = getOrCreateSecretKey(alias)
+
+    private fun getOrCreateSecretKey(targetAlias: String): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
-        (keyStore.getKey(alias, null) as? SecretKey)?.let { return it }
+        (keyStore.getKey(targetAlias, null) as? SecretKey)?.let { return it }
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
         generator.init(
             KeyGenParameterSpec.Builder(
-                alias,
+                targetAlias,
                 KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
             )
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
@@ -71,6 +106,7 @@ class SecureKeyStore(context: Context) {
 
     private companion object {
         const val KEY_CIPHERTEXT = "gemini_api_key_aes_gcm"
+        const val TAVILY_KEY_CIPHERTEXT = "tavily_api_key_aes_gcm"
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val GCM_IV_BYTES = 12
