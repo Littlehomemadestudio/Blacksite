@@ -607,7 +607,7 @@ fun DeepSeekInputPill(
             }
             Spacer(Modifier.width(8.dp))
             OracleSendButton(
-                enabled = busy || value.isNotBlank(),
+                enabled = busy || value.isNotBlank() || attachments.isNotEmpty(),
                 busy = busy,
                 onClick = if (busy) onCancel else onSend
             )
