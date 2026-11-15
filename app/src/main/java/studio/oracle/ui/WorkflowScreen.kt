@@ -1,6 +1,9 @@
 package studio.oracle.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,17 +15,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Notes
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -148,7 +140,7 @@ fun WorkflowScreen(workspaceId: String) {
     }
 
     Column(
-        Modifier.fillMaxSize().background(LocalOraclePalette.current.canvas).imePadding().padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier.fillMaxSize().background(LocalOraclePalette.current.canvas).imePadding().animateContentSize().padding(horizontal = 14.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -200,7 +192,7 @@ fun WorkflowScreen(workspaceId: String) {
                 } else {
                     LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(notes, key = { it.id }) { note ->
-                            Surface(color = LocalOraclePalette.current.surface, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft)) {
+                            Surface(color = LocalOraclePalette.current.surface, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft), modifier = Modifier.animateContentSize()) {
                                 Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                     Text(note.title, color = LocalOraclePalette.current.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                                     Text(note.content, color = LocalOraclePalette.current.textSecondary, fontSize = 11.sp, lineHeight = 16.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
@@ -512,17 +504,26 @@ fun WorkflowScreen(workspaceId: String) {
 
 @Composable
 private fun FlowTab(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    TextButton(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(11.dp),
-        colors = ButtonDefaults.textButtonColors(
-            containerColor = if (selected) LocalOraclePalette.current.surfaceRaised else Color.Transparent,
-            contentColor = if (selected) LocalOraclePalette.current.accent else LocalOraclePalette.current.textSecondary
-        ),
-        contentPadding = PaddingValues(vertical = 7.dp)
+    val palette = LocalOraclePalette.current
+    val target = if (selected) palette.surfaceRaised else Color.Transparent
+    val background by animateColorAsState(target, tween(180), label = "workflow-tab")
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(background)
+            .clickable(onClick = onClick)
+            .padding(vertical = 9.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, fontSize = 10.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+        Text(
+            label.uppercase(),
+            color = if (selected) palette.accent else palette.textSecondary,
+            fontFamily = OracleMono,
+            fontSize = 9.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            letterSpacing = .45.sp
+        )
     }
 }
 
@@ -550,7 +551,7 @@ private fun WorkflowStepCard(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val action = WorkflowAction.from(step.actionType)
-    Surface(color = LocalOraclePalette.current.surface, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft)) {
+    Surface(color = LocalOraclePalette.current.surface, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft), modifier = Modifier.animateContentSize()) {
         Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${(index + 1).toString().padStart(2, '0')}", color = LocalOraclePalette.current.accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
@@ -576,15 +577,9 @@ private fun WorkflowStepCard(
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                IconButton(onClick = onMoveUp, modifier = Modifier.size(28.dp)) {
-                    OracleGlyphIcon(OracleGlyph.ArrowUp, Modifier.size(15.dp), LocalOraclePalette.current.textSecondary)
-                }
-                IconButton(onClick = onMoveDown, modifier = Modifier.size(28.dp)) {
-                    OracleGlyphIcon(OracleGlyph.ChevronDown, Modifier.size(15.dp), LocalOraclePalette.current.textSecondary)
-                }
-                IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
-                    OracleGlyphIcon(OracleGlyph.Trash, Modifier.size(15.dp), LocalOraclePalette.current.textSecondary)
-                }
+                OracleIconButton(OracleGlyph.ArrowUp, "Move step up", onMoveUp, tint = LocalOraclePalette.current.textSecondary, size = 28.dp)
+                OracleIconButton(OracleGlyph.ChevronDown, "Move step down", onMoveDown, tint = LocalOraclePalette.current.textSecondary, size = 28.dp)
+                OracleIconButton(OracleGlyph.Trash, "Remove step", onRemove, tint = LocalOraclePalette.current.error, size = 28.dp)
             }
             FlowField(
                 value = step.title,
