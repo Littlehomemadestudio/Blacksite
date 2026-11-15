@@ -364,8 +364,10 @@ fun OracleScreen(
     }
 
     fun submitPrompt() {
-        val submitted = prompt.trim()
-        if (submitted.isBlank() || busy) return
+        val attachmentSnapshot = selectedAttachments
+        val submittedText = prompt.trim()
+        if ((submittedText.isBlank() && attachmentSnapshot.isEmpty()) || busy) return
+        val submitted = submittedText.ifBlank { "Please inspect the attached media and respond to it." }
 
         val selectedSession = activeSessionId
         val conversation = messages.map { AgentTurn(it.role, it.content) }
@@ -377,19 +379,21 @@ fun OracleScreen(
         )
         val retry = submission.isRetry
         val history = submission.history
-
         if (!retry) {
             failedPrompt = null
             failedPromptPersisted = false
         }
 
         prompt = ""
+        selectedAttachments = emptyList()
+        agentEvents = emptyList()
         error = null
         keyboard?.hide()
         busy = true
 
         requestJob = scope.launch {
             var userMessagePersisted = retry
+            val runEvents = java.util.Collections.synchronizedList(mutableListOf<AgenticEvent>())
             try {
                 val sessionId = selectedSession
                     ?: repository.createSession(model).also { activeSessionId = it }
@@ -402,7 +406,8 @@ fun OracleScreen(
                     error = "The saved Gemini key could not be decrypted. Reconnect it in Settings."
                     failedPrompt = submitted
                     failedPromptPersisted = userMessagePersisted
-                    prompt = submitted
+                    prompt = submittedText
+                    selectedAttachments = attachmentSnapshot
                     return@launch
                 }
 
@@ -410,12 +415,48 @@ fun OracleScreen(
                     error = "Connect a Gemini API key in Settings to start chatting."
                     failedPrompt = submitted
                     failedPromptPersisted = userMessagePersisted
-                    prompt = submitted
+                    prompt = submittedText
+                    selectedAttachments = attachmentSnapshot
+                    return@launch
+                }
+
+                val mediaInputs = try {
+                    withContext(Dispatchers.IO) {
+                        var totalBytes = 0L
+                        attachmentSnapshot.map { attachment ->
+                            val uri = Uri.parse(attachment.uri)
+                            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                                ?: error("Could not read " + attachment.name)
+                            totalBytes += bytes.size
+                            require(bytes.size <= 20 * 1024 * 1024 && totalBytes <= 30 * 1024 * 1024) {
+                                "Attachments exceed the 30 MB combined request limit. Send fewer or smaller files."
+                            }
+                            AgentMediaInput(
+                                name = attachment.name,
+                                mimeType = attachment.mimeType,
+                                base64Data = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                            )
+                        }
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (exception: Exception) {
+                    error = exception.message ?: "Could not prepare the attachments for Gemini."
+                    failedPrompt = submitted
+                    failedPromptPersisted = userMessagePersisted
+                    prompt = submittedText
+                    selectedAttachments = attachmentSnapshot
                     return@launch
                 }
 
                 if (!retry) {
-                    repository.appendMessage(sessionId, "user", submitted, model)
+                    repository.appendMessage(
+                        sessionId = sessionId,
+                        role = "user",
+                        content = submitted,
+                        model = model,
+                        attachments = AgenticEventCodec.encodeAttachments(attachmentSnapshot)
+                    )
                     userMessagePersisted = true
                     failedPromptPersisted = true
                 }
@@ -425,18 +466,60 @@ fun OracleScreen(
                 }
                 val agentPrompt = if (priorContext.isBlank()) submitted else
                     "Conversation history (use as context):\n" + priorContext + "\n\nCurrent user request:\n" + submitted
-                val executor = PhoneWorkspaceTools(context, grantedTreeUri, ::approveTool) { code ->
-                    pythonRuntime.execute(code)
-                }
+                val tavilyKey = withContext(Dispatchers.IO) { runCatching { keyStore.readTavilyKey() }.getOrNull() }
+                val executor = PhoneWorkspaceTools(
+                    context = context,
+                    grantedTree = grantedTreeUri,
+                    tavilyKey = tavilyKey,
+                    authorize = ::authorizeTool,
+                    python = { code -> pythonRuntime.execute(code) },
+                    onFileCreated = { file ->
+                        val event = AgenticEvent(
+                            kind = "file_created",
+                            title = "File created",
+                            detail = file.name + " · " + file.mimeType,
+                            payload = file.uri
+                        )
+                        runEvents.add(event)
+                        scope.launch(Dispatchers.Main.immediate) {
+                            agentEvents = (agentEvents + event).takeLast(60)
+                        }
+                    }
+                )
+
                 when (val result = agenticRuntime.run(
-                    apiKey = key, prompt = agentPrompt, model = model,
-                    settings = agenticSettings, executor = executor,
-                    onEvent = { event -> scope.launch(Dispatchers.Main.immediate) {
-                        agentEvents = (agentEvents + event).takeLast(40)
-                    } }
+                    apiKey = key,
+                    prompt = agentPrompt,
+                    model = model,
+                    settings = agenticSettings,
+                    executor = executor,
+                    media = mediaInputs,
+                    onEvent = { sourceEvent ->
+                        val event = if (sourceEvent.kind == "generated_image" && sourceEvent.payload.isNotBlank()) {
+                            runCatching {
+                                val directory = File(context.filesDir, "oracle-generated").apply { mkdirs() }
+                                val bytes = Base64.decode(sourceEvent.payload, Base64.DEFAULT)
+                                val extension = if (sourceEvent.detail.contains("jpeg", true)) "jpg" else "png"
+                                val file = File(directory, UUID.randomUUID().toString() + "." + extension)
+                                file.writeBytes(bytes)
+                                sourceEvent.copy(payload = file.absolutePath)
+                            }.getOrDefault(sourceEvent.copy(detail = "Image output could not be saved locally."))
+                        } else sourceEvent
+                        runEvents.add(event)
+                        scope.launch(Dispatchers.Main.immediate) {
+                            agentEvents = (agentEvents + event).takeLast(60)
+                        }
+                    }
                 )) {
                     is AgenticResult.Success -> {
-                        repository.appendMessage(sessionId, "assistant", result.text, result.model)
+                        val trace = synchronized(runEvents) { runEvents.toList() }
+                        repository.appendMessage(
+                            sessionId = sessionId,
+                            role = "assistant",
+                            content = result.text,
+                            model = result.model,
+                            agentTrace = AgenticEventCodec.encodeTrace(trace)
+                        )
                         failedPrompt = null
                         failedPromptPersisted = false
                     }
@@ -444,19 +527,22 @@ fun OracleScreen(
                         error = result.message
                         failedPrompt = submitted
                         failedPromptPersisted = userMessagePersisted
+                        selectedAttachments = attachmentSnapshot
                     }
                 }
             } catch (cancelled: CancellationException) {
                 if (!suppressCancelledPromptRestore) {
                     failedPrompt = submitted
                     failedPromptPersisted = userMessagePersisted
-                    prompt = submitted
+                    prompt = submittedText
+                    selectedAttachments = attachmentSnapshot
                 }
                 throw cancelled
-            } catch (_: Exception) {
-                error = "Something went wrong. Check your connection and try again."
+            } catch (exception: Exception) {
+                error = exception.message ?: "Something went wrong. Check your connection and try again."
                 failedPrompt = submitted
                 failedPromptPersisted = userMessagePersisted
+                selectedAttachments = attachmentSnapshot
             } finally {
                 busy = false
                 requestJob = null
