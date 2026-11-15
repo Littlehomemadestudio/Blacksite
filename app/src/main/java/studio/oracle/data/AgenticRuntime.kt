@@ -174,6 +174,9 @@ class GeminiAgenticRuntime(
             }
 
             val steps = root.optJSONArray("steps") ?: JSONArray()
+            val hasFunctionCalls = (0 until steps.length()).any {
+                steps.optJSONObject(it)?.optString("type") == "function_call"
+            }
             val functionResults = JSONArray()
             var functionCalls = 0
 
@@ -242,8 +245,12 @@ class GeminiAgenticRuntime(
                                 "text" -> {
                                     val text = part.optString("text")
                                     if (text.isNotBlank()) {
-                                        if (transcript.isNotEmpty()) transcript.append("\n")
-                                        transcript.append(text)
+                                        if (hasFunctionCalls && transcript.isEmpty()) {
+                                            onEvent(AgenticEvent("plan", "Plan", text.take(2400)))
+                                        } else {
+                                            if (transcript.isNotEmpty()) transcript.append("\n")
+                                            transcript.append(text)
+                                        }
                                     }
                                 }
                                 "image" -> {
@@ -256,6 +263,19 @@ class GeminiAgenticRuntime(
                                     val data = part.optString("data")
                                     if (data.isNotBlank()) onEvent(
                                         AgenticEvent("generated_audio", "Generated audio", part.optString("mime_type", "audio/mpeg"), payload = data)
+                                    )
+                                }
+                                "video" -> {
+                                    val data = part.optString("data")
+                                    val uri = part.optString("uri")
+                                    if (data.isNotBlank() || uri.isNotBlank()) onEvent(
+                                        AgenticEvent("generated_video", "Generated video", part.optString("mime_type", "video/mp4"), payload = if (data.isNotBlank()) data else uri)
+                                    )
+                                }
+                                "document" -> {
+                                    val data = part.optString("data")
+                                    if (data.isNotBlank()) onEvent(
+                                        AgenticEvent("generated_document", "Generated document", part.optString("mime_type", "application/pdf"), payload = data)
                                     )
                                 }
                             }
