@@ -126,6 +126,7 @@ fun OracleScreen(
     var suppressCancelledPromptRestore by remember { mutableStateOf(false) }
     var drawerOpen by remember { mutableStateOf(false) }
     var modelPanelOpen by remember { mutableStateOf(false) }
+    var agentActivity by remember { mutableStateOf<String?>(null) }
 
     val folderPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -278,6 +279,7 @@ fun OracleScreen(
         error = null
         keyboard?.hide()
         busy = true
+        agentActivity = "GEMINI IS WORKING"
 
         requestJob = scope.launch {
             var userMessagePersisted = retry
@@ -311,8 +313,13 @@ fun OracleScreen(
                     failedPromptPersisted = true
                 }
 
+                val modelOutputLimit = menuModels.firstOrNull { it.name == model }?.outputTokenLimit
                 val activeToolSettings = toolSettings.copy(
-                    phoneFiles = toolSettings.phoneFiles && grantedFolderUri != null
+                    phoneFiles = toolSettings.phoneFiles && grantedFolderUri != null,
+                    maxOutputTokens = minOf(
+                        toolSettings.maxOutputTokens,
+                        modelOutputLimit ?: toolSettings.maxOutputTokens
+                    )
                 )
                 when (val result = api.generate(
                     key,
@@ -382,6 +389,7 @@ fun OracleScreen(
             } finally {
                 busy = false
                 requestJob = null
+                agentActivity = null
             }
         }
     }
