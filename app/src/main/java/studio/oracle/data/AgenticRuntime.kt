@@ -113,6 +113,7 @@ class GeminiAgenticRuntime(
         var interactionId: String? = null
         var input: Any = makeInput(prompt, media)
         val transcript = StringBuilder()
+        var planSummaryEmitted = false
         onEvent(AgenticEvent("plan", "ORACLE is working", "Choosing the tools and steps needed to complete your request."))
 
         repeat(MAX_TOOL_ROUNDS) { round ->
@@ -264,7 +265,10 @@ class GeminiAgenticRuntime(
                                     val text = part.optString("text")
                                     if (text.isNotBlank()) {
                                         if (hasFunctionCalls && transcript.isEmpty()) {
-                                            onEvent(AgenticEvent("plan", "Plan", text.take(2400)))
+                                            if (!planSummaryEmitted) {
+                                                onEvent(AgenticEvent("plan", "Plan", text.take(2400)))
+                                                planSummaryEmitted = true
+                                            }
                                         } else {
                                             if (transcript.isNotEmpty()) transcript.append("\n")
                                             transcript.append(text)
