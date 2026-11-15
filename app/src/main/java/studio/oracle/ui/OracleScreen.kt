@@ -146,7 +146,6 @@ fun OracleScreen(
     val textToSpeech = remember(context) { TextToSpeech(context) { status -> ttsReady = status == TextToSpeech.SUCCESS } }
     val speechRecognizer = remember(context) { if (SpeechRecognizer.isRecognitionAvailable(context)) SpeechRecognizer.createSpeechRecognizer(context) else null }
     val voiceReplyLatest by rememberUpdatedState(voiceReplyEnabled)
-    val busyLatest by rememberUpdatedState(busy)
     DisposableEffect(textToSpeech) {
         textToSpeech.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) = Unit
@@ -165,6 +164,7 @@ fun OracleScreen(
     }
     var syncingModels by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
+    val busyLatest by rememberUpdatedState(busy)
     var requestJob by remember { mutableStateOf<Job?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var failedPrompt by remember { mutableStateOf<String?>(null) }
@@ -729,7 +729,7 @@ fun OracleScreen(
             .onFailure { error = "Could not start microphone input. Try again." }
     }
 
-    SideEffect { voiceInputStarter = { startVoiceInput() } }
+    SideEffect { if (voiceInputStarter == null) voiceInputStarter = { startVoiceInput() } }
 
     val microphonePermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()

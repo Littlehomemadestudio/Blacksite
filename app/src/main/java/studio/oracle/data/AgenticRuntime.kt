@@ -171,7 +171,7 @@ class GeminiAgenticRuntime(
 
             // Retry transient transport/API failures without replaying completed local tools.
             // Tool execution only starts after a complete model response has been received.
-            var root: JSONObject? = null
+            var responseRoot: JSONObject? = null
             var lastFailure: String? = null
             for (attempt in 0..5) {
                 val response = try {
@@ -197,7 +197,7 @@ class GeminiAgenticRuntime(
                 val raw = response.body?.string().orEmpty()
                 response.close()
                 if (code in 200..299) {
-                    root = try {
+                    responseRoot = try {
                         JSONObject(raw)
                     } catch (error: Exception) {
                         return AgenticResult.Failed("Gemini returned an unreadable response: ${error.message?.take(180)}")
@@ -211,7 +211,7 @@ class GeminiAgenticRuntime(
                 }
                 return AgenticResult.Failed(apiError(code, raw))
             }
-            val root = root ?: return AgenticResult.Failed(
+            val root = responseRoot ?: return AgenticResult.Failed(
                 "Gemini did not return a response. ${lastFailure ?: "Check your connection and retry."}"
             )
 
