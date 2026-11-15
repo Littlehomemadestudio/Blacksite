@@ -180,6 +180,7 @@ class GeminiApi(
 
         val tools = JSONArray()
         if (settings.googleSearch) tools.put(JSONObject().put("googleSearch", JSONObject()))
+        if (settings.urlContext) tools.put(JSONObject().put("urlContext", JSONObject()))
         if (settings.cloudCodeExecution) tools.put(JSONObject().put("codeExecution", JSONObject()))
         if (includeCustomTools) tools.put(functionTool(settings))
 
@@ -193,6 +194,9 @@ class GeminiApi(
             if (settings.googleSearch) {
                 append("Use Google Search for current facts, recent information, and verifiable web research. ")
                 append("Cite the returned web sources in your response. ")
+            }
+            if (settings.urlContext) {
+                append("Use URL Context when the user supplies a URL and asks you to inspect that page. ")
             }
             if (settings.cloudCodeExecution) {
                 append("You may use Google's managed Python code execution tool for calculations and data analysis. ")
