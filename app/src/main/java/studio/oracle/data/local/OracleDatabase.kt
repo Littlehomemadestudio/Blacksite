@@ -189,7 +189,7 @@ interface WorkspaceDao {
     @Query("SELECT COUNT(*) FROM workspaces WHERE name = :name COLLATE NOCASE")
     suspend fun countName(name: String): Int
 
-    @Insert(onConflict = OnConflictStrategy.ABORT)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertWorkspace(workspace: WorkspaceEntity)
 
     @Query("UPDATE workspaces SET name = :name, updatedAt = :updatedAt WHERE id = :id")

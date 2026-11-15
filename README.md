@@ -29,7 +29,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Selected Gemini model stored in DataStore. The Agent can refresh the models exposed to the connected key using Google's models endpoint and choose a model that supports `generateContent`.
 - Cancellable OkHttp requests: an explicit **Cancel** control cancels the in-flight network call. Failed/cancelled prompts remain in the local thread and retry without duplicating the saved user turn.
 - Bounded conversation context (last 12 messages) with a send-point disclosure in the chat composer; Library Q&A displays the exact retrieved excerpts and requires confirmation before sending them.
-- Unit tests for conversation context, session naming, document chunk boundaries, PDF page citations, stable text sections, and English/Persian keyword ranking.
+- Unit tests for conversation context, session naming, workspace-name normalization (including Persian text), document chunk boundaries, PDF page citations, stable text sections, and English/Persian keyword ranking.
 - Document library imports selectable PDF, TXT, and Markdown files from Android's document picker; originals are copied into app-private storage.
 - PDF text extraction preserves page numbers. TXT/Markdown are segmented into stable section citations; extracted text is chunked and indexed in Room.
 - Offline keyword retrieval across imported passages, document reader, and a Gemini library Q&A flow that shows the exact matched source passages before sending them.

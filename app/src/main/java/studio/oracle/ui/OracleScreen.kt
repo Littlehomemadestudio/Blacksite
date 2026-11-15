@@ -95,6 +95,7 @@ fun OracleScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var failedPrompt by remember { mutableStateOf<String?>(null) }
     var failedPromptPersisted by remember { mutableStateOf(false) }
+    var suppressCancelledPromptRestore by remember { mutableStateOf(false) }
     var drawerOpen by remember { mutableStateOf(false) }
     var modelPanelOpen by remember { mutableStateOf(false) }
 
@@ -103,14 +104,21 @@ fun OracleScreen(
     }
 
     LaunchedEffect(workspaceId) {
+        suppressCancelledPromptRestore = true
         requestJob?.cancel()
+        requestJob = null
         busy = false
         activeSessionId = null
         messages = emptyList()
+        prompt = ""
         error = null
         failedPrompt = null
         failedPromptPersisted = false
-        activeSessionId = repository.ensureSession(model)
+        try {
+            activeSessionId = repository.ensureSession(model)
+        } finally {
+            suppressCancelledPromptRestore = false
+        }
     }
 
     LaunchedEffect(sessions) {
@@ -274,9 +282,11 @@ fun OracleScreen(
                     }
                 }
             } catch (cancelled: CancellationException) {
-                failedPrompt = submitted
-                failedPromptPersisted = userMessagePersisted
-                prompt = submitted
+                if (!suppressCancelledPromptRestore) {
+                    failedPrompt = submitted
+                    failedPromptPersisted = userMessagePersisted
+                    prompt = submitted
+                }
                 throw cancelled
             } catch (_: Exception) {
                 error = "Something went wrong. Check your connection and try again."

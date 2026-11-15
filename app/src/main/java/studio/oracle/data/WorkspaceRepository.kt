@@ -40,6 +40,7 @@ class WorkspaceRepository(private val dao: WorkspaceDao) {
     }
 
     suspend fun create(rawName: String): WorkspaceCreateResult {
+        ensureDefaultWorkspace()
         val name = WorkspacePolicy.normalizeName(rawName)
             ?: return WorkspaceCreateResult.Failure(
                 "Enter a workspace name up to " + WorkspacePolicy.MAX_NAME_LENGTH + " characters."
