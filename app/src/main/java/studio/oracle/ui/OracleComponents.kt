@@ -1,5 +1,7 @@
 package studio.oracle.ui
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -14,6 +16,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +36,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -370,7 +374,7 @@ fun OracleTextAction(
                 scaleY = scale
                 translationY = if (pressed) 1.dp.toPx() else 0f
             }
-            .clip(RoundedCornerShape(50.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(if (pressed) palette.surfaceRaised else Color.Transparent)
             .clickable(
                 enabled = enabled,
@@ -416,7 +420,7 @@ fun OracleSolidAction(
                 scaleY = scale
                 translationY = if (pressed) 1.dp.toPx() else 0f
             }
-            .clip(RoundedCornerShape(50.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(if (enabled) palette.accent else palette.surfaceRaised)
             .clickable(
                 enabled = enabled,
@@ -452,24 +456,37 @@ fun DeepSeekInputPill(
     val palette = LocalOraclePalette.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val focused by interaction.collectIsFocusedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.96f else 1f,
-        animationSpec = spring(stiffness = 430f, dampingRatio = 0.82f),
+        targetValue = if (pressed) 0.985f else 1f,
+        animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f),
         label = "composer-press"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (focused) palette.accent.copy(alpha = 0.72f) else palette.outline,
+        animationSpec = tween(220),
+        label = "composer-border"
+    )
+    val elevation by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (focused) 5.dp else 1.dp,
+        animationSpec = spring(stiffness = 360f, dampingRatio = 0.86f),
+        label = "composer-elevation"
     )
 
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .animateContentSize(spring(stiffness = 420f, dampingRatio = 0.88f))
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
                 translationY = if (pressed) 1.dp.toPx() else 0f
             }
-            .clip(RoundedCornerShape(50.dp))
+            .shadow(elevation, RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(22.dp))
             .background(palette.surface)
-            .border(1.dp, palette.outline.copy(alpha = 0.82f), RoundedCornerShape(50.dp))
-            .padding(start = 18.dp, end = 10.dp, top = 13.dp, bottom = 10.dp)
+            .border(1.dp, borderColor, RoundedCornerShape(22.dp))
+            .padding(start = 17.dp, end = 10.dp, top = 12.dp, bottom = 10.dp)
     ) {
         BasicTextField(
             value = value,
@@ -511,7 +528,7 @@ fun DeepSeekInputPill(
             }
         )
 
-        Spacer(Modifier.height(9.dp))
+        Spacer(Modifier.height(8.dp))
 
         Row(
             Modifier.fillMaxWidth().height(42.dp),
@@ -519,12 +536,20 @@ fun DeepSeekInputPill(
         ) {
             ThinkPill(onClick = onThinkClick, expanded = thinkExpanded)
             Spacer(Modifier.weight(1f))
-            androidx.compose.material3.Text(
-                if (busy) "WORKING" else "",
-                color = palette.textTertiary,
-                fontFamily = OracleMono,
-                fontSize = 9.sp
-            )
+            androidx.compose.animation.AnimatedVisibility(
+                visible = busy,
+                enter = androidx.compose.animation.fadeIn(tween(150)) +
+                    androidx.compose.animation.expandHorizontally(tween(180)),
+                exit = androidx.compose.animation.fadeOut(tween(100)) +
+                    androidx.compose.animation.shrinkHorizontally(tween(150))
+            ) {
+                androidx.compose.material3.Text(
+                    "WORKING",
+                    color = palette.textTertiary,
+                    fontFamily = OracleMono,
+                    fontSize = 9.sp
+                )
+            }
             Spacer(Modifier.width(8.dp))
             OracleSendButton(
                 enabled = busy || value.isNotBlank(),
@@ -548,9 +573,9 @@ private fun ThinkPill(onClick: () -> Unit, expanded: Boolean) {
                 scaleY = scale
                 translationY = if (pressed) 1.dp.toPx() else 0f
             }
-            .clip(RoundedCornerShape(50.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(if (pressed || expanded) palette.surfaceRaised else palette.canvas)
-            .border(1.dp, palette.outlineSoft, RoundedCornerShape(50.dp))
+            .border(1.dp, palette.outlineSoft, RoundedCornerShape(12.dp))
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(start = 11.dp, end = 10.dp, top = 7.dp, bottom = 7.dp),
         verticalAlignment = Alignment.CenterVertically
