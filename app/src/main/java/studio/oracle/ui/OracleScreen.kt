@@ -64,6 +64,7 @@ import studio.oracle.ui.theme.OracleSans
 fun OracleScreen(
     onOpenLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenWorkflows: () -> Unit,
     workspaceId: String,
     workspaces: List<WorkspaceEntity>,
     onWorkspaceChange: (String) -> Unit,
@@ -308,6 +309,8 @@ fun OracleScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(palette.canvas)
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                .imePadding()
         ) {
             CustomTopBar(
                 onMenu = { drawerOpen = true },
@@ -328,7 +331,7 @@ fun OracleScreen(
                         contentPadding = PaddingValues(top = 18.dp, bottom = 22.dp)
                     ) {
                         items(messages, key = { it.id }) { message ->
-                            OracleMessageRow(message = message)
+                            OracleMessageRow(message = message, modifier = Modifier.animateItem())
                         }
                         if (busy) {
                             item { OracleThinkingIndicator() }
@@ -397,6 +400,10 @@ fun OracleScreen(
                 onOpenSettings = {
                     drawerOpen = false
                     onOpenSettings()
+                },
+                onOpenWorkflows = {
+                    drawerOpen = false
+                    onOpenWorkflows()
                 }
             )
         }
@@ -447,11 +454,11 @@ private fun CustomTopBar(
 }
 
 @Composable
-private fun OracleMessageRow(message: AgentMessageEntity) {
+private fun OracleMessageRow(message: AgentMessageEntity, modifier: Modifier = Modifier) {
     val palette = LocalOraclePalette.current
     if (message.role == "user") {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End
         ) {
             Box(
@@ -472,7 +479,7 @@ private fun OracleMessageRow(message: AgentMessageEntity) {
         }
     } else {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top
         ) {
             HandcraftedLogo(
@@ -668,7 +675,8 @@ private fun OracleThreadDrawer(
     onNewThread: () -> Unit,
     onSelectThread: (String) -> Unit,
     onOpenLibrary: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenWorkflows: () -> Unit
 ) {
     val palette = LocalOraclePalette.current
     val scope = rememberCoroutineScope()
@@ -972,6 +980,7 @@ private fun OracleThreadDrawer(
 
                 Spacer(Modifier.height(8.dp))
                 DrawerAction(OracleGlyph.Library, "Library", onOpenLibrary)
+                DrawerAction(OracleGlyph.Spark, "Workflow Studio", onOpenWorkflows)
                 DrawerAction(OracleGlyph.Settings, "Settings", onOpenSettings)
             }
         }
