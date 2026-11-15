@@ -4,6 +4,10 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
@@ -340,7 +344,11 @@ fun OracleScreen(
                 }
             }
 
-            if (error != null) {
+            AnimatedVisibility(
+                visible = error != null,
+                enter = fadeIn(tween(160)) + expandVertically(tween(220)),
+                exit = fadeOut(tween(110)) + shrinkVertically(tween(160))
+            ) {
                 OracleErrorNotice(
                     message = error.orEmpty(),
                     canRestore = failedPrompt != null && prompt != failedPrompt,
@@ -456,47 +464,52 @@ private fun CustomTopBar(
 @Composable
 private fun OracleMessageRow(message: AgentMessageEntity, modifier: Modifier = Modifier) {
     val palette = LocalOraclePalette.current
-    if (message.role == "user") {
-        Row(
-            modifier = modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        ) {
-            Box(
-                modifier = Modifier
-                    .widthIn(max = 320.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(palette.surfaceRaised)
-                    .padding(horizontal = 17.dp, vertical = 12.dp)
+    androidx.compose.animation.AnimatedVisibility(
+        visible = true,
+        modifier = modifier,
+        enter = fadeIn(tween(180)) + slideInVertically(tween(220)) { it / 14 },
+        exit = fadeOut(tween(100))
+    ) {
+        if (message.role == "user") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
             ) {
+                Box(
+                    modifier = Modifier
+                        .widthIn(max = 320.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(palette.surfaceRaised)
+                        .padding(horizontal = 17.dp, vertical = 12.dp)
+                ) {
+                    Text(
+                        text = message.content,
+                        color = palette.text,
+                        fontFamily = OracleSans,
+                        fontSize = 15.sp,
+                        lineHeight = 23.sp
+                    )
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
+            ) {
+                HandcraftedLogo(
+                    modifier = Modifier.padding(top = 3.dp).size(21.dp),
+                    color = palette.accent
+                )
+                Spacer(Modifier.width(12.dp))
                 Text(
                     text = message.content,
+                    modifier = Modifier.weight(1f),
                     color = palette.text,
                     fontFamily = OracleSans,
                     fontSize = 15.sp,
-                    lineHeight = 23.sp
+                    lineHeight = 24.sp
                 )
             }
-        }
-    } else {
-        Row(
-            modifier = modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top
-        ) {
-            HandcraftedLogo(
-                modifier = Modifier
-                    .padding(top = 3.dp)
-                    .size(21.dp),
-                color = palette.accent
-            )
-            Spacer(Modifier.width(12.dp))
-            Text(
-                text = message.content,
-                modifier = Modifier.weight(1f),
-                color = palette.text,
-                fontFamily = OracleSans,
-                fontSize = 15.sp,
-                lineHeight = 24.sp
-            )
         }
     }
 }
@@ -626,7 +639,7 @@ private fun ModelChoice(
     val pressed by interaction.collectIsPressedAsState()
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(50.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(
                 when {
                     selected -> palette.accentSoft
@@ -637,7 +650,7 @@ private fun ModelChoice(
             .border(
                 1.dp,
                 if (selected) palette.accent.copy(alpha = 0.45f) else palette.outlineSoft,
-                RoundedCornerShape(50.dp)
+                RoundedCornerShape(12.dp)
             )
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 9.dp),
