@@ -656,7 +656,7 @@ private fun OracleMessageRow(message: AgentMessageEntity, modifier: Modifier = M
                         .padding(horizontal = 17.dp, vertical = 12.dp)
                 ) {
                     Text(
-                        text = if (message.role == "assistant") GeminiApi.displayText(message.content) else message.content,
+                        text = message.content,
                         color = palette.text,
                         fontFamily = OracleSans,
                         fontSize = 15.sp,
@@ -674,13 +674,9 @@ private fun OracleMessageRow(message: AgentMessageEntity, modifier: Modifier = M
                     color = palette.accent
                 )
                 Spacer(Modifier.width(12.dp))
-                Text(
-                    text = message.content,
-                    modifier = Modifier.weight(1f),
-                    color = palette.text,
-                    fontFamily = OracleSans,
-                    fontSize = 15.sp,
-                    lineHeight = 24.sp
+                OracleAssistantContent(
+                    text = GeminiApi.displayText(message.content),
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
