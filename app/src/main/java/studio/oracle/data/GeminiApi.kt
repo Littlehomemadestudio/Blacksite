@@ -241,7 +241,7 @@ class GeminiApi(
 
         return try {
             var rounds = 0
-            while (rounds < MAX_TOOL_ROUNDS) {
+            while (true) {
                 val request = Request.Builder()
                     .url("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent")
                     .header("x-goog-api-key", apiKey)
@@ -279,6 +279,12 @@ class GeminiApi(
                 }
 
 
+
+                if (calls.isNotEmpty() && rounds >= MAX_TOOL_ROUNDS) {
+                    return GeminiReplyResult.Failed(
+                        "ORACLE reached its $MAX_TOOL_ROUNDS tool-round limit. Ask it to continue from the recorded results."
+                    )
+                }
 
                 if (calls.isEmpty()) {
                     finalCandidateContent = candidateContent
@@ -327,7 +333,7 @@ class GeminiApi(
             }
 
             if (finalCandidateContent == null) {
-                GeminiReplyResult.Failed("ORACLE reached its $MAX_TOOL_ROUNDS-step tool limit. Ask it to continue from the recorded results.")
+                GeminiReplyResult.Failed("Gemini returned no final response.")
             } else if (finalDisplay.isBlank()) {
                 GeminiReplyResult.Failed("Gemini returned no text. Try a different instruction.")
             } else {
