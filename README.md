@@ -15,14 +15,17 @@ Open this repository in Android Studio or run:
 gradle --no-daemon testDebugUnitTest assembleDebug
 ```
 
-Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions runs unit tests, builds the debug APK, verifies alignment/signature, and uploads the artifact.
+Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/apk/debug/app-debug.apk`. The agentic runtime bundles CPython 3.13 (arm64-v8a and x86_64 builds). GitHub Actions runs unit tests, builds the debug APK, verifies alignment/signature, and uploads the artifact.
 
 ## Implemented
 
 ### Gemini chat
 - Chat-first Jetpack Compose workbench with animated navigation, thread drawer, message history, and expandable model controls.
 - Gemini API key validation and AES-GCM encryption backed by Android Keystore. No API key is embedded in source or APK.
-- Live Gemini Agent using `generateContent`, visible request errors, model discovery, and model selection.
+- Stateful Gemini Agent using the Interactions API, with model-directed Google Search, URL context, hosted Python execution, and custom Android tool calls. Tool requests are executed by the app and returned to Gemini in bounded multi-step loops.
+- Model controls in the composer: thinking level and summaries, temperature, top-p/top-k, output-token limit, model-reported input/output limits, Google Search, URL context, hosted code execution, and local tools.
+- A live context ledger reports input, output, thinking, cached, and tool-use token counts when the API returns usage metadata.
+- Agent activity cards show web-search activity, Python source and execution output, local tool requests, results, and approval prompts.
 - Persistent agent threads and messages in Room; thread titles are generated locally from the first user prompt.
 - Cancellable OkHttp requests. Failed/cancelled prompts remain available for retry without duplicating the saved user turn.
 - Bounded conversation context (last 12 messages) with a send-point disclosure in the composer.
@@ -43,7 +46,18 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Three explicit local actions: create a note, append to a note by exact title, and search the on-device document index.
 - Runs require a manual confirmation. Each run records a persistent status and per-step execution log.
 - A failed step stops the run. Deleting a workflow removes its steps and run history but preserves notes created by previous runs.
-- Workflow execution is local-only: no Gemini request, network calls, shell access, arbitrary scripts, app launching, scheduled triggers, or background execution.
+- Workflow execution remains local-only and manually confirmed. It is separate from the autonomous Gemini tool loop.
+
+
+### Agentic tools and execution
+- Google Search, URL context, and hosted Python are enabled as Gemini built-in tools when selected. Availability depends on the chosen model, API key, and Google account/project quota.
+- The app executes custom function calls and returns results to Gemini, allowing the model to continue through multiple tool rounds. The loop has a 12-round safety cap.
+- Phone file access uses Android's system folder picker and persisted Storage Access Framework permission. The agent can list and read files and create or append UTF-8 text files only beneath that granted folder. Paths are relative, traversal is rejected, reads are capped at 512 KB, and writes at 256 KB.
+- Creating or appending phone files requires a per-action approval dialog. The folder grant can be changed through the composer controls.
+- A bundled CPython 3.13 runtime is included through Chaquopy. Local Python execution is displayed in the conversation and requires per-run approval. The runner restricts imports to a standard-library allowlist, blocks filesystem/network/process APIs, caps source/output, and applies a line-execution budget. This is a constrained in-app Python environment, not Termux or a hostile-code security boundary.
+- Hosted Gemini code execution and local on-device Python are separate tools: the first runs in Google's hosted environment; the second runs on the device.
+- The Interactions API uses model-managed implicit context caching. The UI reports cached-token usage when returned by Google; explicit cache-object management is not available through this API.
+- Model capability and context limits vary by model. Unsupported model/API combinations return a visible error instead of silently falling back to a tool-less chat.
 
 ### Verification
 - Unit tests cover conversation context, session naming, workspace-name normalization (including Persian text), document chunk boundaries, PDF citations, stable text sections, keyword ranking, and workflow plan validation.
@@ -53,7 +67,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Scheduled, event-based, and background workflow triggers. Workflow runs are manual only.
 - Additional workflow actions such as export, file operations, notifications, and external integrations.
 - Audio recording, transcription, searchable archive, and task/decision extraction.
-- Agent tool execution. The Agent is currently a Gemini chat/planning interface; it does not silently access files, apps, or perform device actions.
+- Arbitrary shell/Termux access, app launching, UI automation, scheduled triggers, and background agents are not implemented. The local Python runtime is a constrained embedded interpreter, not a general-purpose terminal.
 
 ## Privacy and data handling
 - The API key is stored locally as AES-GCM ciphertext; its non-exportable encryption key is managed by Android Keystore.
