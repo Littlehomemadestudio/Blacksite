@@ -1341,6 +1341,7 @@ private fun AgentEventRow(index: Int, event: AgenticEvent, onOpenFile: (String) 
     var expanded by remember(event.title, event.kind, event.code) { mutableStateOf(false) }
     val accent = when {
         isFile -> Color(0xFF42A68A)
+        event.kind.contains("network") -> Color(0xFFE08A45)
         event.kind.contains("python") || event.kind.contains("hosted") -> Color(0xFFBF8B52)
         event.kind.contains("search") || event.kind.contains("url") -> Color(0xFF5C9ACB)
         else -> Color(0xFF7B8FE8)

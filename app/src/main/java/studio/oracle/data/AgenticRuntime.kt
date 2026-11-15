@@ -194,7 +194,20 @@ class GeminiAgenticRuntime(
 
                 val code = response.code
                 val retryAfterMs = response.header("Retry-After")?.toLongOrNull()?.times(1000L)
-                val raw = response.body?.string().orEmpty()
+                val raw = try {
+                    response.body?.string().orEmpty()
+                } catch (network: IOException) {
+                    response.close()
+                    lastFailure = network.message ?: "Response stream interrupted."
+                    if (attempt < 5) {
+                        onEvent(AgenticEvent("network_retry", "Restoring response stream", "Retry ${attempt + 1} of 5"))
+                        delay((1000L shl attempt).coerceAtMost(16000L))
+                        continue
+                    }
+                    return AgenticResult.Failed(
+                        "Gemini's response stream disconnected after 6 attempts. Completed tool results are retained in this turn. ${lastFailure}"
+                    )
+                }
                 response.close()
                 if (code in 200..299) {
                     responseRoot = try {
