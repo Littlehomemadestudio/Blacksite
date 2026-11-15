@@ -1361,8 +1361,12 @@ private fun ModelControlPanel(
         modifier = modifier.fillMaxWidth()
             .clip(RoundedCornerShape(22.dp))
             .background(
-                androidx.compose.ui.graphics.Brush.verticalGradient(
-                    listOf(Color(0xF5FFFFFF), Color(0xEDEFF2FA), Color(0xF4FFFFFF))
+                androidx.compose.ui.graphics.Brush.linearGradient(
+                    if (palette.isDark) {
+                        listOf(Color(0xED303A49), Color(0xD91E2631), Color(0xF0262E3A))
+                    } else {
+                        listOf(Color(0xF5FFFFFF), Color(0xDCECF1FA), Color(0xF4FFFFFF))
+                    }
                 )
             )
             .border(1.dp, Color(0x66FFFFFF), RoundedCornerShape(22.dp))
