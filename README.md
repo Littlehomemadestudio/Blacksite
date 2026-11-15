@@ -73,7 +73,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Scheduled, event-based, and background workflow triggers. Workflow runs are manual only.
 - Additional workflow actions such as export, file operations, notifications, and external integrations.
 - Audio recording, transcription, searchable archive, and task/decision extraction.
-- Agent tool execution. The Agent is currently a Gemini chat/planning interface; it does not silently access files, apps, or perform device actions.
+- Arbitrary OS-level shell/Termux access, app launching, UI automation, scheduled triggers, and background agents are not implemented. The Agent can use the scoped tools described above, subject to user-selected capabilities and per-session/action approval.
 
 ## Privacy and data handling
 - The API key is stored locally as AES-GCM ciphertext; its non-exportable encryption key is managed by Android Keystore.
