@@ -1,6 +1,11 @@
 package studio.oracle.ui
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.text.BasicTextField
@@ -40,6 +45,36 @@ import androidx.compose.material3.Text
 import studio.oracle.ui.theme.LocalOraclePalette
 import studio.oracle.ui.theme.OracleMono
 import studio.oracle.ui.theme.OracleSans
+
+
+@Composable
+fun OracleSpinner(
+    modifier: Modifier = Modifier.size(18.dp),
+    tint: Color = LocalOraclePalette.current.accent
+) {
+    val transition = rememberInfiniteTransition(label = "oracle-spinner")
+    val rotation by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 920, easing = LinearEasing)
+        ),
+        label = "oracle-spinner-rotation"
+    )
+    Canvas(modifier = modifier) {
+        rotate(rotation, pivot = center) {
+            drawArc(
+                color = tint,
+                startAngle = 36f,
+                sweepAngle = 258f,
+                useCenter = false,
+                topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.12f, size.height * 0.12f),
+                size = androidx.compose.ui.geometry.Size(size.width * 0.76f, size.height * 0.76f),
+                style = Stroke(width = size.minDimension * 0.075f, cap = StrokeCap.Round)
+            )
+        }
+    }
+}
 
 enum class OracleGlyph {
     Menu, NewChat, Library, Settings, Back, Close, ArrowUp, ChevronDown,
