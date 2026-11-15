@@ -1024,17 +1024,20 @@ private fun AudioArtifactCard(event: AgenticEvent) {
             Text("GENERATED AUDIO", color = Color(0xFF7B8FE8), fontFamily = OracleMono, fontSize = 8.sp)
             Text(if (prepared) event.detail else "Preparing audio…", color = palette.textSecondary, fontFamily = OracleSans, fontSize = 10.sp)
         }
-        androidx.compose.material3.TextButton(onClick = {
-            runCatching {
-                if (player.isPlaying) {
-                    player.pause()
-                    playing = false
-                } else if (prepared) {
-                    player.start()
-                    playing = true
+        androidx.compose.material3.TextButton(
+            enabled = prepared,
+            onClick = {
+                runCatching {
+                    if (player.isPlaying) {
+                        player.pause()
+                        playing = false
+                    } else if (prepared) {
+                        player.start()
+                        playing = true
+                    }
                 }
             }
-        }) { Text(if (playing) "PAUSE" else "PLAY") }
+        ) { Text(if (!prepared) "LOADING" else if (playing) "PAUSE" else "PLAY") }
     }
 }
 
