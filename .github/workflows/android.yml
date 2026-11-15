@@ -18,6 +18,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,9 +32,11 @@ jobs:
         with:
           gradle-version: "8.13"
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+      - name: Run Android lint
+        run: gradle --no-daemon lintDebug
       - name: Run unit tests
         run: gradle --no-daemon testDebugUnitTest
       - name: Build debug APK
@@ -47,6 +50,16 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee /tmp/oracle-apk-badging.txt
           grep -q "package: name='studio.oracle'" /tmp/oracle-apk-badging.txt
           grep -q "sdkVersion:'26'" /tmp/oracle-apk-badging.txt
+      - name: Upload verification reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oracle-studio-verification-reports
+          path: |
+            app/build/reports/lint-results-debug.html
+            app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Upload CI artifact
         uses: actions/upload-artifact@v4
         with:
@@ -59,6 +72,7 @@ jobs:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:
