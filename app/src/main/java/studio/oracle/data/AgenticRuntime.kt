@@ -24,7 +24,7 @@ class GeminiAgenticRuntime(private val http:OkHttpClient=OkHttpClient.Builder().
   if(!model.matches(Regex("[A-Za-z0-9._-]+")))return AgenticResult.Failed("Invalid Gemini model identifier.")
   val cfg=settings.validated()
   val tools=JSONArray().apply{if(cfg.googleSearch)put(JSONObject().put("type","google_search"));if(cfg.hostedPython)put(JSONObject().put("type","code_execution"));if(cfg.urlContext)put(JSONObject().put("type","url_context"));if(cfg.localTools){val a=executor.declarations();for(i in 0 until a.length())put(a.getJSONObject(i))}}
-  var interactionId:String?=null;var input:Any=prompt;val transcript=StringBuilder()
+  var interactionId:String?=null;var input:Any=("You are ORACLE, an autonomous AI operator inside an Android workspace. Use available tools when they materially help; do not merely describe actions you can perform. For multi-step work, plan briefly, execute tools, inspect results, and continue until the task is complete. Never claim an action succeeded unless a tool result confirms it. Phone file tools are restricted to the folder the user granted. The app asks for approval before creating or changing files and before local Python execution. Keep progress updates concise and do not expose private chain-of-thought.\\n\\n"+prompt);val transcript=StringBuilder()
   repeat(12){round->
    val body=JSONObject().put("model",model).put("input",input).put("tools",tools).put("generation_config",JSONObject().put("thinking_level",cfg.thinkingLevel).put("thinking_summaries",cfg.thinkingSummaries).put("max_output_tokens",cfg.maxOutputTokens).put("temperature",cfg.temperature).put("top_p",cfg.topP).put("top_k",cfg.topK))
    interactionId?.let{body.put("previous_interaction_id",it)}
@@ -42,10 +42,10 @@ class GeminiAgenticRuntime(private val http:OkHttpClient=OkHttpClient.Builder().
     when(s.optString("type")){
      "thought"->blocks(s.optJSONArray("summary")).takeIf{it.isNotBlank()}?.let{onEvent(AgenticEvent("thinking","Reasoning summary",it))}
      "google_search_call"->onEvent(AgenticEvent("search","Searching the web","Google Search is running."))
-     "google_search_result"->onEvent(AgenticEvent("search_result","Web results received"))
+     "google_search_result"->onEvent(AgenticEvent("search_result","Web results received",s.toString().take(6000)))
      "code_execution_call"->{val code=s.optJSONObject("arguments")?.optString("code").orEmpty();onEvent(AgenticEvent("python","Running hosted Python","Gemini hosted Python environment",code))}
      "code_execution_result"->onEvent(AgenticEvent("python_result","Hosted Python result",s.optJSONObject("result")?.toString().orEmpty().take(12000)))
-     "function_call"->{val name=s.optString("name");val id=s.optString("id");val args=s.optJSONObject("arguments")?:JSONObject();onEvent(AgenticEvent("tool",name,args.toString()));val result=try{executor.execute(name,args)}catch(c:CancellationException){throw c}catch(e:Exception){"Tool failed: "+(e.message?:"unknown error")};onEvent(AgenticEvent("tool_result",name+" completed",result.take(12000)));results.put(JSONObject().put("type","function_result").put("name",name).put("call_id",id).put("result",JSONArray().put(JSONObject().put("type","text").put("text",result.take(24000)))));calls++}
+     "function_call"->{val name=s.optString("name");val id=s.optString("id");val args=s.optJSONObject("arguments")?:JSONObject();if(name=="run_local_python")onEvent(AgenticEvent("python_local","Running local Python","Bundled CPython runtime",args.optString("code")))else onEvent(AgenticEvent("tool",name,args.toString()));val result=try{executor.execute(name,args)}catch(c:CancellationException){throw c}catch(e:Exception){"Tool failed: "+(e.message?:"unknown error")};if(name=="run_local_python")onEvent(AgenticEvent("python_result","Local Python output",result.take(12000)))else onEvent(AgenticEvent("tool_result",name+" completed",result.take(12000)));results.put(JSONObject().put("type","function_result").put("name",name).put("call_id",id).put("result",JSONArray().put(JSONObject().put("type","text").put("text",result.take(24000)))));calls++}
      "model_output"->blocks(s.optJSONArray("content")).takeIf{it.isNotBlank()}?.let{if(transcript.isNotEmpty())transcript.append("\n");transcript.append(it)}
     }
    }
