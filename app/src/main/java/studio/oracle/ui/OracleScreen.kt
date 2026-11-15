@@ -1038,105 +1038,99 @@ private fun ModelControlPanel(
     onSettingsChange: (AgenticSettings) -> Unit,
     folderGranted: Boolean,
     onChooseFolder: () -> Unit,
+    onOpenModelBrowser: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val palette = LocalOraclePalette.current
+    val activeModel = models.firstOrNull { it.name == selectedModel }
+    val thinkingLevels = when {
+        selectedModel.contains("3.8-flash") -> listOf("low", "medium", "high")
+        selectedModel.contains("4-hydrogen") -> listOf("low", "medium", "high", "xhigh")
+        selectedModel.contains("flash-lite") -> listOf("minimal", "low", "medium")
+        else -> listOf("low", "medium", "high")
+    }
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(25.dp))
-            .background(palette.surface)
-            .border(1.dp, palette.outlineSoft, RoundedCornerShape(25.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp)
+        modifier = modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(Color(0xF5FFFFFF), Color(0xEDEFF2FA), Color(0xF4FFFFFF))
+                )
+            )
+            .border(1.dp, Color(0x66FFFFFF), RoundedCornerShape(22.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("MODEL WORKSPACE", color = palette.textTertiary, fontFamily = OracleMono,
+                    fontSize = 8.sp, letterSpacing = 1.0.sp)
+                Text(activeModel?.displayName ?: selectedModel, color = palette.text,
+                    fontFamily = OracleSans, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+            OracleTextAction(if (refreshing) "SYNCING…" else "SYNC MODELS", onRefresh,
+                enabled = !refreshing, accent = true)
+        }
+        activeModel?.let { model ->
             Text(
-                "MODEL",
-                color = palette.textTertiary,
-                fontFamily = OracleMono,
-                fontSize = 9.sp,
-                letterSpacing = 0.8.sp
-            )
-            Spacer(Modifier.weight(1f))
-            OracleTextAction(
-                if (refreshing) "LOADING" else "REFRESH",
-                onRefresh,
-                enabled = !refreshing,
-                accent = true
+                (model.inputTokenLimit?.let { "%,d".format(it) + " input" } ?: "Input limit n/a") +
+                    "    ·    " + (model.outputTokenLimit?.let { "%,d".format(it) + " output" } ?: "Output n/a"),
+                color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp
             )
         }
-        Spacer(Modifier.height(4.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        Box(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                .background(Color(0x157B8FE8))
+                .clickable(onClick = onOpenModelBrowser)
+                .padding(horizontal = 12.dp, vertical = 11.dp)
         ) {
-            models.forEach { candidate ->
-                ModelChoice(label = candidate.displayName, selected = candidate.name == selectedModel, onClick = { onSelect(candidate) })
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(28.dp).clip(RoundedCornerShape(9.dp)).background(Color(0x287B8FE8)),
+                    contentAlignment = Alignment.Center) {
+                    Text("✦", color = Color(0xFF7185DE), fontSize = 17.sp)
+                }
+                Spacer(Modifier.width(9.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("EXPLORE MODELS", color = Color(0xFF6579CF), fontFamily = OracleMono,
+                        fontSize = 9.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.7.sp)
+                    Text("Compare capabilities, context windows and model families",
+                        color = palette.textSecondary, fontFamily = OracleSans, fontSize = 10.sp)
+                }
+                Text("↗", color = Color(0xFF6579CF), fontSize = 16.sp)
             }
         }
-        val activeModel = models.firstOrNull { it.name == selectedModel }
-        val inputLimit = activeModel?.inputTokenLimit
-        val outputLimit = activeModel?.outputTokenLimit
-        Text(
-            "CONTEXT  " + (inputLimit?.let { "%,d".format(it) + " tokens" } ?: "limit unavailable") +
-                "   ·   OUTPUT  " + (outputLimit?.let { "%,d".format(it) } ?: "model default"),
-            color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp
-        )
-        Spacer(Modifier.height(12.dp))
-        val thinkingLevels = when {
-            selectedModel.contains("4-hydrogen") -> listOf("low", "medium", "high", "xhigh")
-            selectedModel.contains("3.6-flash") || selectedModel.contains("3.5-flash-lite") ||
-                selectedModel.contains("3.1-flash-lite") || selectedModel.contains("3-flash-preview") -> listOf("minimal", "low", "medium", "high")
-            else -> listOf("low", "medium", "high")
+        Text("QUICK CONTROLS", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 8.sp, letterSpacing = 0.9.sp)
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ModelChoice("HOSTED PYTHON", settings.hostedPython, { onSettingsChange(settings.copy(hostedPython = !settings.hostedPython)) })
+            ModelChoice("URL CONTEXT", settings.urlContext, { onSettingsChange(settings.copy(urlContext = !settings.urlContext)) })
+            ModelChoice("LOCAL TOOLS", settings.localTools, { onSettingsChange(settings.copy(localTools = !settings.localTools)) })
+            ModelChoice("AUTO", settings.toolChoice == "auto", { onSettingsChange(settings.copy(toolChoice = "auto")) })
         }
-        Text("REASONING", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.8.sp)
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("REASONING", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 8.sp, letterSpacing = 0.8.sp)
+            Spacer(Modifier.width(8.dp))
             thinkingLevels.forEach { level ->
                 ModelChoice(level.uppercase(), settings.thinkingLevel == level,
                     { onSettingsChange(settings.copy(thinkingLevel = level)) })
             }
-        }
-        Spacer(Modifier.height(9.dp))
-        Text("MODEL CAPABILITIES", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.8.sp)
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            ModelChoice("SEARCH", settings.googleSearch, { onSettingsChange(settings.copy(googleSearch = !settings.googleSearch)) })
-            ModelChoice("HOSTED PY", settings.hostedPython, { onSettingsChange(settings.copy(hostedPython = !settings.hostedPython)) })
-            ModelChoice("URL CONTEXT", settings.urlContext, { onSettingsChange(settings.copy(urlContext = !settings.urlContext)) })
-            ModelChoice("LOCAL TOOLS", settings.localTools, { onSettingsChange(settings.copy(localTools = !settings.localTools)) })
-        }
-        Spacer(Modifier.height(9.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(if (folderGranted) "PHONE FOLDER CONNECTED" else "PHONE FILE ACCESS",
-                    color = if (folderGranted) palette.success else palette.textSecondary,
-                    fontFamily = OracleMono, fontSize = 9.sp)
-                Text("Read and create files only inside the folder you choose.",
-                    color = palette.textTertiary, fontFamily = OracleSans, fontSize = 10.sp)
-            }
-            OracleTextAction(if (folderGranted) "CHANGE" else "GRANT FOLDER", onChooseFolder, accent = true)
-        }
-        Spacer(Modifier.height(9.dp))
-        Text("TOOL SELECTION", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.8.sp)
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            ModelChoice("AUTO", settings.toolChoice == "auto", { onSettingsChange(settings.copy(toolChoice = "auto")) })
-            ModelChoice("NO TOOLS", settings.toolChoice == "none", { onSettingsChange(settings.copy(toolChoice = "none")) })
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("THINKING SUMMARY", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp)
             Spacer(Modifier.weight(1f))
-            ModelChoice(if (settings.thinkingSummaries == "auto") "ON" else "OFF",
-                settings.thinkingSummaries == "auto",
+            ModelChoice("SUMMARY", settings.thinkingSummaries == "auto",
                 { onSettingsChange(settings.copy(thinkingSummaries = if (settings.thinkingSummaries == "auto") "none" else "auto")) })
         }
-        Text("Context caching is model-managed; cached tokens appear in the context ledger.",
-            color = palette.textTertiary, fontFamily = OracleSans, fontSize = 10.sp)
-        Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("OUTPUT LIMIT", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp)
+            Column(Modifier.weight(1f)) {
+                Text(if (folderGranted) "PHONE FOLDER READY" else "PHONE FILE ACCESS",
+                    color = if (folderGranted) Color(0xFF39977D) else palette.textSecondary,
+                    fontFamily = OracleMono, fontSize = 8.sp)
+                Text("Read and write only where you grant access.",
+                    color = palette.textTertiary, fontFamily = OracleSans, fontSize = 10.sp)
+            }
+            OracleTextAction(if (folderGranted) "CHANGE" else "CONNECT", onChooseFolder, accent = true)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("OUTPUT", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 8.sp)
             Spacer(Modifier.weight(1f))
-            listOf(4096, 8192, 16384, 32768).forEach { amount ->
+            listOf(4096, 8192, 16384, 32768, 65536).forEach { amount ->
                 ModelChoice((amount / 1024).toString() + "K", settings.maxOutputTokens == amount,
                     { onSettingsChange(settings.copy(maxOutputTokens = amount)) })
             }
