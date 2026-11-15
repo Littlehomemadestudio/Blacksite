@@ -14,7 +14,7 @@ class ModelPreferences(context: Context) {
     private val store = context.applicationContext.oraclePreferences
 
     val selectedModel: Flow<String> = store.data.map { preferences ->
-        preferences[MODEL_KEY] ?: DEFAULT_MODEL
+        preferences[MODEL_KEY]?.takeUnless { it == "gemini-2.5-flash" } ?: DEFAULT_MODEL
     }
 
     suspend fun setSelectedModel(model: String) {
