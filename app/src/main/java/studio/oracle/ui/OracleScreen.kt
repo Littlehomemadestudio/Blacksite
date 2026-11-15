@@ -581,16 +581,17 @@ fun OracleScreen(
                         contentPadding = PaddingValues(top = 18.dp, bottom = 22.dp)
                     ) {
                         items(messages, key = { it.id }) { message ->
-                            OracleMessageRow(message = message, modifier = Modifier.animateItem())
+                            OracleMessageRow(
+                                message = message,
+                                onOpenFile = ::openArtifact,
+                                modifier = Modifier.animateItem()
+                            )
+                        }
+                        if (busy && agentEvents.isNotEmpty()) {
+                            item { LiveAgentActivity(events = agentEvents) }
                         }
                         if (busy) {
                             item { OracleThinkingIndicator() }
-                        }
-                        if (agentEvents.isNotEmpty()) {
-                            item { AgenticActivityTimeline(agentEvents) }
-                        }
-                        if (agentEvents.isNotEmpty()) {
-                            item { AgenticActivityTimeline(agentEvents) }
                         }
                     }
                 }
@@ -620,6 +621,9 @@ fun OracleScreen(
                 onCancel = { requestJob?.cancel() },
                 onThinkClick = { modelPanelOpen = !modelPanelOpen; keyboard?.hide() },
                 thinkExpanded = modelPanelOpen,
+                attachments = selectedAttachments,
+                onAttachClick = { mediaPicker.launch(arrayOf("*/*")) },
+                onRemoveAttachment = { attachment -> selectedAttachments = selectedAttachments.filterNot { it.uri == attachment.uri } },
                 modifier = Modifier
                     .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 10.dp)
             )
@@ -639,6 +643,7 @@ fun OracleScreen(
                     onSettingsChange = { agenticSettings = it },
                     folderGranted = grantedTreeUri != null,
                     onChooseFolder = { folderPicker.launch(null) },
+                    onOpenModelBrowser = { modelBrowserOpen = true },
                     modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp)
                 )
             }
