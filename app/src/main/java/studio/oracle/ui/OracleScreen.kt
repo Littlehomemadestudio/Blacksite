@@ -1170,7 +1170,6 @@ private fun AgentEventRow(event: AgenticEvent, onOpenFile: (String) -> Unit) {
     val palette = LocalOraclePalette.current
     val isFile = event.kind == "file_created"
     val isCode = event.code.isNotBlank()
-    val isImage = event.kind == "generated_image"
     var expanded by remember(event.title, event.kind, event.code) { mutableStateOf(false) }
     val accent = when {
         isFile -> Color(0xFF42A68A)
