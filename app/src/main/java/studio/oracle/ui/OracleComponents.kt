@@ -566,6 +566,11 @@ private fun ThinkPill(onClick: () -> Unit, expanded: Boolean) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.96f else 1f, spring(stiffness = 550f), label = "think-pill")
+    val chevronRotation by animateFloatAsState(
+        if (expanded) 180f else 0f,
+        animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f),
+        label = "think-chevron"
+    )
     Row(
         modifier = Modifier
             .graphicsLayer {
@@ -591,8 +596,8 @@ private fun ThinkPill(onClick: () -> Unit, expanded: Boolean) {
         )
         Spacer(Modifier.width(4.dp))
         OracleGlyphIcon(
-            if (expanded) OracleGlyph.ChevronDown else OracleGlyph.ChevronDown,
-            Modifier.size(11.dp),
+            OracleGlyph.ChevronDown,
+            Modifier.size(11.dp).graphicsLayer { rotationZ = chevronRotation },
             palette.textTertiary,
             1.4f
         )
@@ -631,11 +636,22 @@ private fun OracleSendButton(
             ),
         contentAlignment = Alignment.Center
     ) {
-        OracleGlyphIcon(
-            if (busy) OracleGlyph.Close else OracleGlyph.ArrowUp,
-            Modifier.size(19.dp),
-            tint = if (enabled) palette.onAccent else palette.textTertiary,
-            strokeWidth = 1.8f
-        )
+        androidx.compose.animation.AnimatedContent(
+            targetState = busy,
+            transitionSpec = {
+                (androidx.compose.animation.fadeIn(tween(130)) +
+                    androidx.compose.animation.scaleIn(initialScale = 0.72f, animationSpec = tween(170))) togetherWith
+                    (androidx.compose.animation.fadeOut(tween(90)) +
+                        androidx.compose.animation.scaleOut(targetScale = 0.72f, animationSpec = tween(130)))
+            },
+            label = "send-icon"
+        ) { sending ->
+            OracleGlyphIcon(
+                if (sending) OracleGlyph.Close else OracleGlyph.ArrowUp,
+                Modifier.size(19.dp),
+                tint = if (enabled) palette.onAccent else palette.textTertiary,
+                strokeWidth = 1.8f
+            )
+        }
     }
 }
