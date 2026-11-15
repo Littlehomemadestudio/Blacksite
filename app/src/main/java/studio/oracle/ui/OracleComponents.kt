@@ -453,7 +453,7 @@ fun DeepSeekInputPill(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.985f else 1f,
+        targetValue = if (pressed) 0.96f else 1f,
         animationSpec = spring(stiffness = 430f, dampingRatio = 0.82f),
         label = "composer-press"
     )
