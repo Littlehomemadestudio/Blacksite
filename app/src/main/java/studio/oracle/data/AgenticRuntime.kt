@@ -24,6 +24,7 @@ data class AgenticSettings(
     val webSearch: Boolean = true,
     val phoneFiles: Boolean = true,
     val localPython: Boolean = true,
+    val imageGeneration: Boolean = true,
     val localTools: Boolean = true
 ) {
     fun validated() = copy(
@@ -101,10 +102,11 @@ class GeminiAgenticRuntime(
         if (!model.matches(Regex("[A-Za-z0-9._-]+"))) return AgenticResult.Failed("Invalid Gemini model identifier.")
 
         val cfg = settings.validated()
+        val imageOnlyModel = model.contains("flash-image", ignoreCase = true)
         val tools = JSONArray().apply {
-            if (cfg.hostedPython) put(JSONObject().put("type", "code_execution"))
-            if (cfg.urlContext) put(JSONObject().put("type", "url_context"))
-            if (cfg.localTools) {
+            if (!imageOnlyModel && cfg.hostedPython) put(JSONObject().put("type", "code_execution"))
+            if (!imageOnlyModel && cfg.urlContext) put(JSONObject().put("type", "url_context"))
+            if (!imageOnlyModel && cfg.localTools) {
                 val declared = executor.declarations()
                 for (i in 0 until declared.length()) put(declared.getJSONObject(i))
             }
@@ -138,9 +140,9 @@ class GeminiAgenticRuntime(
                         .put("thinking_level", cfg.thinkingLevel)
                         .put("thinking_summaries", cfg.thinkingSummaries)
                         .put("max_output_tokens", cfg.maxOutputTokens)
-                        .put("tool_choice", cfg.toolChoice)
                 )
-            if (model.contains("flash-image", ignoreCase = true)) {
+            if (!imageOnlyModel) body.getJSONObject("generation_config").put("tool_choice", cfg.toolChoice)
+            if (imageOnlyModel) {
                 body.put(
                     "response_format",
                     JSONArray()
