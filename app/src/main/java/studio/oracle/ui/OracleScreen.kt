@@ -109,7 +109,7 @@ fun OracleScreen(
     var messages by remember { mutableStateOf(emptyList<AgentMessageEntity>()) }
     var prompt by remember { mutableStateOf("") }
     var availableModels by remember {
-        mutableStateOf(listOf(GeminiModel(ModelPreferences.DEFAULT_MODEL, "Gemini 3.5 Flash")))
+        mutableStateOf(listOf(GeminiModel(ModelPreferences.DEFAULT_MODEL, "Gemini 3.8 Flash")))
     }
     var syncingModels by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
