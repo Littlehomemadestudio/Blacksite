@@ -150,7 +150,8 @@ fun WorkflowScreen(workspaceId: String) {
                 Text("Local actions · explicit manual runs", color = LocalOraclePalette.current.textSecondary, fontSize = 10.sp)
             }
             if (tab == "WORKFLOWS" && selectedWorkflowId == null) {
-                Button(
+                OracleSolidAction(
+                    label = "NEW WORKFLOW",
                     onClick = {
                         scope.launch {
                             try {
@@ -161,15 +162,8 @@ fun WorkflowScreen(workspaceId: String) {
                                 status = "COULD NOT CREATE WORKFLOW"
                             }
                         }
-                    },
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = LocalOraclePalette.current.accent, contentColor = LocalOraclePalette.current.canvas)
-                ) {
-                    OracleGlyphIcon(OracleGlyph.NewChat, Modifier.size(16.dp), LocalOraclePalette.current.textSecondary)
-                    Spacer(Modifier.width(5.dp))
-                    Text("New", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
+                    }
+                )
             }
         }
 
@@ -316,9 +310,10 @@ fun WorkflowScreen(workspaceId: String) {
                             )
                         }
                         item {
-                            OutlinedButton(
+                            OracleTextAction(
+                                label = "ADD STEP",
                                 onClick = {
-                                    val id = selectedWorkflowId ?: return@OutlinedButton
+                                    val id = selectedWorkflowId ?: return@OracleTextAction
                                     if (steps.size >= WorkflowRules.MAX_STEPS) {
                                         status = "MAXIMUM ${WorkflowRules.MAX_STEPS} STEPS"
                                     } else {
@@ -333,29 +328,24 @@ fun WorkflowScreen(workspaceId: String) {
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalOraclePalette.current.accent)
-                            ) {
-                                OracleGlyphIcon(OracleGlyph.NewChat, Modifier.size(16.dp), LocalOraclePalette.current.textSecondary)
-                                Spacer(Modifier.width(6.dp))
-                                Text("Add step", fontSize = 12.sp)
-                            }
+                                accent = true
+                            )
                         }
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedButton(
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OracleTextAction(
+                            label = "DELETE",
                             onClick = { showDeleteConfirmation = true },
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 9.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalOraclePalette.current.error)
-                        ) {
-                            OracleGlyphIcon(OracleGlyph.Trash, Modifier.size(16.dp), LocalOraclePalette.current.textSecondary)
-                        }
+                            accent = false
+                        )
                         Spacer(Modifier.weight(1f))
-                        OutlinedButton(
+                        OracleTextAction(
+                            label = if (saving) "SAVING…" else "SAVE",
                             onClick = {
                                 val issue = WorkflowRules.validate(steps)
                                 if (issue != null) status = issue else {
@@ -375,30 +365,16 @@ fun WorkflowScreen(workspaceId: String) {
                                 }
                             },
                             enabled = !saving && !running,
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft),
-                            contentPadding = PaddingValues(horizontal = 11.dp, vertical = 9.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = LocalOraclePalette.current.text)
-                        ) {
-                            OracleGlyphIcon(OracleGlyph.Check, Modifier.size(15.dp), LocalOraclePalette.current.textSecondary)
-                            Spacer(Modifier.width(5.dp))
-                            Text("Save", fontSize = 11.sp)
-                        }
-                        Button(
+                            accent = true
+                        )
+                        OracleSolidAction(
+                            label = if (running) "RUNNING…" else "RUN",
                             onClick = {
                                 val issue = WorkflowRules.validate(steps)
                                 if (issue != null) status = issue else showRunConfirmation = true
                             },
-                            enabled = !saving && !running && selectedWorkflow != null,
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = LocalOraclePalette.current.accent, contentColor = LocalOraclePalette.current.canvas)
-                        ) {
-                            if (running) CircularProgressIndicator(Modifier.size(14.dp), color = LocalOraclePalette.current.canvas, strokeWidth = 2.dp)
-                            else OracleGlyphIcon(OracleGlyph.ArrowUp, Modifier.size(16.dp), LocalOraclePalette.current.textSecondary)
-                            Spacer(Modifier.width(4.dp))
-                            Text(if (running) "Running" else "Run", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
+                            enabled = !saving && !running && selectedWorkflow != null
+                        )
                     }
                 }
             }
@@ -557,10 +533,11 @@ private fun WorkflowStepCard(
                 Text("${(index + 1).toString().padStart(2, '0')}", color = LocalOraclePalette.current.accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
                 Spacer(Modifier.width(8.dp))
                 Box {
-                    TextButton(onClick = { menuExpanded = true }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 2.dp)) {
-                        Text(action?.label ?: "Unsupported action", color = LocalOraclePalette.current.accent, fontSize = 10.sp)
-                        OracleGlyphIcon(OracleGlyph.Settings, Modifier.size(13.dp), LocalOraclePalette.current.textSecondary)
-                    }
+                    OracleTextAction(
+                        label = action?.label?.uppercase() ?: "UNSUPPORTED ACTION",
+                        onClick = { menuExpanded = true },
+                        accent = true
+                    )
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                         WorkflowAction.entries.forEach { candidate ->
                             DropdownMenuItem(
