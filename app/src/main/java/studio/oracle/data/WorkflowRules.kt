@@ -17,9 +17,12 @@ object WorkflowRules {
     const val MAX_TITLE_CHARS = 120
     const val MAX_INPUT_CHARS = 12_000
 
-    fun validate(steps: List<WorkflowStepEntity>): String? {
+    fun validate(steps: List<WorkflowStepEntity>, expectedWorkflowId: String? = null): String? {
         if (steps.isEmpty()) return "Add at least one step before saving or running this workflow."
         if (steps.size > MAX_STEPS) return "A workflow can contain at most $MAX_STEPS steps."
+        if (expectedWorkflowId != null && steps.any { it.workflowId != expectedWorkflowId }) {
+            return "Every step must belong to the workflow being executed."
+        }
 
         steps.sortedBy { it.position }.forEachIndexed { index, step ->
             val action = WorkflowAction.from(step.actionType)
