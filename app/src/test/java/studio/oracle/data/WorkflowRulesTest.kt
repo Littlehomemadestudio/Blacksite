@@ -61,6 +61,16 @@ class WorkflowRulesTest {
     }
 
     @Test
+    fun rejectsStepsFromAnotherWorkflowWhenAnExecutionTargetIsProvided() {
+        val foreignStep = step().copy(workflowId = "another-workflow")
+        assertTrue(
+            WorkflowRules.validate(listOf(foreignStep), expectedWorkflowId = "workflow-1")
+                ?.contains("belong to the workflow") == true
+        )
+        assertNull(WorkflowRules.validate(listOf(foreignStep)))
+    }
+
+    @Test
     fun enforcesInputBounds() {
         val oversized = step(input = "x".repeat(WorkflowRules.MAX_INPUT_CHARS + 1))
         assertTrue(WorkflowRules.validate(listOf(oversized))!!.contains("12,000"))
