@@ -1,0 +1,67 @@
+package studio.oracle.ui.theme
+
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
+
+/**
+ * A semantic palette rather than a collection of one-off screen colors.
+ * Components consume this palette so dark and light surfaces stay coherent.
+ */
+data class OraclePalette(
+    val canvas: Color,
+    val surface: Color,
+    val surfaceRaised: Color,
+    val surfaceSunken: Color,
+    val outline: Color,
+    val outlineSoft: Color,
+    val text: Color,
+    val textSecondary: Color,
+    val textTertiary: Color,
+    val accent: Color,
+    val onAccent: Color,
+    val accentSoft: Color,
+    val error: Color,
+    val success: Color,
+    val scrim: Color,
+    val isDark: Boolean
+)
+
+val OracleDarkPalette = OraclePalette(
+    canvas = Color(0xFF111315),
+    surface = Color(0xFF191C1F),
+    surfaceRaised = Color(0xFF22262A),
+    surfaceSunken = Color(0xFF0C0E10),
+    outline = Color(0xFF343A40),
+    outlineSoft = Color(0xFF292E33),
+    text = Color(0xFFF3F1EC),
+    textSecondary = Color(0xFFA5A9AE),
+    textTertiary = Color(0xFF747A81),
+    accent = Color(0xFFD36B52),
+    onAccent = Color(0xFFFFFFFF),
+    accentSoft = Color(0xFF38251F),
+    error = Color(0xFFFF8E83),
+    success = Color(0xFF73B895),
+    scrim = Color(0x99000000),
+    isDark = true
+)
+
+val OracleLightPalette = OraclePalette(
+    canvas = Color(0xFFF7F6F2),
+    surface = Color(0xFFFFFEFB),
+    surfaceRaised = Color(0xFFF0EFEB),
+    surfaceSunken = Color(0xFFE9E8E3),
+    outline = Color(0xFFD8D7D1),
+    outlineSoft = Color(0xFFE7E5DF),
+    text = Color(0xFF191B1E),
+    textSecondary = Color(0xFF666D73),
+    textTertiary = Color(0xFF92979B),
+    accent = Color(0xFFC6533D),
+    onAccent = Color(0xFFFFFFFF),
+    accentSoft = Color(0xFFF5E7E2),
+    error = Color(0xFFB43B32),
+    success = Color(0xFF287A55),
+    scrim = Color(0x660D1115),
+    isDark = false
+)
+
+val LocalOraclePalette = staticCompositionLocalOf { OracleDarkPalette }
