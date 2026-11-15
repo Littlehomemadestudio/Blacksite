@@ -15,6 +15,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -48,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
+import studio.oracle.data.AgentAttachmentRef
 import studio.oracle.ui.theme.LocalOraclePalette
 import studio.oracle.ui.theme.OracleMono
 import studio.oracle.ui.theme.OracleSans
@@ -452,7 +454,10 @@ fun DeepSeekInputPill(
     onCancel: () -> Unit,
     onThinkClick: () -> Unit,
     modifier: Modifier = Modifier,
-    thinkExpanded: Boolean = false
+    thinkExpanded: Boolean = false,
+    attachments: List<AgentAttachmentRef> = emptyList(),
+    onAttachClick: () -> Unit = {},
+    onRemoveAttachment: (AgentAttachmentRef) -> Unit = {}
 ) {
     val palette = LocalOraclePalette.current
     val interaction = remember { MutableInteractionSource() }
@@ -483,12 +488,60 @@ fun DeepSeekInputPill(
                 scaleY = scale
                 translationY = if (pressed) 1.dp.toPx() else 0f
             }
-            .shadow(elevation, RoundedCornerShape(22.dp))
+             .shadow(elevation + 2.dp, RoundedCornerShape(22.dp))
             .clip(RoundedCornerShape(22.dp))
-            .background(palette.surface)
-            .border(1.dp, borderColor, RoundedCornerShape(22.dp))
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xF9FFFFFF),
+                        Color(0xEAF0F3FC),
+                        Color(0xF5FFFFFF)
+                    )
+                )
+            )
+            .border(1.dp, borderColor.copy(alpha = 0.82f), RoundedCornerShape(22.dp))
             .padding(start = 17.dp, end = 10.dp, top = 12.dp, bottom = 10.dp)
     ) {
+        if (attachments.isNotEmpty()) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                attachments.forEach { attachment ->
+                    Row(
+                        Modifier.clip(RoundedCornerShape(11.dp))
+                            .background(palette.surfaceRaised)
+                            .border(1.dp, palette.outlineSoft, RoundedCornerShape(11.dp))
+                            .padding(start = 9.dp, end = 5.dp, top = 6.dp, bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.material3.Text(
+                            when {
+                                attachment.mimeType.startsWith("image/") -> "▧"
+                                attachment.mimeType.startsWith("video/") -> "▶"
+                                attachment.mimeType.startsWith("audio/") -> "♫"
+                                else -> "▤"
+                            },
+                            color = palette.accent, fontSize = 13.sp
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        androidx.compose.material3.Text(
+                            attachment.name.take(19),
+                            color = palette.textSecondary, fontFamily = OracleSans,
+                            fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.width(5.dp))
+                        androidx.compose.material3.Text(
+                            "×",
+                            modifier = Modifier.clickable { onRemoveAttachment(attachment) }.padding(horizontal = 3.dp),
+                            color = palette.textTertiary, fontSize = 16.sp
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(9.dp))
+        }
+
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
@@ -535,6 +588,16 @@ fun DeepSeekInputPill(
             Modifier.fillMaxWidth().height(42.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                Modifier.size(38.dp).clip(RoundedCornerShape(12.dp))
+                    .background(palette.surfaceRaised)
+                    .border(1.dp, palette.outlineSoft, RoundedCornerShape(12.dp))
+                    .clickable(onClick = onAttachClick),
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.compose.material3.Text("＋", color = palette.textSecondary, fontSize = 23.sp, lineHeight = 24.sp)
+            }
+            Spacer(Modifier.width(8.dp))
             ThinkPill(onClick = onThinkClick, expanded = thinkExpanded)
             Spacer(Modifier.weight(1f))
             androidx.compose.animation.AnimatedVisibility(
@@ -553,7 +616,7 @@ fun DeepSeekInputPill(
             }
             Spacer(Modifier.width(8.dp))
             OracleSendButton(
-                enabled = busy || value.isNotBlank(),
+                enabled = busy || value.isNotBlank() || attachments.isNotEmpty(),
                 busy = busy,
                 onClick = if (busy) onCancel else onSend
             )
@@ -589,7 +652,7 @@ private fun ThinkPill(onClick: () -> Unit, expanded: Boolean) {
         OracleGlyphIcon(OracleGlyph.Spark, Modifier.size(13.dp), palette.textSecondary, 1.35f)
         Spacer(Modifier.width(7.dp))
         androidx.compose.material3.Text(
-            "Think",
+            "Model / Tools",
             color = palette.textSecondary,
             fontFamily = OracleMono,
             fontSize = 10.sp,
