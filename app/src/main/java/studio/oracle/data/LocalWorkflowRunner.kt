@@ -22,12 +22,16 @@ data class WorkflowRunResult(
 /** Executes only the explicit local actions in WorkflowAction. */
 class LocalWorkflowRunner(
     private val dao: WorkflowDao,
-    private val documents: DocumentRepository
+    private val documents: DocumentRepository,
+    private val workspaceId: String
 ) {
     suspend fun execute(
         workflow: WorkflowEntity,
         steps: List<WorkflowStepEntity>
     ): WorkflowRunResult {
+        if (workflow.workspaceId != workspaceId || dao.findWorkflow(workflow.id, workspaceId) == null) {
+            return WorkflowRunResult("", "INVALID", "This workflow does not belong to the active workspace.")
+        }
         val validation = WorkflowRules.validate(steps)
         if (validation != null) return WorkflowRunResult("", "INVALID", validation)
 
@@ -61,15 +65,16 @@ class LocalWorkflowRunner(
                                     title = step.title.trim(),
                                     content = step.input,
                                     createdAt = now,
-                                    updatedAt = now
+                                    updatedAt = now,
+                                    workspaceId = workspaceId
                                 )
                             )
                             "Created local note “${step.title.trim()}” (${step.input.length} characters)."
                         }
                         WorkflowAction.APPEND_NOTE -> {
-                            val note = dao.findNoteByTitle(step.title.trim())
-                                ?: error("No local note titled “${step.title.trim()}” exists. Create it first or correct the title.")
-                            val changed = dao.appendToNote(note.id, step.input, System.currentTimeMillis())
+                            val note = dao.findNoteByTitle(step.title.trim(), workspaceId)
+                                ?: error("No local note titled “${step.title.trim()}” exists in this workspace. Create it first or correct the title.")
+                            val changed = dao.appendToNote(note.id, workspaceId, step.input, System.currentTimeMillis())
                             if (changed != 1) error("The target note could not be updated.")
                             "Appended ${step.input.length} characters to “${note.title}”."
                         }
