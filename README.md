@@ -91,3 +91,6 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 
 ## Database compatibility
 Room schema v4 retains both the workspace and workflow data models. Its 3→4 migration is idempotent across the two earlier v3 layouts: it adds any missing workspace columns and creates workflow tables only when they do not already exist.
+
+
+<!-- CI validation marker for PR #4; no runtime source changes. -->
