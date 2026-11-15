@@ -729,12 +729,20 @@ private fun ModelControlPanel(
             color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp
         )
         Spacer(Modifier.height(12.dp))
+        val thinkingLevels = when {
+            selectedModel.contains("4-hydrogen") -> listOf("low", "medium", "high", "xhigh")
+            selectedModel.contains("3.6-flash") || selectedModel.contains("3.5-flash-lite") ||
+                selectedModel.contains("3.1-flash-lite") || selectedModel.contains("3-flash-preview") -> listOf("minimal", "low", "medium", "high")
+            else -> listOf("low", "medium", "high")
+        }
         Text("REASONING", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.8.sp)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            listOf("low", "medium", "high", "xhigh").forEach { level ->
-                ModelChoice(level.uppercase(), settings.thinkingLevel == level, { onSettingsChange(settings.copy(thinkingLevel = level)) })
+            thinkingLevels.forEach { level ->
+                ModelChoice(level.uppercase(), settings.thinkingLevel == level,
+                    { onSettingsChange(settings.copy(thinkingLevel = level)) })
             }
         }
+        Spacer(Modifier.height(9.dp))
         Spacer(Modifier.height(9.dp))
         Text("MODEL CAPABILITIES", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.8.sp)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -755,17 +763,10 @@ private fun ModelControlPanel(
             OracleTextAction(if (folderGranted) "CHANGE" else "GRANT FOLDER", onChooseFolder, accent = true)
         }
         Spacer(Modifier.height(9.dp))
-        Text("SAMPLING", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.8.sp)
+        Text("TOOL SELECTION", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.8.sp)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            listOf(0.2, 0.5, 0.8, 1.0).forEach { value ->
-                ModelChoice(value.toString(), settings.temperature == value, { onSettingsChange(settings.copy(temperature = value)) })
-            }
-            listOf(0.7, 0.85, 0.95, 1.0).forEach { value ->
-                ModelChoice("P" + value.toString(), settings.topP == value, { onSettingsChange(settings.copy(topP = value)) })
-            }
-            listOf(20, 40, 64).forEach { value ->
-                ModelChoice("K" + value, settings.topK == value, { onSettingsChange(settings.copy(topK = value)) })
-            }
+            ModelChoice("AUTO", settings.toolChoice == "auto", { onSettingsChange(settings.copy(toolChoice = "auto")) })
+            ModelChoice("NO TOOLS", settings.toolChoice == "none", { onSettingsChange(settings.copy(toolChoice = "none")) })
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("THINKING SUMMARY", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp)
