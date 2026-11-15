@@ -491,12 +491,12 @@ fun DeepSeekInputPill(
              .shadow(elevation + 2.dp, RoundedCornerShape(22.dp))
             .clip(RoundedCornerShape(22.dp))
             .background(
-                androidx.compose.ui.graphics.Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xF9FFFFFF),
-                        Color(0xEAF0F3FC),
-                        Color(0xF5FFFFFF)
-                    )
+                androidx.compose.ui.graphics.Brush.linearGradient(
+                    colors = if (palette.isDark) {
+                        listOf(Color(0xEE303947), Color(0xD91E2631), Color(0xF0262E3A), Color(0xEA202832))
+                    } else {
+                        listOf(Color(0xF9FFFFFF), Color(0xDCECF1FB), Color(0xF4FFFFFF), Color(0xEAF7F8FC))
+                    }
                 )
             )
             .border(1.dp, borderColor.copy(alpha = 0.82f), RoundedCornerShape(22.dp))
