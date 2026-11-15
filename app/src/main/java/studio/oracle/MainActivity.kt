@@ -24,6 +24,7 @@ import studio.oracle.ui.OracleGlyph
 import studio.oracle.ui.OracleIconButton
 import studio.oracle.ui.OracleScreen
 import studio.oracle.ui.SettingsScreen
+import studio.oracle.ui.WorkflowScreen
 import studio.oracle.ui.theme.LocalOraclePalette
 import studio.oracle.ui.theme.OracleSans
 import studio.oracle.ui.theme.OracleTheme
@@ -42,6 +43,7 @@ class MainActivity : ComponentActivity() {
 private enum class OracleDestination {
     CHAT,
     LIBRARY,
+    WORKFLOWS,
     SETTINGS
 }
 
@@ -89,6 +91,7 @@ private fun OracleRoot() {
         OracleDestination.CHAT -> OracleScreen(
             onOpenLibrary = { destination = OracleDestination.LIBRARY },
             onOpenSettings = { destination = OracleDestination.SETTINGS },
+            onOpenWorkflows = { destination = OracleDestination.WORKFLOWS },
             workspaceId = activeWorkspaceId,
             workspaces = workspaces,
             onWorkspaceChange = ::selectWorkspace,
@@ -100,6 +103,13 @@ private fun OracleRoot() {
             onBack = { destination = OracleDestination.CHAT }
         ) {
             LibraryScreen(workspaceId = activeWorkspaceId)
+        }
+
+        OracleDestination.WORKFLOWS -> OracleSection(
+            title = "Workflow Studio",
+            onBack = { destination = OracleDestination.CHAT }
+        ) {
+            WorkflowScreen(workspaceId = activeWorkspaceId)
         }
 
         OracleDestination.SETTINGS -> OracleSection(
