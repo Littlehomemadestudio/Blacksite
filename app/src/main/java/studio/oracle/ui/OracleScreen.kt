@@ -741,7 +741,8 @@ private fun OracleAssistantContent(text: String, modifier: Modifier = Modifier) 
 }
 
 private fun splitAssistantMessage(raw: String): List<AssistantMessageSegment> {
-    val pattern = Regex("""\\x60{3}([A-Za-z0-9_+.-]*)\n([\s\S]*?)\\x60{3}""")
+    val fence = 96.toChar().toString().repeat(3)
+    val pattern = Regex(Regex.escape(fence) + "([A-Za-z0-9_+.-]*)" + "\n" + "([\\s\\S]*?)" + Regex.escape(fence))
     val result = mutableListOf<AssistantMessageSegment>()
     var cursor = 0
     pattern.findAll(raw).forEach { match ->
