@@ -321,15 +321,53 @@ private fun parseRichBlocks(source: String): List<RichBlock> {
 
 private fun inlineMarkdown(source: String, color: Color): AnnotatedString = buildAnnotatedString {
     var cursor = 0
-    val token = Regex(
-        """(?m)(#.*$|//.*$)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(\b(?:def|class|return|if|elif|else|for|while|in|not|and|or|is|import|from|as|try|except|finally|with|async|await|yield|pass|break|continue|lambda|raise|new|fun|val|var|const|let|function|public|private|static|suspend|override|when|object|interface|package)\b)|(\b(?:True|False|None|null|true|false|undefined)\b)|(\b\d+(?:\.\d+)?\b)|(\b[A-Za-z_][A-Za-z_0-9]*(?=\s*\())"""
+    val token = Regex("\\*\\*(.+?)\\*\\*|(?<!\\*)\\*([^*]+?)\\*(?!\\*)|\\x60([^\\x60]+?)\\x60|\\[([^]]+)]\\((https?://[^ )]+)\\)")
+    token.findAll(source).forEach { match ->
+        append(source.substring(cursor, match.range.first))
+        when {
+            match.groups[1] != null -> {
+                pushStyle(SpanStyle(fontWeight = FontWeight.Bold, color = color))
+                append(match.groupValues[1]); pop()
+            }
+            match.groups[2] != null -> {
+                pushStyle(SpanStyle(fontStyle = FontStyle.Italic, color = color))
+                append(match.groupValues[2]); pop()
+            }
+            match.groups[3] != null -> {
+                pushStyle(SpanStyle(fontFamily = FontFamily.Monospace, color = Color(0xFF788CE5),
+                    background = Color(0x14788CE5)))
+                append(match.groupValues[3]); pop()
+            }
+            match.groups[4] != null -> {
+                pushStringAnnotation("URL", match.groupValues[5])
+                pushStyle(SpanStyle(color = Color(0xFF7288E4), textDecoration = TextDecoration.Underline))
+                append(match.groupValues[4])
+                pop(); pop()
+            }
+        }
+        cursor = match.range.last + 1
+    }
+    append(source.substring(cursor))
+}
+
+/** Syntax-colored source renderer shared by assistant code blocks and tool execution traces. */
+@Composable
+fun OracleSyntaxCode(source: String, modifier: Modifier = Modifier) {
+    val annotated = remember(source) { colorizeSource(source) }
+    Text(
+        text = annotated,
+        modifier = modifier,
+        style = androidx.compose.ui.text.TextStyle(
+            fontFamily = FontFamily.Monospace,
+            fontSize = 11.sp,
+            lineHeight = 17.sp,
+            color = Color(0xFFE1E7F2)
+        )
     )
 }
 
 private fun colorizeSource(source: String): AnnotatedString = buildAnnotatedString {
-    val token = Regex(
-        """(?m)(#.*$|//.*$)|("(?:\\\\.|[^"\\\\])*"|'(?:\\\\.|[^'\\\\])*')|(\b(?:def|class|return|if|elif|else|for|while|in|not|and|or|is|import|from|as|try|except|finally|with|async|await|yield|pass|break|continue|lambda|raise|new|fun|val|var|const|let|function|public|private|static|suspend|override|when|object|interface|package)\b)|(\b(?:True|False|None|null|true|false|undefined)\b)|(\b\d+(?:\\.\d+)?\b)|(\b[A-Za-z_][A-Za-z_0-9]*(?=\s*\\())"""
-    )
+    val token = Regex("(?m)(#.*$|//.*$)|(\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*')|(\\b(?:def|class|return|if|elif|else|for|while|in|not|and|or|is|import|from|as|try|except|finally|with|async|await|yield|pass|break|continue|lambda|raise|new|fun|val|var|const|let|function|public|private|static|suspend|override|when|object|interface|package)\\b)|(\\b(?:True|False|None|null|true|false|undefined)\\b)|(\\b\\d+(?:\\.\\d+)?\\b)|(\\b[A-Za-z_][A-Za-z_0-9]*(?=\\s*\\())")
     var cursor = 0
     token.findAll(source).forEach { match ->
         append(source.substring(cursor, match.range.first))
