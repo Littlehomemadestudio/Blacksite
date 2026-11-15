@@ -45,17 +45,9 @@ import studio.oracle.ui.theme.LocalOraclePalette
 import studio.oracle.ui.theme.OracleMono
 import studio.oracle.ui.theme.OracleSans
 
-private val palette.canvas = Color(0xFF101317)
-private val palette.surface = Color(0xFF171C22)
-private val palette.surfaceRaised = Color(0xFF202730)
-private val palette.outline = Color(0xFF2B343F)
-private val palette.text = Color(0xFFE9E7E1)
-private val palette.textSecondary = Color(0xFF929BA5)
-private val palette.accent = Color(0xFFE17A52)
-private val palette.accent = Color(0xFFB49AF4)
-
 @Composable
 fun LibraryScreen() {
+    val palette = LocalOraclePalette.current
     val context = LocalContext.current
     val repository = remember(context) {
         DocumentRepository(context, OracleDatabase.get(context).documentDao())
