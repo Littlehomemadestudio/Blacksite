@@ -3,7 +3,7 @@ package studio.oracle.ui
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.BasicTextField
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -410,7 +411,8 @@ fun DeepSeekInputPill(
     onSend: () -> Unit,
     onCancel: () -> Unit,
     onThinkClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    thinkExpanded: Boolean = false
 ) {
     val palette = LocalOraclePalette.current
     val interaction = remember { MutableInteractionSource() }
@@ -480,7 +482,7 @@ fun DeepSeekInputPill(
             Modifier.fillMaxWidth().height(42.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            ThinkPill(onClick = onThinkClick, expanded = false)
+            ThinkPill(onClick = onThinkClick, expanded = thinkExpanded)
             Spacer(Modifier.weight(1f))
             androidx.compose.material3.Text(
                 if (busy) "WORKING" else "",
