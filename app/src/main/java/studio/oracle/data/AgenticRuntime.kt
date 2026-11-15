@@ -197,8 +197,12 @@ class GeminiAgenticRuntime(
             }
 
             val steps = root.optJSONArray("steps") ?: JSONArray()
-            val hasFunctionCalls = (0 until steps.length()).any {
-                steps.optJSONObject(it)?.optString("type") == "function_call"
+            val hasToolCalls = (0 until steps.length()).any { index ->
+                steps.optJSONObject(index)?.optString("type") in setOf(
+                    "function_call",
+                    "code_execution_call",
+                    "url_context_call"
+                )
             }
             val functionResults = JSONArray()
             var functionCalls = 0
@@ -268,7 +272,7 @@ class GeminiAgenticRuntime(
                                 "text" -> {
                                     val text = part.optString("text")
                                     if (text.isNotBlank()) {
-                                        if (hasFunctionCalls && transcript.isEmpty()) {
+                                        if (hasToolCalls && transcript.isEmpty()) {
                                             if (!planSummaryEmitted) {
                                                 onEvent(AgenticEvent("plan", "Plan", text.take(2400)))
                                                 planSummaryEmitted = true
