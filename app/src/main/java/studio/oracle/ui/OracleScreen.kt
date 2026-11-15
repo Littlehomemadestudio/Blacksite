@@ -530,6 +530,9 @@ fun OracleScreen(
                     context = context,
                     grantedTree = grantedTreeUri,
                     tavilyKey = tavilyKey,
+                    webSearchEnabled = agenticSettings.localTools && agenticSettings.webSearch,
+                    phoneFilesEnabled = agenticSettings.localTools && agenticSettings.phoneFiles,
+                    localPythonEnabled = agenticSettings.localTools && agenticSettings.localPython,
                     authorize = ::authorizeTool,
                     python = { code ->
                         val before = pythonRuntime.workspaceDirectory().walkTopDown()
@@ -1343,10 +1346,12 @@ private fun ModelControlPanel(
         }
         Text("QUICK CONTROLS", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 8.sp, letterSpacing = 0.9.sp)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            ModelChoice("HOSTED PYTHON", settings.hostedPython, { onSettingsChange(settings.copy(hostedPython = !settings.hostedPython)) })
+            ModelChoice("WEB SEARCH", settings.localTools && settings.webSearch, { onSettingsChange(settings.copy(webSearch = !settings.webSearch)) })
+            ModelChoice("PHONE FILES", settings.localTools && settings.phoneFiles, { onSettingsChange(settings.copy(phoneFiles = !settings.phoneFiles)) })
+            ModelChoice("LOCAL PY", settings.localTools && settings.localPython, { onSettingsChange(settings.copy(localPython = !settings.localPython)) })
+            ModelChoice("HOSTED PY", settings.hostedPython, { onSettingsChange(settings.copy(hostedPython = !settings.hostedPython)) })
             ModelChoice("URL CONTEXT", settings.urlContext, { onSettingsChange(settings.copy(urlContext = !settings.urlContext)) })
-            ModelChoice("LOCAL TOOLS", settings.localTools, { onSettingsChange(settings.copy(localTools = !settings.localTools)) })
-            ModelChoice("AUTO", settings.toolChoice == "auto", { onSettingsChange(settings.copy(toolChoice = "auto")) })
+            ModelChoice("ALL TOOLS", settings.localTools, { onSettingsChange(settings.copy(localTools = !settings.localTools)) })
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("REASONING", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 8.sp, letterSpacing = 0.8.sp)
