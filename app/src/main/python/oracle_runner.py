@@ -20,7 +20,7 @@ def run(source):
     except SyntaxError as e: return "SyntaxError: "+str(e)
     out=io.StringIO(); builtins=__builtins__ if isinstance(__builtins__,dict) else vars(__builtins__)
     safe={k:builtins[k] for k in _SAFE if k in builtins}; safe["__import__"]=_import; safe["__build_class__"]=builtins["__build_class__"]
-    env={"__builtins__":safe}; ticks=[0]; old=sys.gettrace()
+    env={"__builtins__":safe,"__name__":"__oracle__"}; ticks=[0]; old=sys.gettrace()
     def trace(frame,event,arg):
         if event=="line":
             ticks[0]+=1
