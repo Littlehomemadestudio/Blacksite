@@ -332,7 +332,6 @@ fun OracleScreen(
     fun createNewThread(closeDrawer: Boolean = false) {
         scope.launch {
             activeSessionId = repository.createSession(model)
-            sessionToolsApproved = false
             selectedAttachments = emptyList()
             agentEvents = emptyList()
             prompt = ""
@@ -345,7 +344,6 @@ fun OracleScreen(
 
     fun selectThread(sessionId: String) {
         activeSessionId = sessionId
-        sessionToolsApproved = false
         selectedAttachments = emptyList()
         agentEvents = emptyList()
         clearTransientState()
