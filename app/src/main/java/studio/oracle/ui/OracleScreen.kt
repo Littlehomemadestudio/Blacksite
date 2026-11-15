@@ -955,6 +955,7 @@ private fun OracleMessageRow(
     modifier: Modifier = Modifier
 ) {
     val palette = LocalOraclePalette.current
+    val context = LocalContext.current
     val attachments = remember(message.attachments) { AgenticEventCodec.decodeAttachments(message.attachments) }
     val events = remember(message.agentTrace) { AgenticEventCodec.decodeTrace(message.agentTrace) }
     androidx.compose.animation.AnimatedVisibility(
@@ -1029,6 +1030,25 @@ private fun OracleMessageRow(
                         Text("ORACLE", color = palette.text, fontFamily = OracleMono,
                             fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.7.sp)
                         Spacer(Modifier.weight(1f))
+                        androidx.compose.material3.Text(
+                            "COPY",
+                            modifier = Modifier.clip(RoundedCornerShape(7.dp)).clickable {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("ORACLE response", message.content))
+                            }.padding(horizontal = 7.dp, vertical = 5.dp),
+                            color = palette.textTertiary, fontFamily = OracleMono, fontSize = 8.sp
+                        )
+                        androidx.compose.material3.Text(
+                            "SHARE",
+                            modifier = Modifier.clip(RoundedCornerShape(7.dp)).clickable {
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, message.content)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Share ORACLE response"))
+                            }.padding(horizontal = 7.dp, vertical = 5.dp),
+                            color = palette.textTertiary, fontFamily = OracleMono, fontSize = 8.sp
+                        )
                         events.lastOrNull { it.kind == "usage" }?.let { TokenUsageChip(it.detail) }
                     }
                     if (events.isNotEmpty()) AgentExecutionTrace(events, onOpenFile)
@@ -1206,10 +1226,10 @@ private fun AgentExecutionTrace(events: List<AgenticEvent>, onOpenFile: (String)
                 .padding(vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(Modifier.width(2.dp).height(20.dp).background(Color(0xFF788CE5), RoundedCornerShape(2.dp)))
+            Box(Modifier.width(2.dp).height(20.dp).background(Color(0xFFE08A45), RoundedCornerShape(2.dp)))
             Spacer(Modifier.width(9.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("REASONING SUMMARY  ·  ACTIVITY", color = Color(0xFF7E8FE0), fontFamily = OracleMono,
+                Text("REASONING SUMMARY  ·  ACTIVITY", color = Color(0xFFE08A45), fontFamily = OracleMono,
                     fontSize = 8.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
                 Text(
                     planSummary?.takeIf { it.isNotBlank() }?.replace(Regex("\\s+"), " ")?.take(180)
