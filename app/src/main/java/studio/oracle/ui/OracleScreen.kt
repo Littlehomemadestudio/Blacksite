@@ -285,7 +285,6 @@ fun OracleScreen(
         requestJob = null
         busy = false
         activeSessionId = null
-        sessionToolsApproved = false
         selectedAttachments = emptyList()
         messages = emptyList()
         agentEvents = emptyList()
