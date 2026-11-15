@@ -96,3 +96,11 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 
 ## Database compatibility
 Room schema v5 retains the existing agent, document, and workflow data while adding workspace ownership to workflows and local notes. The 4→5 migration assigns existing workflows and notes to the Personal workspace, replaces global note-title uniqueness with per-workspace uniqueness, and adds workspace-aware indexes. Earlier 3→4 compatibility remains idempotent across the two v3 layouts.
+
+
+### Release polish
+- Startup splash and animated new-conversation idle scene.
+- Turn-taking voice conversation: speech recognition captures a turn, Gemini responds, Android TTS speaks the answer, and the microphone resumes until voice mode is disabled.
+- Generated files appear as extension-aware, tappable artifact cards that open the exact local file in the ORACLE editor.
+- The agent loop has no fixed tool-round ceiling. Transient connection, response-stream, and retryable HTTP failures use exponential backoff; the user can cancel a run at any time.
+- The Gemini API key vault supports multiple encrypted named keys and switching the active key without re-entering credentials.
