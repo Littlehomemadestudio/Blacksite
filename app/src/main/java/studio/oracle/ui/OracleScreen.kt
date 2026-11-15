@@ -328,6 +328,13 @@ fun OracleScreen(
                     model,
                     activeToolSettings,
                     AgentToolExecutor { toolName, arguments ->
+                        agentActivity = when (toolName) {
+                            "run_local_python" -> "RUNNING ON-DEVICE PYTHON"
+                            "list_phone_files" -> "LISTING GRANTED FOLDER"
+                            "read_phone_file" -> "READING GRANTED FILE"
+                            "create_phone_file" -> "WAITING FOR FILE APPROVAL"
+                            else -> "RUNNING TOOL"
+                        }
                         when (toolName) {
                             "run_local_python" -> withContext(Dispatchers.IO) {
                                 EmbeddedPythonExecutor.execute(context, arguments.optString("code"))
