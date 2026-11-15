@@ -4,6 +4,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,6 +45,9 @@ fun SettingsScreen() {
     val scope = rememberCoroutineScope()
 
     var keyInput by remember { mutableStateOf("") }
+    var keyLabel by remember { mutableStateOf("Primary") }
+    var savedKeyLabels by remember { mutableStateOf(store.keyLabels()) }
+    var activeKeyLabel by remember { mutableStateOf(store.activeKeyLabel()) }
     var showKey by remember { mutableStateOf(false) }
     var stored by remember { mutableStateOf(store.hasKey()) }
     var busy by remember { mutableStateOf(false) }
@@ -54,6 +58,12 @@ fun SettingsScreen() {
         )
     }
     var success by remember { mutableStateOf(false) }
+    var tavilyInput by remember { mutableStateOf("") }
+    var showTavilyKey by remember { mutableStateOf(false) }
+    var tavilyStored by remember { mutableStateOf(store.hasTavilyKey()) }
+    var tavilyStatus by remember {
+        mutableStateOf(if (tavilyStored) "Web search credential encrypted on this device." else "No independent web-search credential connected.")
+    }
 
     Column(
         modifier = Modifier
@@ -120,6 +130,45 @@ fun SettingsScreen() {
                     )
                 }
             }
+
+            if (savedKeyLabels.isNotEmpty()) {
+                Text("SAVED KEYS · ACTIVE: ${activeKeyLabel ?: "LEGACY"}", color = palette.textTertiary,
+                    fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.7.sp)
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    savedKeyLabels.forEach { label ->
+                        Text(
+                            label + if (label == activeKeyLabel) "  ✓" else "",
+                            modifier = Modifier.clip(RoundedCornerShape(10.dp))
+                                .background(if (label == activeKeyLabel) palette.accentSoft else palette.canvas)
+                                .border(1.dp, if (label == activeKeyLabel) palette.accent.copy(alpha = 0.5f) else palette.outlineSoft, RoundedCornerShape(10.dp))
+                                .clickable {
+                                    store.setActiveKey(label)
+                                    activeKeyLabel = label
+                                    status = "Active Gemini key switched to $label."
+                                }.padding(horizontal = 12.dp, vertical = 9.dp),
+                            color = if (label == activeKeyLabel) palette.accent else palette.textSecondary,
+                            fontFamily = OracleSans, fontSize = 11.sp
+                        )
+                    }
+                }
+            }
+            Text("KEY LABEL", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.7.sp)
+            BasicTextField(
+                value = keyLabel,
+                onValueChange = { keyLabel = it.take(32) },
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                    .background(palette.canvas).border(1.dp, palette.outlineSoft, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 13.dp, vertical = 12.dp),
+                singleLine = true,
+                textStyle = TextStyle(color = palette.text, fontFamily = OracleSans, fontSize = 12.sp),
+                cursorBrush = SolidColor(palette.accent),
+                decorationBox = { inner ->
+                    Box {
+                        if (keyLabel.isBlank()) Text("e.g. Personal / Backup / Work", color = palette.textTertiary, fontSize = 12.sp)
+                        inner()
+                    }
+                }
+            )
 
             Row(
                 modifier = Modifier
@@ -189,7 +238,9 @@ fun SettingsScreen() {
                             when (val result = api.validateKey(candidate)) {
                                 is GeminiConnectionResult.Connected -> {
                                     if (enteredKey.isNotBlank()) {
-                                        withContext(Dispatchers.IO) { store.save(candidate) }
+                                        withContext(Dispatchers.IO) { store.saveNamedKey(keyLabel.trim().ifBlank { "Primary" }, candidate) }
+                                        savedKeyLabels = withContext(Dispatchers.IO) { store.keyLabels() }
+                                        activeKeyLabel = withContext(Dispatchers.IO) { store.activeKeyLabel() }
                                         stored = true
                                         keyInput = ""
                                     }
@@ -247,10 +298,15 @@ fun SettingsScreen() {
                             status = "Removing encrypted credential…"
                             success = false
                             try {
-                                withContext(Dispatchers.IO) { store.clear() }
-                                stored = false
+                                withContext(Dispatchers.IO) {
+                                    val active = store.activeKeyLabel()
+                                    if (active != null) store.removeNamedKey(active) else store.clear()
+                                }
+                                savedKeyLabels = withContext(Dispatchers.IO) { store.keyLabels() }
+                                activeKeyLabel = withContext(Dispatchers.IO) { store.activeKeyLabel() }
+                                stored = store.hasKey()
                                 keyInput = ""
-                                status = "Stored key and Keystore alias removed."
+                                status = "Selected key removed. Other saved keys remain available."
                             } catch (cancelled: CancellationException) {
                                 throw cancelled
                             } catch (_: Exception) {
@@ -263,6 +319,99 @@ fun SettingsScreen() {
                     enabled = !busy,
                     accent = false
                 )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(22.dp))
+                .background(palette.surface)
+                .border(1.dp, palette.outlineSoft, RoundedCornerShape(22.dp))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OracleGlyphIcon(OracleGlyph.Search, Modifier.size(17.dp), palette.textSecondary)
+                Spacer(Modifier.width(9.dp))
+                Text("INDEPENDENT WEB SEARCH", color = palette.text, fontFamily = OracleMono,
+                    fontSize = 10.sp, letterSpacing = 0.5.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.weight(1f))
+                if (tavilyStored) Text("ENCRYPTED", color = palette.success, fontFamily = OracleMono, fontSize = 9.sp)
+            }
+            Text(
+                "ORACLE uses Tavily Search as its own web-search tool. It does not use Gemini Google Search grounding.",
+                color = palette.textSecondary, fontFamily = OracleSans, fontSize = 12.sp, lineHeight = 18.sp
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                    .background(palette.canvas).border(1.dp, palette.outline, RoundedCornerShape(14.dp))
+                    .padding(start = 14.dp, end = 5.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                BasicTextField(
+                    value = tavilyInput,
+                    onValueChange = { tavilyInput = it },
+                    modifier = Modifier.weight(1f).padding(vertical = 10.dp),
+                    singleLine = true,
+                    textStyle = TextStyle(color = palette.text, fontFamily = OracleMono, fontSize = 11.sp),
+                    cursorBrush = SolidColor(palette.accent),
+                    visualTransformation = if (showTavilyKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    decorationBox = { inner ->
+                        Box {
+                            if (tavilyInput.isEmpty()) Text(
+                                if (tavilyStored) "Paste a replacement Tavily key" else "Paste Tavily API key",
+                                color = palette.textTertiary, fontFamily = OracleSans, fontSize = 12.sp
+                            )
+                            inner()
+                        }
+                    }
+                )
+                OracleIconButton(
+                    glyph = if (showTavilyKey) OracleGlyph.EyeOff else OracleGlyph.Eye,
+                    description = if (showTavilyKey) "Hide Tavily key" else "Show Tavily key",
+                    onClick = { showTavilyKey = !showTavilyKey },
+                    size = 38.dp
+                )
+            }
+            OracleSolidAction(
+                label = "SAVE SEARCH KEY ENCRYPTED",
+                onClick = {
+                    scope.launch {
+                        try {
+                            withContext(Dispatchers.IO) { store.saveTavilyKey(tavilyInput.trim()) }
+                            tavilyStored = true
+                            tavilyInput = ""
+                            tavilyStatus = "Tavily key saved using Android Keystore encryption."
+                        } catch (_: Exception) {
+                            tavilyStatus = "Could not securely store the Tavily key."
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = tavilyInput.isNotBlank()
+            )
+            Text(
+                tavilyStatus,
+                color = palette.textSecondary, fontFamily = OracleSans, fontSize = 11.sp, lineHeight = 16.sp
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                OracleTextAction("GET TAVILY KEY", onClick = {
+                    runCatching {
+                        context.startActivity(android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse("https://app.tavily.com/")
+                        ))
+                    }
+                }, accent = true)
+                if (tavilyStored) OracleTextAction("REMOVE KEY", onClick = {
+                    scope.launch {
+                        withContext(Dispatchers.IO) { store.clearTavilyKey() }
+                        tavilyStored = false
+                        tavilyStatus = "Tavily key removed from this device."
+                    }
+                }, accent = false)
             }
         }
 

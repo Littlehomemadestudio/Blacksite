@@ -21,6 +21,11 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 
 ### Gemini chat
 - Chat-first Jetpack Compose workbench with animated navigation, thread drawer, message history, and expandable model controls.
+- Animated branded startup splash and an animated empty-conversation stage with tappable mission starters.
+- Default model for new installations: `gemini-3.5-flash-lite` (Gemini 3.5 Flash-Lite); users can still select any model exposed by their API key.
+- Multiple named Gemini API-key profiles can be stored with independent Android Keystore AES-GCM encryption and switched without re-pasting credentials.
+- Push-to-talk voice input uses Android speech recognition; an optional spoken-reply mode reads completed Gemini responses with Android TextToSpeech. This is turn-based voice interaction, not a persistent full-duplex Gemini Live session.
+- Assistant replies provide one-tap copy and Android share-sheet actions.
 - Gemini API key validation and AES-GCM encryption backed by Android Keystore. No API key is embedded in source or APK.
 - Live Gemini Agent using `generateContent`, visible request errors, model discovery, and model selection.
 - Persistent agent threads and messages in Room; thread titles are generated locally from the first user prompt.
@@ -39,6 +44,25 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Offline keyword retrieval, document reader, and Gemini library Q&A.
 - Library Q&A displays the exact retrieved excerpts and requires confirmation before sending them to Gemini.
 
+### Agentic Operator
+- Gemini Interactions loop: model → tool call → execution → function result → model, runs until the model completes or the user cancels; transient network failures retry with backoff.
+- Built-in Gemini capabilities: URL Context and hosted Python. Gemini Google Search grounding is not enabled.
+- Independent live web research via Tavily and a separately encrypted API key stored through Android Keystore.
+- Composer quick switches independently enable web search, phone files, local Python, hosted Python, URL Context, image generation and all custom tools.
+- The main agent exposes a DRAW tool that calls Gemini 3.1 Flash Image as a separate service. Generated PNGs are saved in the app workspace and displayed inline. The direct image model can also be selected in the Model Atlas; direct image mode omits tool payloads because the model does not support function calling.
+- Phone files are accessed through a user-selected Storage Access Framework folder. Paths are scoped, traversal is rejected, and text read/write operations have size limits.
+- Reading file contents sent to Gemini, modifying files, running local Python and generating images require permission. Users can approve once or for the active chat thread.
+- Bundled CPython 3.13 via Chaquopy exposes standard Python built-ins, supported standard-library modules, network and an app-private working directory. It runs under Android's app UID; it is not an unrestricted OS-level Termux shell.
+- Python-created or modified workspace files are surfaced as in-chat artifacts and text/code files can be opened and edited in the in-app editor.
+
+### Rich Agent Interface
+- Assistant responses render headings, bold/italic text, lists, tables, quotes, fenced code with copy, Markdown links, images and simple process-map diagrams.
+- A compact colored Plan & Work Log rail sits above the assistant answer; expand it to inspect actual tool calls, code and results. Created files also appear as extension-aware artifact cards that open the exact file in ORACLE. Private model thought steps are not exposed.
+- Token usage is a small circular control with a detailed ledger on tap.
+- Generated images/audio/video/documents and saved files are surfaced inline where supported.
+- Model / Tools opens practical quick controls; Explore Models opens a full-screen model atlas with API metadata, descriptions, context limits, tags and artwork.
+- The composer and model controls use translucent glass surfaces and animated content transitions.
+
 ### Workflow Studio
 - Create, edit, reorder, save, and delete workflows with up to 20 ordered steps.
 - Three explicit local actions: create a note, append to a note by exact title, and search the on-device document index.
@@ -53,8 +77,8 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Office document extraction, image OCR, scanned-PDF OCR, document summaries, flashcards, quizzes, semantic embeddings, and knowledge graph.
 - Scheduled, event-based, and background workflow triggers. Workflow runs are manual only.
 - Additional workflow actions such as export, file operations, notifications, and external integrations.
-- Audio recording, transcription, searchable archive, and task/decision extraction.
-- Agent tool execution. The Agent is currently a Gemini chat/planning interface; it does not silently access files, apps, or perform device actions.
+- Persistent full-duplex Gemini Live audio streaming, interruption handling, and a searchable voice transcript archive. Current voice mode is push-to-talk with Android speech recognition and optional spoken replies.
+- Arbitrary OS-level shell/Termux access, app launching, UI automation, scheduled triggers, and background agents are not implemented. The Agent can use the scoped tools described above, subject to user-selected capabilities and per-session/action approval.
 
 ## Privacy and data handling
 - The API key is stored locally as AES-GCM ciphertext; its non-exportable encryption key is managed by Android Keystore.
@@ -72,3 +96,13 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 
 ## Database compatibility
 Room schema v5 retains the existing agent, document, and workflow data while adding workspace ownership to workflows and local notes. The 4→5 migration assigns existing workflows and notes to the Personal workspace, replaces global note-title uniqueness with per-workspace uniqueness, and adds workspace-aware indexes. Earlier 3→4 compatibility remains idempotent across the two v3 layouts.
+
+
+### Release polish
+- Startup splash and animated new-conversation idle scene.
+- Turn-taking voice conversation: speech recognition captures a turn, Gemini responds, Android TTS speaks the answer, and the microphone resumes until voice mode is disabled.
+- Generated files appear as extension-aware, tappable artifact cards that open the exact local file in the ORACLE editor.
+- The agent loop has no fixed tool-round ceiling. Transient connection, response-stream, and retryable HTTP failures use exponential backoff; the user can cancel a run at any time.
+- The Gemini API key vault supports multiple encrypted named keys and switching the active key without re-entering credentials.
+
+- Voice listener state is lifecycle-safe and microphone permission is declared once in the Android manifest.

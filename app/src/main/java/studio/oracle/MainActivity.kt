@@ -11,7 +11,16 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -56,6 +65,51 @@ private enum class OracleDestination {
 
 @Composable
 private fun OracleRoot() {
+    var splashVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(1050)
+        splashVisible = false
+    }
+    AnimatedContent(
+        targetState = splashVisible,
+        label = "oracle-startup",
+        transitionSpec = { fadeIn(tween(420)) togetherWith fadeOut(tween(260)) }
+    ) { showingSplash ->
+        if (showingSplash) OracleStartupSplash() else OracleWorkspaceRoot()
+    }
+}
+
+@Composable
+private fun OracleStartupSplash() {
+    val palette = LocalOraclePalette.current
+    val motion = rememberInfiniteTransition(label = "startup-motion")
+    val rotation by motion.animateFloat(
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(4200), repeatMode = RepeatMode.Restart),
+        label = "logo-rotation"
+    )
+    val pulse by motion.animateFloat(
+        initialValue = 0.94f, targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(tween(1500), repeatMode = RepeatMode.Reverse),
+        label = "logo-pulse"
+    )
+    Box(Modifier.fillMaxSize().background(palette.canvas), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Box(Modifier.size(112.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxSize().border(1.dp, palette.accent.copy(alpha = 0.20f), CircleShape))
+                Box(Modifier.fillMaxSize().padding(9.dp).rotate(rotation).border(1.dp, palette.accent.copy(alpha = 0.42f), CircleShape))
+                HandcraftedLogo(Modifier.size(54.dp).scale(pulse), palette.accent)
+            }
+            Text("ORACLE", color = palette.text, fontFamily = OracleSans, fontSize = 22.sp, letterSpacing = 4.5.sp)
+            Text("INTELLIGENCE WORKSPACE", color = palette.accent, fontFamily = studio.oracle.ui.theme.OracleMono, fontSize = 9.sp, letterSpacing = 1.7.sp)
+            Spacer(Modifier.height(15.dp))
+            Text("INITIALIZING WORKSPACE", color = palette.textSecondary, fontFamily = studio.oracle.ui.theme.OracleMono, fontSize = 8.sp, letterSpacing = 1.sp)
+        }
+    }
+}
+
+@Composable
+private fun OracleWorkspaceRoot() {
     val context = LocalContext.current
     val database = remember(context) { OracleDatabase.get(context) }
     val workspaceRepository = remember(database) { WorkspaceRepository(database.workspaceDao()) }
