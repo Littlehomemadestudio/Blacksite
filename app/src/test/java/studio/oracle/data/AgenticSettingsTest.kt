@@ -15,7 +15,7 @@ class AgenticSettingsTest {
 
         assertEquals("high", settings.thinkingLevel)
         assertEquals("auto", settings.thinkingSummaries)
-        assertEquals(32768, settings.maxOutputTokens)
+        assertEquals(65536, settings.maxOutputTokens)
         assertEquals("auto", settings.toolChoice)
     }
 
