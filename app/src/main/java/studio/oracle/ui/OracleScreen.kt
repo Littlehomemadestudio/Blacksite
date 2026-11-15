@@ -500,24 +500,47 @@ fun OracleScreen(
                     "\n\n" + textAttachmentContext.joinToString("\n\n")
                 val agentPrompt = historyText + "Current user request:\n" + submitted + attachedText
                 val tavilyKey = withContext(Dispatchers.IO) { runCatching { keyStore.readTavilyKey() }.getOrNull() }
+                val reportCreatedFile: (CreatedAgentFile) -> Unit = { file ->
+                    val event = AgenticEvent(
+                        kind = "file_created",
+                        title = "File ready",
+                        detail = file.name + " · " + file.mimeType,
+                        payload = file.uri
+                    )
+                    runEvents.add(event)
+                    scope.launch(Dispatchers.Main.immediate) {
+                        agentEvents = (agentEvents + event).takeLast(60)
+                    }
+                }
                 val executor = PhoneWorkspaceTools(
                     context = context,
                     grantedTree = grantedTreeUri,
                     tavilyKey = tavilyKey,
                     authorize = ::authorizeTool,
-                    python = { code -> pythonRuntime.execute(code) },
-                    onFileCreated = { file ->
-                        val event = AgenticEvent(
-                            kind = "file_created",
-                            title = "File created",
-                            detail = file.name + " · " + file.mimeType,
-                            payload = file.uri
-                        )
-                        runEvents.add(event)
-                        scope.launch(Dispatchers.Main.immediate) {
-                            agentEvents = (agentEvents + event).takeLast(60)
+                    python = { code ->
+                        val before = pythonRuntime.workspaceDirectory().walkTopDown()
+                            .filter { it.isFile }
+                            .associate { it.absolutePath to (it.lastModified() to it.length()) }
+                        val resultText = pythonRuntime.execute(code)
+                        val after = pythonRuntime.workspaceDirectory().walkTopDown()
+                            .filter { it.isFile }
+                            .toList()
+                        after.forEach { file ->
+                            val stamp = file.lastModified() to file.length()
+                            if (before[file.absolutePath] != stamp) {
+                                val mime = when (file.extension.lowercase()) {
+                                    "md", "markdown" -> "text/markdown"
+                                    "json" -> "application/json"
+                                    "html", "htm" -> "text/html"
+                                    "csv" -> "text/csv"
+                                    else -> "text/plain"
+                                }
+                                reportCreatedFile(CreatedAgentFile(Uri.fromFile(file).toString(), file.name, mime))
+                            }
                         }
-                    }
+                        resultText
+                    },
+                    onFileCreated = reportCreatedFile
                 )
 
                 when (val result = agenticRuntime.run(
