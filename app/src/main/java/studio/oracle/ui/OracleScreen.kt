@@ -1,6 +1,13 @@
 package studio.oracle.ui
 
+import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import kotlinx.coroutines.CompletableDeferred
+import org.json.JSONObject
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -49,6 +56,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import studio.oracle.data.AgentConversationPolicy
 import studio.oracle.data.AgentRepository
+import studio.oracle.data.AgentToolExecutor
+import studio.oracle.data.AgentToolPreferences
+import studio.oracle.data.AgentToolSettings
+import studio.oracle.data.EmbeddedPythonExecutor
+import studio.oracle.data.PhoneFileAccess
 import studio.oracle.data.AgentTurn
 import studio.oracle.data.GeminiApi
 import studio.oracle.data.GeminiModel
@@ -63,6 +75,12 @@ import studio.oracle.security.SecureKeyStore
 import studio.oracle.ui.theme.LocalOraclePalette
 import studio.oracle.ui.theme.OracleMono
 import studio.oracle.ui.theme.OracleSans
+
+private data class PhoneWriteConfirmation(
+    val name: String,
+    val content: String,
+    val approved: CompletableDeferred<Boolean>
+)
 
 @Composable
 fun OracleScreen(
@@ -83,10 +101,15 @@ fun OracleScreen(
         AgentRepository(OracleDatabase.get(context).agentDao(), workspaceId)
     }
     val modelPreferences = remember(context) { ModelPreferences(context) }
+    val agentToolPreferences = remember(context) { AgentToolPreferences(context) }
+    val phoneFileAccess = remember(context) { PhoneFileAccess(context) }
     val scope = rememberCoroutineScope()
 
     val sessions by repository.sessions.collectAsState(initial = emptyList())
     val model by modelPreferences.selectedModel.collectAsState(initial = ModelPreferences.DEFAULT_MODEL)
+    val toolSettings by agentToolPreferences.settings.collectAsState(initial = AgentToolSettings())
+    var grantedFolderUri by remember { mutableStateOf(phoneFileAccess.currentTreeUri()) }
+    var pendingPhoneWrite by remember { mutableStateOf<PhoneWriteConfirmation?>(null) }
 
     var activeSessionId by remember { mutableStateOf<String?>(null) }
     var messages by remember { mutableStateOf(emptyList<AgentMessageEntity>()) }
@@ -103,6 +126,25 @@ fun OracleScreen(
     var suppressCancelledPromptRestore by remember { mutableStateOf(false) }
     var drawerOpen by remember { mutableStateOf(false) }
     var modelPanelOpen by remember { mutableStateOf(false) }
+
+    val folderPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+                phoneFileAccess.saveTreeUri(uri)
+                grantedFolderUri = uri
+                scope.launch { agentToolPreferences.setPhoneFiles(true) }
+                error = null
+            } catch (_: Exception) {
+                error = "Android could not preserve access to that folder. Choose a different folder."
+            }
+        }
+    }
 
     BackHandler(enabled = drawerOpen) {
         drawerOpen = false
@@ -269,14 +311,54 @@ fun OracleScreen(
                     failedPromptPersisted = true
                 }
 
+                val activeToolSettings = toolSettings.copy(
+                    phoneFiles = toolSettings.phoneFiles && grantedFolderUri != null
+                )
                 when (val result = api.generate(
                     key,
                     submitted,
-                    AgentConversationPolicy.context(history),
-                    model
+                    AgentConversationPolicy.context(history, activeToolSettings.contextMessages),
+                    model,
+                    activeToolSettings,
+                    AgentToolExecutor { toolName, arguments ->
+                        when (toolName) {
+                            "run_local_python" -> withContext(Dispatchers.IO) {
+                                EmbeddedPythonExecutor.execute(context, arguments.optString("code"))
+                            }
+                            "list_phone_files" -> withContext(Dispatchers.IO) {
+                                phoneFileAccess.listFiles(arguments.optString("path", ""))
+                            }
+                            "read_phone_file" -> withContext(Dispatchers.IO) {
+                                phoneFileAccess.readFile(arguments.optString("path"))
+                            }
+                            "create_phone_file" -> {
+                                val name = arguments.optString("name")
+                                val content = arguments.optString("content")
+                                val confirmation = PhoneWriteConfirmation(
+                                    name = name,
+                                    content = content,
+                                    approved = CompletableDeferred()
+                                )
+                                pendingPhoneWrite = confirmation
+                                val approved = try {
+                                    confirmation.approved.await()
+                                } finally {
+                                    if (pendingPhoneWrite === confirmation) pendingPhoneWrite = null
+                                }
+                                if (!approved) {
+                                    JSONObject().put("ok", false).put("error", "The user declined this file write.")
+                                } else {
+                                    withContext(Dispatchers.IO) {
+                                        phoneFileAccess.createFile(name, content)
+                                    }
+                                }
+                            }
+                            else -> JSONObject().put("ok", false).put("error", "Unknown ORACLE tool.")
+                        }
+                    }
                 )) {
                     is studio.oracle.data.GeminiReplyResult.Success -> {
-                        repository.appendMessage(sessionId, "assistant", result.text, result.model)
+                        repository.appendMessage(sessionId, "assistant", result.persistedContent, result.model)
                         failedPrompt = null
                         failedPromptPersisted = false
                     }
@@ -377,17 +459,74 @@ fun OracleScreen(
                 enter = fadeIn() + androidx.compose.animation.expandVertically(),
                 exit = fadeOut() + androidx.compose.animation.shrinkVertically()
             ) {
-                ModelControlPanel(
-                    models = menuModels,
-                    selectedModel = model,
-                    refreshing = syncingModels,
-                    onSelect = ::chooseModel,
-                    onRefresh = ::refreshModels,
-                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp)
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 14.dp, end = 14.dp, bottom = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ModelControlPanel(
+                        models = menuModels,
+                        selectedModel = model,
+                        refreshing = syncingModels,
+                        onSelect = ::chooseModel,
+                        onRefresh = ::refreshModels,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    AgentCapabilitiesPanel(
+                        settings = toolSettings,
+                        model = menuModels.firstOrNull { it.name == model },
+                        folderGranted = grantedFolderUri != null,
+                        onGoogleSearch = { enabled -> scope.launch { agentToolPreferences.setGoogleSearch(enabled) } },
+                        onCloudPython = { enabled -> scope.launch { agentToolPreferences.setCloudCodeExecution(enabled) } },
+                        onLocalPython = { enabled -> scope.launch { agentToolPreferences.setLocalPython(enabled) } },
+                        onPhoneFiles = { enabled -> scope.launch { agentToolPreferences.setPhoneFiles(enabled) } },
+                        onGrantFolder = { folderPicker.launch(null) },
+                        onThinking = { value -> scope.launch { agentToolPreferences.setThinkingLevel(value) } },
+                        onContext = { value -> scope.launch { agentToolPreferences.setContextMessages(value) } },
+                        onOutput = { value -> scope.launch { agentToolPreferences.setMaxOutputTokens(value) } },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
 
             Spacer(Modifier.height(WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().coerceAtLeast(4.dp)))
+        }
+
+        if (pendingPhoneWrite != null) {
+            val request = pendingPhoneWrite
+            if (request != null) {
+                AlertDialog(
+                    onDismissRequest = { request.approved.complete(false) },
+                    title = { Text("Allow ORACLE to create this file?") },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(request.name, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                request.content.take(900) + if (request.content.length > 900) "\\n… preview truncated" else "",
+                                maxLines = 12
+                            )
+                            Text(
+                                "This writes only inside the folder you granted.",
+                                color = palette.textSecondary
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { request.approved.complete(true) }) {
+                            Text("CREATE FILE")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { request.approved.complete(false) }) {
+                            Text("CANCEL")
+                        }
+                    },
+                    containerColor = palette.surface,
+                    titleContentColor = palette.text,
+                    textContentColor = palette.textSecondary
+                )
+            }
         }
 
         if (drawerOpen) {
@@ -483,7 +622,7 @@ private fun OracleMessageRow(message: AgentMessageEntity, modifier: Modifier = M
                         .padding(horizontal = 17.dp, vertical = 12.dp)
                 ) {
                     Text(
-                        text = message.content,
+                        text = if (message.role == "assistant") GeminiApi.displayText(message.content) else message.content,
                         color = palette.text,
                         fontFamily = OracleSans,
                         fontSize = 15.sp,
