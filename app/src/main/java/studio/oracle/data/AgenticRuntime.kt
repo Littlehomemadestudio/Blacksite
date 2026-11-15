@@ -1,6 +1,7 @@
 package studio.oracle.data
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Call
 import okhttp3.Callback
@@ -120,7 +121,7 @@ class GeminiAgenticRuntime(
         val transcript = StringBuilder()
         var planSummaryEmitted = false
 
-        repeat(MAX_TOOL_ROUNDS) { round ->
+        while (true) {
             val body = JSONObject()
                 .put("model", model)
                 .put("input", input)
@@ -168,19 +169,51 @@ class GeminiAgenticRuntime(
                 .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
                 .build()
 
-            val root = try {
-                http.newCall(request).await().use { response ->
-                    val raw = response.body?.string().orEmpty()
-                    if (!response.isSuccessful) return AgenticResult.Failed(apiError(response.code, raw))
-                    JSONObject(raw)
+            // Retry transient transport/API failures without replaying completed local tools.
+            // Tool execution only starts after a complete model response has been received.
+            var root: JSONObject? = null
+            var lastFailure: String? = null
+            for (attempt in 0..5) {
+                val response = try {
+                    http.newCall(request).await()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (network: IOException) {
+                    lastFailure = network.message ?: "Connection interrupted."
+                    if (attempt < 5) {
+                        onEvent(AgenticEvent("network_retry", "Reconnecting to Gemini", "Retry ${attempt + 1} of 5"))
+                        delay((1000L shl attempt).coerceAtMost(16000L))
+                        continue
+                    }
+                    return AgenticResult.Failed(
+                        "Connection interrupted after 6 attempts. Completed tool results are retained in this turn; retry to continue. ${lastFailure}"
+                    )
+                } catch (error: Exception) {
+                    return AgenticResult.Failed(error.message?.take(240) ?: "Could not contact Gemini.")
                 }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: IOException) {
-                return AgenticResult.Failed("Network error contacting Gemini Interactions API.")
-            } catch (error: Exception) {
-                return AgenticResult.Failed(error.message?.take(240) ?: "Could not read Gemini interaction.")
+
+                val code = response.code
+                val retryAfterMs = response.header("Retry-After")?.toLongOrNull()?.times(1000L)
+                val raw = response.body?.string().orEmpty()
+                response.close()
+                if (code in 200..299) {
+                    root = try {
+                        JSONObject(raw)
+                    } catch (error: Exception) {
+                        return AgenticResult.Failed("Gemini returned an unreadable response: ${error.message?.take(180)}")
+                    }
+                    break
+                }
+                if (code in RETRYABLE_HTTP_CODES && attempt < 5) {
+                    onEvent(AgenticEvent("network_retry", "Retrying Gemini request", "HTTP ${code} · attempt ${attempt + 1} of 5"))
+                    delay((retryAfterMs ?: (1000L shl attempt)).coerceIn(1000L, 30000L))
+                    continue
+                }
+                return AgenticResult.Failed(apiError(code, raw))
             }
+            val root = root ?: return AgenticResult.Failed(
+                "Gemini did not return a response. ${lastFailure ?: "Check your connection and retry."}"
+            )
 
             interactionId = root.optString("id").takeIf { it.isNotBlank() } ?: interactionId
             root.optJSONObject("usage")?.let { usage ->
@@ -326,9 +359,6 @@ class GeminiAgenticRuntime(
                 }
             }
 
-            if (round == MAX_TOOL_ROUNDS - 1) {
-                return AgenticResult.Failed("The agent reached the 12-round tool-call safety limit. Ask it to continue.")
-            }
             if (interactionId.isNullOrBlank()) {
                 return AgenticResult.Failed("Gemini returned tool calls without an interaction ID; execution stopped safely.")
             }
@@ -358,7 +388,7 @@ class GeminiAgenticRuntime(
     }
 
     companion object {
-        const val MAX_TOOL_ROUNDS = 12
+        private val RETRYABLE_HTTP_CODES = setOf(408, 425, 429, 500, 502, 503, 504)
         private const val INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
         private const val API_REVISION = "2026-05-20"
     }

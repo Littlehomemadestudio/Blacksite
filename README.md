@@ -45,7 +45,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Library Q&A displays the exact retrieved excerpts and requires confirmation before sending them to Gemini.
 
 ### Agentic Operator
-- Gemini Interactions loop: model → tool call → execution → function result → model, bounded to 12 tool rounds.
+- Gemini Interactions loop: model → tool call → execution → function result → model, runs until the model completes or the user cancels; transient network failures retry with backoff.
 - Built-in Gemini capabilities: URL Context and hosted Python. Gemini Google Search grounding is not enabled.
 - Independent live web research via Tavily and a separately encrypted API key stored through Android Keystore.
 - Composer quick switches independently enable web search, phone files, local Python, hosted Python, URL Context, image generation and all custom tools.
@@ -57,7 +57,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 
 ### Rich Agent Interface
 - Assistant responses render headings, bold/italic text, lists, tables, quotes, fenced code with copy, Markdown links, images and simple process-map diagrams.
-- A compact colored Plan & Work Log rail sits above the assistant answer; expand it to inspect actual tool calls, code and results. Private model thought steps are not exposed.
+- A compact colored Plan & Work Log rail sits above the assistant answer; expand it to inspect actual tool calls, code and results. Created files also appear as extension-aware artifact cards that open the exact file in ORACLE. Private model thought steps are not exposed.
 - Token usage is a small circular control with a detailed ledger on tap.
 - Generated images/audio/video/documents and saved files are surfaced inline where supported.
 - Model / Tools opens practical quick controls; Explore Models opens a full-screen model atlas with API metadata, descriptions, context limits, tags and artwork.

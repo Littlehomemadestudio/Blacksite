@@ -9,6 +9,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.os.Bundle
 import android.util.Base64
 import androidx.compose.ui.graphics.asImageBitmap
@@ -140,10 +141,24 @@ fun OracleScreen(
     var messages by remember { mutableStateOf(emptyList<AgentMessageEntity>()) }
     var prompt by remember { mutableStateOf("") }
     var voiceReplyEnabled by remember { mutableStateOf(false) }
+    var voiceInputStarter by remember { mutableStateOf<(() -> Unit)?>(null) }
     var ttsReady by remember { mutableStateOf(false) }
     val textToSpeech = remember(context) { TextToSpeech(context) { status -> ttsReady = status == TextToSpeech.SUCCESS } }
     val speechRecognizer = remember(context) { if (SpeechRecognizer.isRecognitionAvailable(context)) SpeechRecognizer.createSpeechRecognizer(context) else null }
-    DisposableEffect(textToSpeech) { onDispose { textToSpeech.stop(); textToSpeech.shutdown() } }
+    val voiceReplyLatest by rememberUpdatedState(voiceReplyEnabled)
+    val busyLatest by rememberUpdatedState(busy)
+    DisposableEffect(textToSpeech) {
+        textToSpeech.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) = Unit
+            override fun onDone(utteranceId: String?) {
+                if (utteranceId == "oracle-voice-reply" && voiceReplyLatest && !busyLatest) {
+                    scope.launch { voiceInputStarter?.invoke() }
+                }
+            }
+            override fun onError(utteranceId: String?) = Unit
+        })
+        onDispose { textToSpeech.stop(); textToSpeech.shutdown() }
+    }
     DisposableEffect(speechRecognizer) { onDispose { speechRecognizer?.destroy() } }
     var availableModels by remember {
         mutableStateOf(listOf(GeminiModel(ModelPreferences.DEFAULT_MODEL, "Gemini 3.5 Flash-Lite")))
@@ -714,10 +729,15 @@ fun OracleScreen(
             .onFailure { error = "Could not start microphone input. Try again." }
     }
 
+    SideEffect { voiceInputStarter = { startVoiceInput() } }
+
     val microphonePermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) startVoiceInput() else error = "Allow microphone access to use voice input."
+        if (granted) startVoiceInput() else {
+            voiceReplyEnabled = false
+            error = "Allow microphone access to use voice input."
+        }
     }
 
     Box(
@@ -798,7 +818,15 @@ fun OracleScreen(
                 onRemoveAttachment = { attachment -> selectedAttachments = selectedAttachments.filterNot { it.uri == attachment.uri } },
                 onVoiceClick = { microphonePermission.launch(android.Manifest.permission.RECORD_AUDIO) },
                 voiceReplyEnabled = voiceReplyEnabled,
-                onVoiceReplyToggle = { voiceReplyEnabled = !voiceReplyEnabled },
+                onVoiceReplyToggle = {
+                    val enabling = !voiceReplyEnabled
+                    voiceReplyEnabled = enabling
+                    if (enabling) microphonePermission.launch(android.Manifest.permission.RECORD_AUDIO)
+                    else {
+                        speechRecognizer?.stopListening()
+                        textToSpeech.stop()
+                    }
+                },
                 modifier = Modifier
                     .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 10.dp)
             )
@@ -1052,6 +1080,9 @@ private fun OracleMessageRow(
                         events.lastOrNull { it.kind == "usage" }?.let { TokenUsageChip(it.detail) }
                     }
                     if (events.isNotEmpty()) AgentExecutionTrace(events, onOpenFile)
+                    events.filter { it.kind == "file_created" }.forEach { event ->
+                        GeneratedFileArtifact(event, onOpenFile)
+                    }
                     events.filter { it.kind == "generated_image" || it.kind == "generated_audio" ||
                         it.kind == "generated_video" || it.kind == "generated_document" }.forEach { event ->
                         GeneratedMediaArtifact(event, onOpenFile)
@@ -1060,6 +1091,52 @@ private fun OracleMessageRow(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun GeneratedFileArtifact(event: AgenticEvent, onOpenFile: (String) -> Unit) {
+    val palette = LocalOraclePalette.current
+    val fileName = event.detail.substringBefore(" · ").ifBlank {
+        event.payload.substringAfterLast('/').substringAfterLast('\\')
+    }
+    val extension = fileName.substringAfterLast('.', "").lowercase()
+    val glyph = when (extension) {
+        "png", "jpg", "jpeg", "webp", "svg" -> "▧"
+        "pdf" -> "PDF"
+        "py" -> "PY"
+        "kt", "kts", "java", "js", "ts" -> "</>"
+        "md", "markdown" -> "MD"
+        "json" -> "{}"
+        "csv", "xlsx" -> "▦"
+        "mp3", "wav", "ogg", "m4a" -> "♫"
+        "mp4", "mov", "webm" -> "▶"
+        else -> "TXT"
+    }
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp))
+            .background(palette.surfaceRaised)
+            .border(1.dp, Color(0x55E08A45), RoundedCornerShape(13.dp))
+            .clickable { onOpenFile(event.payload) }
+            .padding(horizontal = 12.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Color(0x1FE08A45)),
+            contentAlignment = Alignment.Center) {
+            Text(glyph, color = Color(0xFFE08A45), fontFamily = OracleMono,
+                fontWeight = FontWeight.Bold, fontSize = if (glyph.length > 2) 9.sp else 15.sp)
+        }
+        Spacer(Modifier.width(11.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(fileName, color = palette.text, fontFamily = OracleSans,
+                fontWeight = FontWeight.SemiBold, fontSize = 12.sp, maxLines = 1,
+                overflow = TextOverflow.Ellipsis)
+            Text(event.detail.substringAfter(" · ", "Created in ORACLE workspace"),
+                color = palette.textTertiary, fontFamily = OracleMono, fontSize = 8.sp,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Text("OPEN  ↗", color = Color(0xFFE08A45), fontFamily = OracleMono,
+            fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
