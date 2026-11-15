@@ -442,23 +442,23 @@ class GeminiApi(
     private fun renderLocalPython(base: String, traces: JSONArray): String {
         if (traces.length() == 0) return base
         return buildString {
-            if (base.isNotBlank()) append(base).append("\\n\\n")
+            if (base.isNotBlank()) append(base).append("\n\n")
             for (index in 0 until traces.length()) {
                 val trace = traces.optJSONObject(index) ?: continue
                 val result = trace.optJSONObject("result") ?: JSONObject()
-                append("**On-device Python · execution ").append(index + 1).append("**\\n")
-                append("\\n```python\\n")
+                append("**On-device Python · execution ").append(index + 1).append("**\n")
+                append("\n```python\n")
                     .append(trace.optString("code"))
-                    .append("\\n```\\n")
+                    .append("\n```\n")
                 val stdout = result.optString("stdout")
                 val stderr = result.optString("stderr")
                 val error = result.optString("error")
-                append("\\n```text\\n")
+                append("\n```text\n")
                 if (stdout.isNotBlank()) append(stdout)
                 if (stderr.isNotBlank()) append(stderr)
                 if (error.isNotBlank()) append("ERROR: ").append(error)
                 if (stdout.isBlank() && stderr.isBlank() && error.isBlank()) append("(No output)")
-                append("\\n```\\n")
+                append("\n```\n")
             }
         }.trim()
     }
