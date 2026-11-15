@@ -144,7 +144,7 @@ fun OracleScreen(
     var agenticSettings by remember { mutableStateOf(AgenticSettings()) }
     var agentEvents by remember { mutableStateOf(emptyList<AgenticEvent>()) }
     var selectedAttachments by remember { mutableStateOf(emptyList<AgentAttachmentRef>()) }
-    var sessionToolsApproved by remember { mutableStateOf(false) }
+    var approvedToolSessions by remember { mutableStateOf<Set<String>>(emptySet()) }
     var editingFileUri by remember { mutableStateOf<Uri?>(null) }
     var editingFileName by remember { mutableStateOf("") }
     var editingFileMime by remember { mutableStateOf("text/plain") }
@@ -183,8 +183,8 @@ fun OracleScreen(
                 .edit().putString("phone_tree_uri", uri.toString()).apply()
         }.onFailure { error = "Android could not persist access to that folder. Choose it again." }
     }
-    suspend fun authorizeTool(action: String, permissionGroup: String): Boolean {
-        if (sessionToolsApproved) return true
+    suspend fun authorizeTool(action: String, permissionGroup: String, authorizationSessionId: String): Boolean {
+        if (authorizationSessionId in approvedToolSessions) return true
         val deferred = CompletableDeferred<String>()
         withContext(Dispatchers.Main.immediate) {
             pendingApproval = action
@@ -193,7 +193,9 @@ fun OracleScreen(
         return try {
             when (deferred.await()) {
                 "session" -> {
-                    withContext(Dispatchers.Main.immediate) { sessionToolsApproved = true }
+                    withContext(Dispatchers.Main.immediate) {
+                        approvedToolSessions = approvedToolSessions + authorizationSessionId
+                    }
                     true
                 }
                 "once" -> true
@@ -535,7 +537,7 @@ fun OracleScreen(
                     webSearchEnabled = agenticSettings.localTools && agenticSettings.webSearch,
                     phoneFilesEnabled = agenticSettings.localTools && agenticSettings.phoneFiles,
                     localPythonEnabled = agenticSettings.localTools && agenticSettings.localPython,
-                    authorize = ::authorizeTool,
+                    authorize = { action, group -> authorizeTool(action, group, sessionId) },
                     python = { code ->
                         val before = pythonRuntime.workspaceDirectory().walkTopDown()
                             .filter { it.isFile }
