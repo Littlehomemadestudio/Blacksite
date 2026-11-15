@@ -457,7 +457,10 @@ fun DeepSeekInputPill(
     thinkExpanded: Boolean = false,
     attachments: List<AgentAttachmentRef> = emptyList(),
     onAttachClick: () -> Unit = {},
-    onRemoveAttachment: (AgentAttachmentRef) -> Unit = {}
+    onRemoveAttachment: (AgentAttachmentRef) -> Unit = {},
+    onVoiceClick: () -> Unit = {},
+    voiceReplyEnabled: Boolean = false,
+    onVoiceReplyToggle: () -> Unit = {}
 ) {
     val palette = LocalOraclePalette.current
     val interaction = remember { MutableInteractionSource() }
@@ -599,6 +602,25 @@ fun DeepSeekInputPill(
             }
             Spacer(Modifier.width(8.dp))
             ThinkPill(onClick = onThinkClick, expanded = thinkExpanded)
+            Spacer(Modifier.width(6.dp))
+            Box(
+                Modifier.size(36.dp).clip(RoundedCornerShape(11.dp))
+                    .background(palette.surfaceRaised).border(1.dp, palette.outlineSoft, RoundedCornerShape(11.dp))
+                    .clickable(onClick = onVoiceClick),
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.compose.material3.Text("♩", color = palette.accent, fontSize = 19.sp)
+            }
+            Spacer(Modifier.width(5.dp))
+            Box(
+                Modifier.size(36.dp).clip(RoundedCornerShape(11.dp))
+                    .background(if (voiceReplyEnabled) palette.accentSoft else palette.surfaceRaised)
+                    .border(1.dp, if (voiceReplyEnabled) palette.accent.copy(alpha = 0.55f) else palette.outlineSoft, RoundedCornerShape(11.dp))
+                    .clickable(onClick = onVoiceReplyToggle),
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.compose.material3.Text(if (voiceReplyEnabled) "◖))" else "◖)", color = if (voiceReplyEnabled) palette.accent else palette.textSecondary, fontSize = 11.sp)
+            }
             Spacer(Modifier.weight(1f))
             androidx.compose.animation.AnimatedVisibility(
                 visible = busy,
