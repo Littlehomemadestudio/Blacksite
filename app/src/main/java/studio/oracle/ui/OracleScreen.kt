@@ -978,7 +978,6 @@ private fun GeneratedMediaArtifact(event: AgenticEvent, onOpenFile: (String) -> 
 @Composable
 private fun AudioArtifactCard(event: AgenticEvent) {
     val palette = LocalOraclePalette.current
-    val context = LocalContext.current
     var playing by remember(event.payload) { mutableStateOf(false) }
     var prepared by remember(event.payload) { mutableStateOf(false) }
     val player = remember(event.payload) {
@@ -1049,16 +1048,45 @@ private fun VideoArtifactCard(event: AgenticEvent) {
 
 @Composable
 private fun TokenUsageChip(detail: String) {
-    val input = Regex("input\\s+(\\d+)").find(detail)?.groupValues?.getOrNull(1)
-    val output = Regex("output\\s+(\\d+)").find(detail)?.groupValues?.getOrNull(1)
-    val total = (input?.toIntOrNull() ?: 0) + (output?.toIntOrNull() ?: 0)
-    val label = if (total > 0) if (total >= 1000) "%.1fk".format(total / 1000f) else total.toString() else "i"
+    val palette = LocalOraclePalette.current
+    var showDetails by remember { mutableStateOf(false) }
+    val values = remember(detail) {
+        listOf("input", "output", "thinking", "cached", "tools").mapNotNull { key ->
+            Regex(key + "\\s+(\\d+)").find(detail)?.groupValues?.getOrNull(1)?.let { key to it }
+        }
+    }
+    val input = values.firstOrNull { it.first == "input" }?.second?.toIntOrNull() ?: 0
+    val output = values.firstOrNull { it.first == "output" }?.second?.toIntOrNull() ?: 0
+    val total = input + output
+    val label = if (total >= 1000) "%.1fk".format(total / 1000f) else total.toString()
     Box(
         Modifier.size(30.dp).clip(CircleShape)
-            .background(Color(0x187B8FE8)).border(1.dp, Color(0x397B8FE8), CircleShape),
+            .background(Color(0x187B8FE8)).border(1.dp, Color(0x557B8FE8), CircleShape)
+            .clickable { showDetails = true },
         contentAlignment = Alignment.Center
     ) {
         Text(label, color = Color(0xFF7488E2), fontFamily = OracleMono, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+    }
+    if (showDetails) {
+        AlertDialog(
+            onDismissRequest = { showDetails = false },
+            title = { Text("Context usage") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    values.forEach { (key, value) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(key.uppercase(), color = palette.textSecondary, fontFamily = OracleMono, fontSize = 9.sp)
+                            Spacer(Modifier.weight(1f))
+                            Text("%,d".format(value.toIntOrNull() ?: 0), color = palette.text,
+                                fontFamily = OracleMono, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                    Text("Usage values are shown when Gemini returns them. Cached tokens are reported separately.",
+                        color = palette.textTertiary, fontSize = 10.sp, lineHeight = 15.sp)
+                }
+            },
+            confirmButton = { TextButton(onClick = { showDetails = false }) { Text("CLOSE") } }
+        )
     }
 }
 
