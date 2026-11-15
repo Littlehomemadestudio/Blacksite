@@ -434,40 +434,40 @@ fun OracleScreen(
                 val textAttachmentContext = mutableListOf<String>()
                 val mediaInputs = try {
                     var totalBytes = 0L
-                    buildList {
-                        for (attachment in attachmentSnapshot) {
-                            val uri = Uri.parse(attachment.uri)
-                            val bytes = withContext(Dispatchers.IO) {
-                                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                            } ?: error("Could not read " + attachment.name)
-                            totalBytes += bytes.size
-                            require(bytes.size <= 30 * 1024 * 1024 && totalBytes <= 30 * 1024 * 1024) {
-                                "Attachments exceed the 30 MB combined limit. Send fewer or smaller files."
+                    val prepared = mutableListOf<AgentMediaInput>()
+                    for (attachment in attachmentSnapshot) {
+                        val uri = Uri.parse(attachment.uri)
+                        val bytes: ByteArray = withContext(Dispatchers.IO) {
+                            context.contentResolver.openInputStream(uri)?.use { stream -> stream.readBytes() }
+                        } ?: error("Could not read " + attachment.name)
+                        totalBytes += bytes.size.toLong()
+                        require(bytes.size <= 30 * 1024 * 1024 && totalBytes <= 30L * 1024 * 1024) {
+                            "Attachments exceed the 30 MB combined limit. Send fewer or smaller files."
+                        }
+                        val mime = attachment.mimeType.lowercase()
+                        when {
+                            mime.startsWith("video/") -> {
+                                val uploaded = fileUploader.upload(key, attachment.name, mime, bytes)
+                                prepared.add(AgentMediaInput(attachment.name, mime, fileUri = uploaded.uri))
                             }
-                            val mime = attachment.mimeType.lowercase()
-                            when {
-                                mime.startsWith("video/") -> {
-                                    val uploaded = fileUploader.upload(key, attachment.name, mime, bytes)
-                                    add(AgentMediaInput(attachment.name, mime, fileUri = uploaded.uri))
-                                }
-                                mime.startsWith("image/") || mime.startsWith("audio/") ||
-                                    mime == "application/pdf" || mime == "text/csv" -> {
-                                    add(AgentMediaInput(
-                                        name = attachment.name,
-                                        mimeType = mime,
-                                        base64Data = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                                    ))
-                                }
-                                mime == "text/plain" || mime == "text/markdown" || mime == "application/json" -> {
-                                    textAttachmentContext.add(
-                                        "ATTACHED TEXT FILE: " + attachment.name + "\n" +
-                                            bytes.toString(Charsets.UTF_8).take(200000)
-                                    )
-                                }
-                                else -> error("Gemini cannot read this attachment type directly: " + attachment.mimeType)
+                            mime.startsWith("image/") || mime.startsWith("audio/") ||
+                                mime == "application/pdf" || mime == "text/csv" -> {
+                                prepared.add(AgentMediaInput(
+                                    name = attachment.name,
+                                    mimeType = mime,
+                                    base64Data = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                                ))
                             }
+                            mime == "text/plain" || mime == "text/markdown" || mime == "application/json" -> {
+                                textAttachmentContext.add(
+                                    "ATTACHED TEXT FILE: " + attachment.name + "\n" +
+                                        bytes.toString(Charsets.UTF_8).take(200000)
+                                )
+                            }
+                            else -> error("Gemini cannot read this attachment type directly: " + attachment.mimeType)
                         }
                     }
+                    prepared
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (exception: Exception) {
