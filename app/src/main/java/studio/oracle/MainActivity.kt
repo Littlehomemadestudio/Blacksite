@@ -23,6 +23,7 @@ import studio.oracle.data.local.OracleDatabase
 import studio.oracle.data.GeminiConnectionResult
 import studio.oracle.security.SecureKeyStore
 import studio.oracle.ui.LibraryScreen
+import studio.oracle.ui.WorkflowScreen
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -74,7 +75,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class OracleSection { AGENT, LIBRARY, SETTINGS }
+private enum class OracleSection { AGENT, LIBRARY, AUTOMATIONS, SETTINGS }
 
 @Composable
 private fun OracleApp() {
@@ -103,7 +104,8 @@ private fun OracleApp() {
                     prompt = prompt,
                     onPrompt = { prompt = it },
                     onSettings = { section = OracleSection.SETTINGS },
-                    onLibrary = { section = OracleSection.LIBRARY }
+                    onLibrary = { section = OracleSection.LIBRARY },
+                    onAutomations = { section = OracleSection.AUTOMATIONS }
                 )
 
                 OracleSection.LIBRARY -> Column(Modifier.fillMaxSize()) {
@@ -117,6 +119,19 @@ private fun OracleApp() {
                         Text("Document Library", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                     }
                     LibraryScreen()
+                }
+
+                OracleSection.AUTOMATIONS -> Column(Modifier.fillMaxSize()) {
+                    Row(
+                        Modifier.fillMaxWidth().height(54.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { section = OracleSection.AGENT }) {
+                            Icon(Icons.Default.ArrowBack, "Back to ORACLE")
+                        }
+                        Text("Workflow Studio", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    WorkflowScreen()
                 }
 
                 OracleSection.SETTINGS -> Column(Modifier.fillMaxSize()) {
@@ -141,7 +156,8 @@ private fun AgentScreen(
     prompt: String,
     onPrompt: (String) -> Unit,
     onSettings: () -> Unit,
-    onLibrary: () -> Unit
+    onLibrary: () -> Unit,
+    onAutomations: () -> Unit
 ) {
     val context = LocalContext.current
     val keyStore = remember { SecureKeyStore(context) }
@@ -318,6 +334,11 @@ private fun AgentScreen(
                         }
                     }
                     Spacer(Modifier.height(8.dp))
+                    XPButton("⌘   Workflow Studio", Modifier.fillMaxWidth(), onClick = {
+                        onAutomations()
+                        uiScope.launch { drawer.close() }
+                    })
+                    Spacer(Modifier.height(5.dp))
                     XPButton("⚙   Settings", Modifier.fillMaxWidth(), onClick = {
                         onSettings()
                         uiScope.launch { drawer.close() }
@@ -360,6 +381,7 @@ private fun AgentScreen(
             ) {
                 XPMenuItem("Chats", onClick = { uiScope.launch { drawer.open() } })
                 XPMenuItem("Library", onClick = onLibrary)
+                XPMenuItem("Flows", onClick = onAutomations)
                 XPMenuItem("New", onClick = {
                     uiScope.launch {
                         activeSessionId = repository.createSession(model)
