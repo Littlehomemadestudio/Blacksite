@@ -21,6 +21,11 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 
 ### Gemini chat
 - Chat-first Jetpack Compose workbench with animated navigation, thread drawer, message history, and expandable model controls.
+- Animated branded startup splash and an animated empty-conversation stage with tappable mission starters.
+- Default model for new installations: `gemini-3.5-flash-lite` (Gemini 3.5 Flash-Lite); users can still select any model exposed by their API key.
+- Multiple named Gemini API-key profiles can be stored with independent Android Keystore AES-GCM encryption and switched without re-pasting credentials.
+- Push-to-talk voice input uses Android speech recognition; an optional spoken-reply mode reads completed Gemini responses with Android TextToSpeech. This is turn-based voice interaction, not a persistent full-duplex Gemini Live session.
+- Assistant replies provide one-tap copy and Android share-sheet actions.
 - Gemini API key validation and AES-GCM encryption backed by Android Keystore. No API key is embedded in source or APK.
 - Live Gemini Agent using `generateContent`, visible request errors, model discovery, and model selection.
 - Persistent agent threads and messages in Room; thread titles are generated locally from the first user prompt.
@@ -72,7 +77,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Office document extraction, image OCR, scanned-PDF OCR, document summaries, flashcards, quizzes, semantic embeddings, and knowledge graph.
 - Scheduled, event-based, and background workflow triggers. Workflow runs are manual only.
 - Additional workflow actions such as export, file operations, notifications, and external integrations.
-- Audio recording, transcription, searchable archive, and task/decision extraction.
+- Persistent full-duplex Gemini Live audio streaming, interruption handling, and a searchable voice transcript archive. Current voice mode is push-to-talk with Android speech recognition and optional spoken replies.
 - Arbitrary OS-level shell/Termux access, app launching, UI automation, scheduled triggers, and background agents are not implemented. The Agent can use the scoped tools described above, subject to user-selected capabilities and per-session/action approval.
 
 ## Privacy and data handling
