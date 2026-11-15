@@ -210,7 +210,9 @@ fun OracleScreen(
     }
 
     fun openArtifact(uriText: String) {
-        val uri = runCatching { Uri.parse(uriText) }.getOrNull() ?: return
+        val uri = runCatching {
+            if (uriText.startsWith("/")) Uri.fromFile(File(uriText)) else Uri.parse(uriText)
+        }.getOrNull() ?: return
         scope.launch {
             loadingFile = true
             fileEditorError = null
@@ -894,26 +896,44 @@ private fun OracleMessageRow(
                         color = palette.text, fontFamily = OracleSans, fontSize = 15.sp, lineHeight = 23.sp
                     )
                     attachments.forEach { attachment ->
-                        Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                                .background(palette.surface).padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                when {
-                                    attachment.mimeType.startsWith("image/") -> "▧"
-                                    attachment.mimeType.startsWith("video/") -> "▶"
-                                    attachment.mimeType.startsWith("audio/") -> "♫"
-                                    else -> "▤"
-                                },
-                                color = palette.accent, fontSize = 14.sp
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(attachment.name, color = palette.text, fontSize = 11.sp,
-                                    fontFamily = OracleSans, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(attachment.mimeType, color = palette.textTertiary,
-                                    fontSize = 9.sp, fontFamily = OracleMono)
+                        if (attachment.mimeType.startsWith("image/")) {
+                            Column(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                    .background(palette.surface).padding(7.dp),
+                                verticalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                AsyncImage(
+                                    model = Uri.parse(attachment.uri),
+                                    contentDescription = attachment.name,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                )
+                                Text(attachment.name, color = palette.textSecondary,
+                                    fontFamily = OracleSans, fontSize = 10.sp, maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis)
+                            }
+                        } else {
+                            Row(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                                    .background(palette.surface).padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    when {
+                                        attachment.mimeType.startsWith("video/") -> "▶"
+                                        attachment.mimeType.startsWith("audio/") -> "♫"
+                                        else -> "▤"
+                                    },
+                                    color = palette.accent, fontSize = 14.sp
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(attachment.name, color = palette.text, fontSize = 11.sp,
+                                        fontFamily = OracleSans, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(attachment.mimeType, color = palette.textTertiary,
+                                        fontSize = 9.sp, fontFamily = OracleMono)
+                                }
                             }
                         }
                     }
@@ -1002,15 +1022,15 @@ private fun AudioArtifactCard(event: AgenticEvent) {
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text("GENERATED AUDIO", color = Color(0xFF7B8FE8), fontFamily = OracleMono, fontSize = 8.sp)
-            Text(event.detail, color = palette.textSecondary, fontFamily = OracleSans, fontSize = 10.sp)
+            Text(if (prepared) event.detail else "Preparing audio…", color = palette.textSecondary, fontFamily = OracleSans, fontSize = 10.sp)
         }
         androidx.compose.material3.TextButton(onClick = {
             runCatching {
                 if (player.isPlaying) {
                     player.pause()
                     playing = false
-                } else {
-                    if (player.isPlaying.not()) player.start()
+                } else if (prepared) {
+                    player.start()
                     playing = true
                 }
             }
@@ -1021,7 +1041,6 @@ private fun AudioArtifactCard(event: AgenticEvent) {
 @Composable
 private fun VideoArtifactCard(event: AgenticEvent) {
     val palette = LocalOraclePalette.current
-    val context = LocalContext.current
     val uri = remember(event.payload) {
         if (event.payload.startsWith("http") || event.payload.startsWith("content://") || event.payload.startsWith("file://")) {
             Uri.parse(event.payload)
