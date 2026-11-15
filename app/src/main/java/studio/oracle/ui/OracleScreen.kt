@@ -267,6 +267,8 @@ fun OracleScreen(
         requestJob = null
         busy = false
         activeSessionId = null
+        sessionToolsApproved = false
+        selectedAttachments = emptyList()
         messages = emptyList()
         agentEvents = emptyList()
         prompt = ""
@@ -313,6 +315,8 @@ fun OracleScreen(
     fun createNewThread(closeDrawer: Boolean = false) {
         scope.launch {
             activeSessionId = repository.createSession(model)
+            sessionToolsApproved = false
+            selectedAttachments = emptyList()
             agentEvents = emptyList()
             prompt = ""
             clearTransientState()
@@ -324,6 +328,8 @@ fun OracleScreen(
 
     fun selectThread(sessionId: String) {
         activeSessionId = sessionId
+        sessionToolsApproved = false
+        selectedAttachments = emptyList()
         agentEvents = emptyList()
         clearTransientState()
         drawerOpen = false
@@ -863,7 +869,7 @@ private fun OracleMessageRow(
                         Text("ORACLE", color = palette.text, fontFamily = OracleMono,
                             fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.7.sp)
                         Spacer(Modifier.weight(1f))
-                        events.firstOrNull { it.kind == "usage" }?.let { TokenUsageChip(it.detail) }
+                        events.lastOrNull { it.kind == "usage" }?.let { TokenUsageChip(it.detail) }
                     }
                     if (events.isNotEmpty()) AgentExecutionTrace(events, onOpenFile)
                     OracleRichMessage(message.content)
