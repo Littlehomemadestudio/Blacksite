@@ -133,8 +133,8 @@ private fun OracleRoot() {
         ) {
             SettingsScreen()
         }
-        }
-    }}
+    }
+}
 @Composable
 private fun OracleSection(
     title: String,
