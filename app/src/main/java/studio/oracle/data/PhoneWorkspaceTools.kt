@@ -16,7 +16,12 @@ import java.io.InputStreamReader
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
-data class CreatedAgentFile(val uri: String, val name: String, val mimeType: String)
+data class CreatedAgentFile(
+    val uri: String,
+    val name: String,
+    val mimeType: String,
+    val kind: String = "file_created"
+)
 
 /** SAF-scoped phone tools, web search and local Python execution. */
 class PhoneWorkspaceTools(
@@ -26,8 +31,10 @@ class PhoneWorkspaceTools(
     private val webSearchEnabled: Boolean = true,
     private val phoneFilesEnabled: Boolean = true,
     private val localPythonEnabled: Boolean = true,
+    private val imageGenerationEnabled: Boolean = true,
     private val authorize: suspend (action: String, permissionGroup: String) -> Boolean,
     private val python: suspend (String) -> String,
+    private val generateImage: suspend (prompt: String, aspectRatio: String) -> GeminiGeneratedImage,
     private val onFileCreated: (CreatedAgentFile) -> Unit = {}
 ) : AgenticToolExecutor {
 
@@ -46,6 +53,14 @@ class PhoneWorkspaceTools(
             put(function("read_phone_file", "Read a UTF-8 text file under the granted phone folder. Contents are sent to Gemini for this task.", schema("path" to property("Relative file path under the granted folder.")), arrayOf("path")))
             put(function("create_phone_file", "Create a text, Markdown, JSON, HTML or CSV file under the granted phone folder. ORACLE displays it as an editable in-chat artifact.", schema("path" to property("Relative path including filename."), "content" to property("Complete UTF-8 contents."), "mime_type" to property("Optional MIME type, e.g. text/markdown or application/json.")), arrayOf("path", "content")))
             put(function("append_phone_file", "Append text to an existing UTF-8 file under the granted phone folder.", schema("path" to property("Relative file path."), "content" to property("Text to append.")), arrayOf("path", "content")))
+        }
+        if (imageGenerationEnabled) {
+            put(function(
+                "generate_image",
+                "Generate a polished image using Gemini 3.1 Flash Image. Use this for illustrations, diagrams, posters, artwork, concept art, visual assets and image editing. Returns a generated image artifact that appears in the conversation.",
+                schema("prompt" to property("Detailed image-generation or editing description."), "aspect_ratio" to property("Optional aspect ratio, e.g. 16:9, 1:1, 3:2 or 9:16.")),
+                arrayOf("prompt")
+            ))
         }
         if (localPythonEnabled) {
             put(function("run_local_python", "Run Python 3 on-device in ORACLE's bundled CPython runtime. Network access and normal Python standard-library imports are enabled. Use it for calculations, data processing, code and downloads.", schema("code" to property("Python 3 source code to execute.")), arrayOf("code")))
@@ -104,6 +119,25 @@ class PhoneWorkspaceTools(
                 } ?: return@withContext "Android could not append to the file."
                 onFileCreated(CreatedAgentFile(file.uri.toString(), file.name.orEmpty(), file.type ?: "text/plain"))
                 "Appended " + content.length + " characters to " + path.last() + " successfully."
+            }
+            "generate_image" -> {
+                val prompt = arguments.optString("prompt")
+                if (prompt.isBlank()) return@withContext "Image prompt is empty."
+                val aspect = arguments.optString("aspect_ratio").ifBlank { "16:9" }
+                if (!authorize("Generate an image with Gemini 3.1 Flash Image? This sends the image prompt to Google and uses your Gemini API quota.", "image_generation")) {
+                    return@withContext "The user declined image generation."
+                }
+                val generated = generateImage(prompt, aspect)
+                val directory = java.io.File(context.filesDir, "oracle-generated").apply { mkdirs() }
+                val imageFile = java.io.File(directory, "oracle-image-" + java.util.UUID.randomUUID() + ".png")
+                imageFile.writeBytes(generated.bytes)
+                onFileCreated(CreatedAgentFile(
+                    uri = imageFile.absolutePath,
+                    name = imageFile.name,
+                    mimeType = generated.mimeType,
+                    kind = "generated_image"
+                ))
+                "Generated image successfully: " + imageFile.name + ". The image is displayed in the conversation."
             }
             "run_local_python" -> {
                 val code = arguments.optString("code")
