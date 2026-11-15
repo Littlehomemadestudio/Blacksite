@@ -518,7 +518,10 @@ fun OracleScreen(
                         onContext = { value -> scope.launch { agentToolPreferences.setContextMessages(value) } },
                         onOutput = { value ->
                             val cap = menuModels.firstOrNull { it.name == model }?.outputTokenLimit
-                            scope.launch { agentToolPreferences.setMaxOutputTokens(minOf(value, cap ?: value)) }
+                            val allowed = AgentToolSettings.OUTPUT_CHOICES
+                                .filter { it <= (cap ?: Int.MAX_VALUE) }
+                                .maxOrNull() ?: AgentToolSettings.OUTPUT_CHOICES.minOrNull() ?: 4096
+                            scope.launch { agentToolPreferences.setMaxOutputTokens(minOf(value, allowed)) }
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
