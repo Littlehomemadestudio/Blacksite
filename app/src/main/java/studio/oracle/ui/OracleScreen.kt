@@ -420,7 +420,7 @@ fun OracleScreen(
                             OracleMessageRow(message = message, modifier = Modifier.animateItem())
                         }
                         if (busy) {
-                            item { OracleThinkingIndicator() }
+                            item { OracleThinkingIndicator(agentActivity) }
                         }
                     }
                 }
@@ -462,6 +462,8 @@ fun OracleScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(max = 360.dp)
+                        .verticalScroll(rememberScrollState())
                         .padding(start = 14.dp, end = 14.dp, bottom = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -478,13 +480,30 @@ fun OracleScreen(
                         model = menuModels.firstOrNull { it.name == model },
                         folderGranted = grantedFolderUri != null,
                         onGoogleSearch = { enabled -> scope.launch { agentToolPreferences.setGoogleSearch(enabled) } },
+                        onUrlContext = { enabled -> scope.launch { agentToolPreferences.setUrlContext(enabled) } },
                         onCloudPython = { enabled -> scope.launch { agentToolPreferences.setCloudCodeExecution(enabled) } },
                         onLocalPython = { enabled -> scope.launch { agentToolPreferences.setLocalPython(enabled) } },
                         onPhoneFiles = { enabled -> scope.launch { agentToolPreferences.setPhoneFiles(enabled) } },
                         onGrantFolder = { folderPicker.launch(null) },
+                        onRevokeFolder = {
+                            grantedFolderUri?.let { uri ->
+                                runCatching {
+                                    context.contentResolver.releasePersistableUriPermission(
+                                        uri,
+                                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                                    )
+                                }
+                            }
+                            phoneFileAccess.clearTreeUri()
+                            grantedFolderUri = null
+                            scope.launch { agentToolPreferences.setPhoneFiles(false) }
+                        },
                         onThinking = { value -> scope.launch { agentToolPreferences.setThinkingLevel(value) } },
                         onContext = { value -> scope.launch { agentToolPreferences.setContextMessages(value) } },
-                        onOutput = { value -> scope.launch { agentToolPreferences.setMaxOutputTokens(value) } },
+                        onOutput = { value ->
+                            val cap = menuModels.firstOrNull { it.name == model }?.outputTokenLimit
+                            scope.launch { agentToolPreferences.setMaxOutputTokens(minOf(value, cap ?: value)) }
+                        },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
