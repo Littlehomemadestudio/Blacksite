@@ -1,6 +1,9 @@
 package studio.oracle.ui
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -220,7 +224,7 @@ fun AgentCapabilitiesPanel(
         }
 
         val customNeedsGemini3 = (settings.localPython || settings.phoneFiles) &&
-            (settings.googleSearch || settings.cloudCodeExecution) && !modelIsGemini3
+            (settings.googleSearch || settings.urlContext || settings.cloudCodeExecution) && !modelIsGemini3
         if (customNeedsGemini3) {
             Text(
                 "This model cannot combine local tools with Google's built-in tools in one call. Switch to an available Gemini 3 model, or turn off Google Search and Google Python to let this model use local tools.",
@@ -303,16 +307,28 @@ private fun CapabilityChip(
     modifier: Modifier = Modifier
 ) {
     val palette = LocalOraclePalette.current
+    val background by animateColorAsState(
+        if (active) palette.accentSoft else palette.canvas,
+        animationSpec = spring(stiffness = 520f, dampingRatio = 0.82f),
+        label = "capability-chip-background"
+    )
+    val outline by animateColorAsState(
+        if (active) palette.accent.copy(alpha = 0.38f) else palette.outlineSoft,
+        animationSpec = spring(stiffness = 520f),
+        label = "capability-chip-outline"
+    )
+    val scale by animateFloatAsState(
+        if (active) 1.025f else 1f,
+        animationSpec = spring(stiffness = 560f, dampingRatio = 0.72f),
+        label = "capability-chip-scale"
+    )
     Text(
         text = label,
         modifier = modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(8.dp))
-            .background(if (active) palette.accentSoft else palette.canvas)
-            .border(
-                1.dp,
-                if (active) palette.accent.copy(alpha = 0.35f) else palette.outlineSoft,
-                RoundedCornerShape(8.dp)
-            )
+            .background(background)
+            .border(1.dp, outline, RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 9.dp, vertical = 7.dp),
         color = if (active) palette.accent else palette.textSecondary,
@@ -323,7 +339,6 @@ private fun CapabilityChip(
         overflow = TextOverflow.Ellipsis
     )
 }
-
 private fun compactTokens(value: Int): String =
     if (value >= 1_000_000) "${value / 1_000_000}M"
     else if (value >= 1_000) "${value / 1_000}K"
