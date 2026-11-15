@@ -395,6 +395,9 @@ fun OracleScreen(
                         if (agentEvents.isNotEmpty()) {
                             item { AgenticActivityTimeline(agentEvents) }
                         }
+                        if (agentEvents.isNotEmpty()) {
+                            item { AgenticActivityTimeline(agentEvents) }
+                        }
                     }
                 }
             }
@@ -438,6 +441,10 @@ fun OracleScreen(
                     refreshing = syncingModels,
                     onSelect = ::chooseModel,
                     onRefresh = ::refreshModels,
+                    settings = agenticSettings,
+                    onSettingsChange = { agenticSettings = it },
+                    folderGranted = grantedTreeUri != null,
+                    onChooseFolder = { folderPicker.launch(null) },
                     modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp)
                 )
             }
@@ -605,6 +612,22 @@ private fun OracleThinkingIndicator() {
 }
 
 @Composable
+private fun AgenticActivityTimeline(events: List<AgenticEvent>) {
+    val palette = LocalOraclePalette.current
+    Column(Modifier.fillMaxWidth().padding(start = 32.dp, end = 4.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        events.forEach { event ->
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                .background(palette.surface).border(1.dp, palette.outlineSoft, RoundedCornerShape(12.dp))
+                .padding(horizontal = 11.dp, vertical = 9.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(event.title.uppercase(), color = palette.accent, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.55.sp)
+                if (event.detail.isNotBlank()) Text(event.detail, color = palette.textSecondary, fontFamily = OracleSans, fontSize = 11.sp, lineHeight = 16.sp)
+                if (event.code.isNotBlank()) Text(event.code.take(6000), color = palette.text, fontFamily = OracleMono, fontSize = 10.sp, lineHeight = 14.sp)
+            }
+        }
+    }
+}
+
+@Composable
 private fun OracleErrorNotice(
     message: String,
     canRestore: Boolean,
@@ -647,6 +670,10 @@ private fun ModelControlPanel(
     refreshing: Boolean,
     onSelect: (GeminiModel) -> Unit,
     onRefresh: () -> Unit,
+    settings: AgenticSettings,
+    onSettingsChange: (AgenticSettings) -> Unit,
+    folderGranted: Boolean,
+    onChooseFolder: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val palette = LocalOraclePalette.current
@@ -682,11 +709,42 @@ private fun ModelControlPanel(
             horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             models.forEach { candidate ->
-                ModelChoice(
-                    label = candidate.displayName,
-                    selected = candidate.name == selectedModel,
-                    onClick = { onSelect(candidate) }
-                )
+                ModelChoice(label = candidate.displayName, selected = candidate.name == selectedModel, onClick = { onSelect(candidate) })
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Text("REASONING", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.8.sp)
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            listOf("low", "medium", "high", "xhigh").forEach { level ->
+                ModelChoice(level.uppercase(), settings.thinkingLevel == level, { onSettingsChange(settings.copy(thinkingLevel = level)) })
+            }
+        }
+        Spacer(Modifier.height(9.dp))
+        Text("MODEL CAPABILITIES", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.8.sp)
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            ModelChoice("SEARCH", settings.googleSearch, { onSettingsChange(settings.copy(googleSearch = !settings.googleSearch)) })
+            ModelChoice("HOSTED PY", settings.hostedPython, { onSettingsChange(settings.copy(hostedPython = !settings.hostedPython)) })
+            ModelChoice("URL CONTEXT", settings.urlContext, { onSettingsChange(settings.copy(urlContext = !settings.urlContext)) })
+            ModelChoice("LOCAL TOOLS", settings.localTools, { onSettingsChange(settings.copy(localTools = !settings.localTools)) })
+        }
+        Spacer(Modifier.height(9.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(if (folderGranted) "PHONE FOLDER CONNECTED" else "PHONE FILE ACCESS",
+                    color = if (folderGranted) palette.success else palette.textSecondary,
+                    fontFamily = OracleMono, fontSize = 9.sp)
+                Text("Read and create files only inside the folder you choose.",
+                    color = palette.textTertiary, fontFamily = OracleSans, fontSize = 10.sp)
+            }
+            OracleTextAction(if (folderGranted) "CHANGE" else "GRANT FOLDER", onChooseFolder, accent = true)
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("OUTPUT LIMIT", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp)
+            Spacer(Modifier.weight(1f))
+            listOf(4096, 8192, 16384, 32768).forEach { amount ->
+                ModelChoice((amount / 1024).toString() + "K", settings.maxOutputTokens == amount,
+                    { onSettingsChange(settings.copy(maxOutputTokens = amount)) })
             }
         }
     }
