@@ -32,25 +32,27 @@ class LocalWorkflowRunner(
         if (workflow.workspaceId != workspaceId || dao.findWorkflow(workflow.id, workspaceId) == null) {
             return WorkflowRunResult("", "INVALID", "This workflow does not belong to the active workspace.")
         }
-        val validation = WorkflowRules.validate(steps)
+        val validation = WorkflowRules.validate(steps, expectedWorkflowId = workflow.id)
         if (validation != null) return WorkflowRunResult("", "INVALID", validation)
 
         val ordered = steps.sortedBy { it.position }
         val runId = UUID.randomUUID().toString()
-        dao.insertRun(
-            WorkflowRunEntity(
-                id = runId,
-                workflowId = workflow.id,
-                status = "RUNNING",
-                startedAt = System.currentTimeMillis(),
-                finishedAt = null,
-                summary = "Started after explicit user confirmation."
-            )
-        )
-        log(runId, null, "INFO", "Manual run started. All actions execute locally; no Gemini request is made.")
-
+        var runCreated = false
         var completed = 0
         try {
+            dao.insertRun(
+                WorkflowRunEntity(
+                    id = runId,
+                    workflowId = workflow.id,
+                    status = "RUNNING",
+                    startedAt = System.currentTimeMillis(),
+                    finishedAt = null,
+                    summary = "Started after explicit user confirmation."
+                )
+            )
+            runCreated = true
+            log(runId, null, "INFO", "Manual run started. All actions execute locally; no Gemini request is made.")
+
             ordered.forEachIndexed { index, step ->
                 currentCoroutineContext().ensureActive()
                 val action = WorkflowAction.from(step.actionType)
@@ -102,16 +104,32 @@ class LocalWorkflowRunner(
             }
 
             val summary = "$completed of ${ordered.size} steps completed."
-            dao.finishRun(runId, "SUCCEEDED", System.currentTimeMillis(), summary)
             log(runId, null, "INFO", "Run completed successfully.")
+            dao.finishRun(runId, "SUCCEEDED", System.currentTimeMillis(), summary)
             return WorkflowRunResult(runId, "SUCCEEDED", summary)
         } catch (cancelled: CancellationException) {
-            withContext(NonCancellable) {
-                val summary = "Run cancelled after $completed of ${ordered.size} steps."
-                log(runId, null, "CANCELLED", summary)
-                dao.finishRun(runId, "CANCELLED", System.currentTimeMillis(), summary)
+            if (runCreated) {
+                withContext(NonCancellable) {
+                    val summary = "Run cancelled after $completed of ${ordered.size} steps."
+                    runCatching { log(runId, null, "CANCELLED", summary) }
+                    runCatching {
+                        dao.finishRun(runId, "CANCELLED", System.currentTimeMillis(), summary)
+                    }
+                }
             }
             throw cancelled
+        } catch (failure: Exception) {
+            val detail = failure.message?.take(600) ?: "Unexpected local execution failure."
+            val summary = "Run failed after $completed of ${ordered.size} steps. $detail"
+            if (runCreated) {
+                withContext(NonCancellable) {
+                    runCatching { log(runId, null, "FAILED", summary) }
+                    runCatching {
+                        dao.finishRun(runId, "FAILED", System.currentTimeMillis(), summary)
+                    }
+                }
+            }
+            return WorkflowRunResult(runId, "FAILED", summary)
         }
     }
 
