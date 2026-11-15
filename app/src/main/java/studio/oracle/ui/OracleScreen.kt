@@ -1492,13 +1492,13 @@ private fun modelArt(model: String): String = when {
         "https://puzzleout.net/_emdash/api/media/file/01M1QNY5YJ98KNT5ZS29MDZXA0.png"
 }
 
-private fun modelDescription(model: String): String = when {
-    model.contains("3.8-flash", true) -> "A versatile agent model for coding, long-running tasks, advanced reasoning and multimodal understanding."
-    model.contains("flash-lite", true) -> "A lighter, throughput-oriented model for fast everyday work and high-volume tasks."
-    model.contains("pro", true) -> "A higher-capability reasoning model for demanding analysis and complex knowledge work."
-    model.contains("4-hydrogen", true) -> "A frontier reasoning model for difficult, long-horizon problems and complex agent workflows."
-    model.contains("4-carbon", true) -> "A powerful general model with strong reasoning and multimodal capabilities."
-    model.contains("audio", true) || model.contains("live", true) -> "A model family optimized for realtime audio input and conversational output."
+private fun modelDescription(model: GeminiModel): String = model.description?.takeIf { it.isNotBlank() } ?: when {
+    model.name.contains("3.8-flash", true) -> "A versatile agent model for coding, long-running tasks, advanced reasoning and multimodal understanding."
+    model.name.contains("flash-lite", true) -> "A lighter, throughput-oriented model for fast everyday work and high-volume tasks."
+    model.name.contains("pro", true) -> "A higher-capability reasoning model for demanding analysis and complex knowledge work."
+    model.name.contains("4-hydrogen", true) -> "A frontier reasoning model for difficult, long-horizon problems and complex agent workflows."
+    model.name.contains("4-carbon", true) -> "A powerful general model with strong reasoning and multimodal capabilities."
+    model.name.contains("audio", true) || model.name.contains("live", true) -> "A model family optimized for realtime audio input and conversational output."
     else -> "A Gemini model available to the connected API key. Its capabilities and limits are determined by Google's model metadata."
 }
 
@@ -1590,7 +1590,7 @@ private fun ModelBrowserDialog(
                                         fontFamily = OracleSans, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                                     Text(candidate.name, color = Color(0xFF788195),
                                         fontFamily = OracleMono, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(modelDescription(candidate.name), color = Color(0xFF596273),
+                                    Text(modelDescription(candidate), color = Color(0xFF596273),
                                         fontFamily = OracleSans, fontSize = 10.sp, lineHeight = 14.sp)
                                 }
                             }
