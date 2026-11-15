@@ -61,7 +61,9 @@ data class AgentMessageEntity(
     val sessionId: String,
     val role: String,
     val content: String,
-    val createdAt: Long
+    val createdAt: Long,
+    @ColumnInfo(defaultValue = "''") val agentTrace: String = "",
+    @ColumnInfo(defaultValue = "''") val attachments: String = ""
 )
 
 @Entity(
@@ -356,7 +358,7 @@ interface WorkflowDao {
         WorkflowRunEntity::class,
         WorkflowRunLogEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class OracleDatabase : RoomDatabase() {
@@ -485,6 +487,17 @@ abstract class OracleDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!database.hasColumn("agent_messages", "agentTrace")) {
+                    database.execSQL("ALTER TABLE agent_messages ADD COLUMN agentTrace TEXT NOT NULL DEFAULT ''")
+                }
+                if (!database.hasColumn("agent_messages", "attachments")) {
+                    database.execSQL("ALTER TABLE agent_messages ADD COLUMN attachments TEXT NOT NULL DEFAULT ''")
+                }
+            }
+        }
+
         private fun SupportSQLiteDatabase.hasColumn(table: String, column: String): Boolean =
             query("PRAGMA table_info($table)").use { cursor ->
                 val nameIndex = cursor.getColumnIndex("name")
@@ -504,7 +517,7 @@ abstract class OracleDatabase : RoomDatabase() {
                     OracleDatabase::class.java,
                     "oracle_studio.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
                     .also { instance = it }
             }
