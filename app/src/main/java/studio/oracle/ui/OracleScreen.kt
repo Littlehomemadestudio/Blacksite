@@ -7,6 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.expandVertically
@@ -276,6 +277,7 @@ fun OracleScreen(
         }
 
         prompt = ""
+        agentEvents = emptyList()
         error = null
         keyboard?.hide()
         busy = true
@@ -588,24 +590,22 @@ private fun OracleMessageRow(message: AgentMessageEntity, modifier: Modifier = M
 @Composable
 private fun OracleThinkingIndicator() {
     val palette = LocalOraclePalette.current
-    Row(
-        modifier = Modifier.padding(start = 33.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    val pulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "oracle-thinking")
+    Row(Modifier.padding(start = 33.dp), verticalAlignment = Alignment.CenterVertically) {
         repeat(3) { index ->
-            val interaction = remember { MutableInteractionSource() }
-            val scale by androidx.compose.animation.core.animateFloatAsState(
+            val scale by pulse.animateFloat(
+                initialValue = 0.42f,
                 targetValue = 1f,
-                animationSpec = androidx.compose.animation.core.spring(stiffness = 420f),
+                animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                    animation = tween(520, delayMillis = index * 135),
+                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                ),
                 label = "thinking-dot-$index"
             )
             Box(
-                Modifier
-                    .padding(end = 5.dp)
-                    .size(5.dp)
-                    .graphicsLayer { scaleX = scale; scaleY = scale }
-                    .clip(CircleShape)
-                    .background(palette.textTertiary.copy(alpha = 0.6f))
+                Modifier.padding(end = 5.dp).size(5.dp)
+                    .graphicsLayer { scaleX = scale; scaleY = scale; alpha = 0.45f + (scale * 0.55f) }
+                    .clip(CircleShape).background(palette.accent)
             )
         }
     }
@@ -616,12 +616,18 @@ private fun AgenticActivityTimeline(events: List<AgenticEvent>) {
     val palette = LocalOraclePalette.current
     Column(Modifier.fillMaxWidth().padding(start = 32.dp, end = 4.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
         events.forEach { event ->
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                .background(palette.surface).border(1.dp, palette.outlineSoft, RoundedCornerShape(12.dp))
-                .padding(horizontal = 11.dp, vertical = 9.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(event.title.uppercase(), color = palette.accent, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.55.sp)
-                if (event.detail.isNotBlank()) Text(event.detail, color = palette.textSecondary, fontFamily = OracleSans, fontSize = 11.sp, lineHeight = 16.sp)
-                if (event.code.isNotBlank()) Text(event.code.take(6000), color = palette.text, fontFamily = OracleMono, fontSize = 10.sp, lineHeight = 14.sp)
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(tween(180)) + slideInVertically(tween(220)) { it / 5 }
+            ) {
+                Column(Modifier.fillMaxWidth().animateContentSize()
+                    .clip(RoundedCornerShape(12.dp)).background(palette.surface)
+                    .border(1.dp, palette.outlineSoft, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 11.dp, vertical = 9.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(event.title.uppercase(), color = palette.accent, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.55.sp)
+                    if (event.detail.isNotBlank()) Text(event.detail, color = palette.textSecondary, fontFamily = OracleSans, fontSize = 11.sp, lineHeight = 16.sp)
+                    if (event.code.isNotBlank()) Text(event.code.take(6000), color = palette.text, fontFamily = OracleMono, fontSize = 10.sp, lineHeight = 14.sp)
+                }
             }
         }
     }
