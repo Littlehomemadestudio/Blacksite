@@ -182,7 +182,7 @@ fun WorkflowScreen(workspaceId: String) {
         }
 
         Row(
-            Modifier.fillMaxWidth().background(LocalOraclePalette.current.surface, RoundedCornerShape(9.dp)).padding(4.dp),
+            Modifier.fillMaxWidth().background(LocalOraclePalette.current.surface, RoundedCornerShape(14.dp)).padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             FlowTab("Workflows", tab == "WORKFLOWS", Modifier.weight(1f)) {
@@ -200,7 +200,7 @@ fun WorkflowScreen(workspaceId: String) {
                 } else {
                     LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(notes, key = { it.id }) { note ->
-                            Surface(color = LocalOraclePalette.current.surface, shape = RoundedCornerShape(9.dp), border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft)) {
+                            Surface(color = LocalOraclePalette.current.surface, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft)) {
                                 Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                     Text(note.title, color = LocalOraclePalette.current.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                                     Text(note.content, color = LocalOraclePalette.current.textSecondary, fontSize = 11.sp, lineHeight = 16.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
@@ -221,7 +221,7 @@ fun WorkflowScreen(workspaceId: String) {
                             val name = workflows.firstOrNull { it.id == run.workflowId }?.title ?: "Deleted workflow"
                             Surface(
                                 color = LocalOraclePalette.current.surface,
-                                shape = RoundedCornerShape(9.dp),
+                                shape = RoundedCornerShape(14.dp),
                                 border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft),
                                 modifier = Modifier.fillMaxWidth().clickable {
                                     viewingRunId = run.id
@@ -251,7 +251,7 @@ fun WorkflowScreen(workspaceId: String) {
                             items(workflows, key = { it.id }) { workflow ->
                                 Surface(
                                     color = LocalOraclePalette.current.surface,
-                                    shape = RoundedCornerShape(9.dp),
+                                    shape = RoundedCornerShape(14.dp),
                                     border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft),
                                     modifier = Modifier.fillMaxWidth().clickable {
                                         selectedWorkflowId = workflow.id
@@ -262,13 +262,13 @@ fun WorkflowScreen(workspaceId: String) {
                                         Modifier.fillMaxWidth().padding(13.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(Icons.Default.Tune, null, tint = LocalOraclePalette.current.accent, modifier = Modifier.size(20.dp))
+                                        OracleGlyphIcon(OracleGlyph.Settings, Modifier.size(20.dp), LocalOraclePalette.current.textSecondary)
                                         Spacer(Modifier.width(10.dp))
                                         Column(Modifier.weight(1f)) {
                                             Text(workflow.title, color = LocalOraclePalette.current.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             Text(workflow.description.ifBlank { "Manual workflow · local only" }, color = LocalOraclePalette.current.textSecondary, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                         }
-                                        Icon(Icons.Default.ArrowBack, null, tint = LocalOraclePalette.current.textSecondary, modifier = Modifier.size(16.dp))
+                                        OracleGlyphIcon(OracleGlyph.Back, Modifier.size(16.dp), LocalOraclePalette.current.textSecondary)
                                     }
                                 }
                             }
@@ -276,9 +276,7 @@ fun WorkflowScreen(workspaceId: String) {
                     }
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { selectedWorkflowId = null }, modifier = Modifier.size(34.dp)) {
-                            Icon(Icons.Default.ArrowBack, "Back to workflows", tint = LocalOraclePalette.current.accent)
-                        }
+                        OracleIconButton(OracleGlyph.Back, "Back to workflows", onClick = { selectedWorkflowId = null }, tint = LocalOraclePalette.current.accent, size = 34.dp)
                         Column(Modifier.weight(1f)) {
                             Text("WORKFLOW BUILDER", color = LocalOraclePalette.current.accent, fontSize = 9.sp, letterSpacing = 1.2.sp)
                             Text("Edit steps", color = LocalOraclePalette.current.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
@@ -306,9 +304,9 @@ fun WorkflowScreen(workspaceId: String) {
                                     singleLine = false,
                                     minLines = 2
                                 )
-                                Surface(color = LocalOraclePalette.current.surfaceRaised, shape = RoundedCornerShape(7.dp), border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft)) {
+                                Surface(color = LocalOraclePalette.current.surfaceRaised, shape = RoundedCornerShape(11.dp), border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft)) {
                                     Row(Modifier.fillMaxWidth().padding(9.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Tune, null, tint = LocalOraclePalette.current.accent, modifier = Modifier.size(16.dp))
+                                        OracleGlyphIcon(OracleGlyph.Settings, Modifier.size(16.dp), LocalOraclePalette.current.textSecondary)
                                         Spacer(Modifier.width(7.dp))
                                         Text("MANUAL TRIGGER  ·  ON-DEVICE EXECUTION  ·  NO NETWORK", color = LocalOraclePalette.current.textSecondary, fontSize = 8.sp, letterSpacing = .35.sp)
                                     }
@@ -517,7 +515,7 @@ private fun FlowTab(label: String, selected: Boolean, modifier: Modifier = Modif
     TextButton(
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(7.dp),
+        shape = RoundedCornerShape(11.dp),
         colors = ButtonDefaults.textButtonColors(
             containerColor = if (selected) LocalOraclePalette.current.surfaceRaised else Color.Transparent,
             contentColor = if (selected) LocalOraclePalette.current.accent else LocalOraclePalette.current.textSecondary
@@ -535,7 +533,7 @@ private fun FlowEmptyState(title: String, description: String) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Icon(Icons.Default.Tune, null, tint = LocalOraclePalette.current.accent, modifier = Modifier.size(30.dp))
+        OracleGlyphIcon(OracleGlyph.Settings, Modifier.size(30.dp), LocalOraclePalette.current.textSecondary)
         Text(title, color = LocalOraclePalette.current.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         Text(description, color = LocalOraclePalette.current.textSecondary, fontSize = 11.sp, lineHeight = 17.sp)
     }
@@ -552,7 +550,7 @@ private fun WorkflowStepCard(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val action = WorkflowAction.from(step.actionType)
-    Surface(color = LocalOraclePalette.current.surface, shape = RoundedCornerShape(9.dp), border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft)) {
+    Surface(color = LocalOraclePalette.current.surface, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft)) {
         Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${(index + 1).toString().padStart(2, '0')}", color = LocalOraclePalette.current.accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
@@ -560,7 +558,7 @@ private fun WorkflowStepCard(
                 Box {
                     TextButton(onClick = { menuExpanded = true }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 2.dp)) {
                         Text(action?.label ?: "Unsupported action", color = LocalOraclePalette.current.accent, fontSize = 10.sp)
-                        Icon(Icons.Default.Tune, null, tint = LocalOraclePalette.current.accent, modifier = Modifier.size(13.dp))
+                        OracleGlyphIcon(OracleGlyph.Settings, Modifier.size(13.dp), LocalOraclePalette.current.textSecondary)
                     }
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                         WorkflowAction.entries.forEach { candidate ->
@@ -579,13 +577,13 @@ private fun WorkflowStepCard(
                 }
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onMoveUp, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.ArrowUpward, "Move step up", tint = LocalOraclePalette.current.textSecondary, modifier = Modifier.size(15.dp))
+                    OracleGlyphIcon(OracleGlyph.ArrowUp, Modifier.size(15.dp), LocalOraclePalette.current.textSecondary)
                 }
                 IconButton(onClick = onMoveDown, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.ArrowDownward, "Move step down", tint = LocalOraclePalette.current.textSecondary, modifier = Modifier.size(15.dp))
+                    OracleGlyphIcon(OracleGlyph.ChevronDown, Modifier.size(15.dp), LocalOraclePalette.current.textSecondary)
                 }
                 IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.DeleteOutline, "Remove step", tint = LocalOraclePalette.current.error, modifier = Modifier.size(15.dp))
+                    OracleGlyphIcon(OracleGlyph.Trash, Modifier.size(15.dp), LocalOraclePalette.current.textSecondary)
                 }
             }
             FlowField(
