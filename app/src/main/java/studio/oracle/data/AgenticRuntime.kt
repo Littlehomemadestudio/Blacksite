@@ -119,7 +119,6 @@ class GeminiAgenticRuntime(
         var input: Any = makeInput(prompt, media)
         val transcript = StringBuilder()
         var planSummaryEmitted = false
-        onEvent(AgenticEvent("plan", "ORACLE is working", "Choosing the tools and steps needed to complete your request."))
 
         repeat(MAX_TOOL_ROUNDS) { round ->
             val body = JSONObject()
