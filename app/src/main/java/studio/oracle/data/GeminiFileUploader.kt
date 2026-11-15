@@ -90,6 +90,8 @@ class GeminiFileUploader(
             when (state.uppercase()) {
                 "ACTIVE" -> return
                 "FAILED" -> throw IOException("Google could not process video '" + file.name + "'.")
+                "PROCESSING", "STATE_UNSPECIFIED", "" -> Unit
+                else -> throw IOException("Unexpected Gemini video state: " + state)
             }
         }
         throw IOException("Video processing is still pending. Try again in a moment.")
