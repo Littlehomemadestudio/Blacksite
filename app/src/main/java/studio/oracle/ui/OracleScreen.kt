@@ -1,12 +1,20 @@
 package studio.oracle.ui
 
+import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import kotlinx.coroutines.CompletableDeferred
+import org.json.JSONObject
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -49,6 +57,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import studio.oracle.data.AgentConversationPolicy
 import studio.oracle.data.AgentRepository
+import studio.oracle.data.AgentToolExecutor
+import studio.oracle.data.AgentToolPreferences
+import studio.oracle.data.AgentToolSettings
+import studio.oracle.data.EmbeddedPythonExecutor
+import studio.oracle.data.PhoneFileAccess
 import studio.oracle.data.AgentTurn
 import studio.oracle.data.GeminiApi
 import studio.oracle.data.GeminiModel
@@ -63,6 +76,12 @@ import studio.oracle.security.SecureKeyStore
 import studio.oracle.ui.theme.LocalOraclePalette
 import studio.oracle.ui.theme.OracleMono
 import studio.oracle.ui.theme.OracleSans
+
+private data class PhoneWriteConfirmation(
+    val name: String,
+    val content: String,
+    val approved: CompletableDeferred<Boolean>
+)
 
 @Composable
 fun OracleScreen(
@@ -83,10 +102,15 @@ fun OracleScreen(
         AgentRepository(OracleDatabase.get(context).agentDao(), workspaceId)
     }
     val modelPreferences = remember(context) { ModelPreferences(context) }
+    val agentToolPreferences = remember(context) { AgentToolPreferences(context) }
+    val phoneFileAccess = remember(context) { PhoneFileAccess(context) }
     val scope = rememberCoroutineScope()
 
     val sessions by repository.sessions.collectAsState(initial = emptyList())
     val model by modelPreferences.selectedModel.collectAsState(initial = ModelPreferences.DEFAULT_MODEL)
+    val toolSettings by agentToolPreferences.settings.collectAsState(initial = AgentToolSettings())
+    var grantedFolderUri by remember { mutableStateOf(phoneFileAccess.currentTreeUri()) }
+    var pendingPhoneWrite by remember { mutableStateOf<PhoneWriteConfirmation?>(null) }
 
     var activeSessionId by remember { mutableStateOf<String?>(null) }
     var messages by remember { mutableStateOf(emptyList<AgentMessageEntity>()) }
@@ -103,6 +127,26 @@ fun OracleScreen(
     var suppressCancelledPromptRestore by remember { mutableStateOf(false) }
     var drawerOpen by remember { mutableStateOf(false) }
     var modelPanelOpen by remember { mutableStateOf(false) }
+    var agentActivity by remember { mutableStateOf<String?>(null) }
+
+    val folderPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+                phoneFileAccess.saveTreeUri(uri)
+                grantedFolderUri = uri
+                scope.launch { agentToolPreferences.setPhoneFiles(true) }
+                error = null
+            } catch (_: Exception) {
+                error = "Android could not preserve access to that folder. Choose a different folder."
+            }
+        }
+    }
 
     BackHandler(enabled = drawerOpen) {
         drawerOpen = false
@@ -236,6 +280,7 @@ fun OracleScreen(
         error = null
         keyboard?.hide()
         busy = true
+        agentActivity = "GEMINI IS WORKING"
 
         requestJob = scope.launch {
             var userMessagePersisted = retry
@@ -269,14 +314,66 @@ fun OracleScreen(
                     failedPromptPersisted = true
                 }
 
+                val modelOutputLimit = menuModels.firstOrNull { it.name == model }?.outputTokenLimit
+                val activeToolSettings = toolSettings.copy(
+                    phoneFiles = toolSettings.phoneFiles && grantedFolderUri != null,
+                    maxOutputTokens = minOf(
+                        toolSettings.maxOutputTokens,
+                        modelOutputLimit ?: toolSettings.maxOutputTokens
+                    )
+                )
                 when (val result = api.generate(
                     key,
                     submitted,
-                    AgentConversationPolicy.context(history),
-                    model
+                    AgentConversationPolicy.context(history, activeToolSettings.contextMessages),
+                    model,
+                    activeToolSettings,
+                    AgentToolExecutor { toolName, arguments ->
+                        agentActivity = when (toolName) {
+                            "run_local_python" -> "RUNNING ON-DEVICE PYTHON"
+                            "list_phone_files" -> "LISTING GRANTED FOLDER"
+                            "read_phone_file" -> "READING GRANTED FILE"
+                            "create_phone_file" -> "WAITING FOR FILE APPROVAL"
+                            else -> "RUNNING TOOL"
+                        }
+                        when (toolName) {
+                            "run_local_python" -> withContext(Dispatchers.IO) {
+                                EmbeddedPythonExecutor.execute(context, arguments.optString("code"))
+                            }
+                            "list_phone_files" -> withContext(Dispatchers.IO) {
+                                phoneFileAccess.listFiles(arguments.optString("path", ""))
+                            }
+                            "read_phone_file" -> withContext(Dispatchers.IO) {
+                                phoneFileAccess.readFile(arguments.optString("path"))
+                            }
+                            "create_phone_file" -> {
+                                val name = arguments.optString("name")
+                                val content = arguments.optString("content")
+                                val confirmation = PhoneWriteConfirmation(
+                                    name = name,
+                                    content = content,
+                                    approved = CompletableDeferred()
+                                )
+                                pendingPhoneWrite = confirmation
+                                val approved = try {
+                                    confirmation.approved.await()
+                                } finally {
+                                    if (pendingPhoneWrite === confirmation) pendingPhoneWrite = null
+                                }
+                                if (!approved) {
+                                    JSONObject().put("ok", false).put("error", "The user declined this file write.")
+                                } else {
+                                    withContext(Dispatchers.IO) {
+                                        phoneFileAccess.createFile(name, content)
+                                    }
+                                }
+                            }
+                            else -> JSONObject().put("ok", false).put("error", "Unknown ORACLE tool.")
+                        }
+                    }
                 )) {
                     is studio.oracle.data.GeminiReplyResult.Success -> {
-                        repository.appendMessage(sessionId, "assistant", result.text, result.model)
+                        repository.appendMessage(sessionId, "assistant", result.persistedContent, result.model)
                         failedPrompt = null
                         failedPromptPersisted = false
                     }
@@ -300,6 +397,7 @@ fun OracleScreen(
             } finally {
                 busy = false
                 requestJob = null
+                agentActivity = null
             }
         }
     }
@@ -338,7 +436,7 @@ fun OracleScreen(
                             OracleMessageRow(message = message, modifier = Modifier.animateItem())
                         }
                         if (busy) {
-                            item { OracleThinkingIndicator() }
+                            item { OracleThinkingIndicator(agentActivity) }
                         }
                     }
                 }
@@ -377,17 +475,96 @@ fun OracleScreen(
                 enter = fadeIn() + androidx.compose.animation.expandVertically(),
                 exit = fadeOut() + androidx.compose.animation.shrinkVertically()
             ) {
-                ModelControlPanel(
-                    models = menuModels,
-                    selectedModel = model,
-                    refreshing = syncingModels,
-                    onSelect = ::chooseModel,
-                    onRefresh = ::refreshModels,
-                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp)
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 360.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(start = 14.dp, end = 14.dp, bottom = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ModelControlPanel(
+                        models = menuModels,
+                        selectedModel = model,
+                        refreshing = syncingModels,
+                        onSelect = ::chooseModel,
+                        onRefresh = ::refreshModels,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    AgentCapabilitiesPanel(
+                        settings = toolSettings,
+                        model = menuModels.firstOrNull { it.name == model },
+                        folderGranted = grantedFolderUri != null,
+                        onGoogleSearch = { enabled -> scope.launch { agentToolPreferences.setGoogleSearch(enabled) } },
+                        onUrlContext = { enabled -> scope.launch { agentToolPreferences.setUrlContext(enabled) } },
+                        onCloudPython = { enabled -> scope.launch { agentToolPreferences.setCloudCodeExecution(enabled) } },
+                        onLocalPython = { enabled -> scope.launch { agentToolPreferences.setLocalPython(enabled) } },
+                        onPhoneFiles = { enabled -> scope.launch { agentToolPreferences.setPhoneFiles(enabled) } },
+                        onGrantFolder = { folderPicker.launch(null) },
+                        onRevokeFolder = {
+                            grantedFolderUri?.let { uri ->
+                                runCatching {
+                                    context.contentResolver.releasePersistableUriPermission(
+                                        uri,
+                                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                                    )
+                                }
+                            }
+                            phoneFileAccess.clearTreeUri()
+                            grantedFolderUri = null
+                            scope.launch { agentToolPreferences.setPhoneFiles(false) }
+                        },
+                        onThinking = { value -> scope.launch { agentToolPreferences.setThinkingLevel(value) } },
+                        onContext = { value -> scope.launch { agentToolPreferences.setContextMessages(value) } },
+                        onOutput = { value ->
+                            val cap = menuModels.firstOrNull { it.name == model }?.outputTokenLimit
+                            val allowed = AgentToolSettings.OUTPUT_CHOICES
+                                .filter { it <= (cap ?: Int.MAX_VALUE) }
+                                .maxOrNull() ?: AgentToolSettings.OUTPUT_CHOICES.minOrNull() ?: 4096
+                            scope.launch { agentToolPreferences.setMaxOutputTokens(minOf(value, allowed)) }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
 
             Spacer(Modifier.height(WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().coerceAtLeast(4.dp)))
+        }
+
+        if (pendingPhoneWrite != null) {
+            val request = pendingPhoneWrite
+            if (request != null) {
+                AlertDialog(
+                    onDismissRequest = { request.approved.complete(false) },
+                    title = { Text("Allow ORACLE to create this file?") },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(request.name, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                request.content.take(900) + if (request.content.length > 900) "\\n… preview truncated" else "",
+                                maxLines = 12
+                            )
+                            Text(
+                                "This writes only inside the folder you granted.",
+                                color = palette.textSecondary
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { request.approved.complete(true) }) {
+                            Text("CREATE FILE")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { request.approved.complete(false) }) {
+                            Text("CANCEL")
+                        }
+                    },
+                    containerColor = palette.surface,
+                    titleContentColor = palette.text,
+                    textContentColor = palette.textSecondary
+                )
+            }
         }
 
         if (drawerOpen) {
@@ -501,9 +678,62 @@ private fun OracleMessageRow(message: AgentMessageEntity, modifier: Modifier = M
                     color = palette.accent
                 )
                 Spacer(Modifier.width(12.dp))
+                OracleAssistantContent(
+                    text = GeminiApi.displayText(message.content),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+private data class AssistantMessageSegment(
+    val code: Boolean,
+    val language: String,
+    val text: String
+)
+
+@Composable
+private fun OracleAssistantContent(text: String, modifier: Modifier = Modifier) {
+    val palette = LocalOraclePalette.current
+    val segments = remember(text) { splitAssistantMessage(text) }
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        segments.forEach { segment ->
+            if (segment.code) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(13.dp))
+                        .background(palette.surfaceRaised)
+                        .border(1.dp, palette.outlineSoft, RoundedCornerShape(13.dp))
+                        .padding(horizontal = 11.dp, vertical = 9.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        segment.language.uppercase().ifBlank { "OUTPUT" },
+                        color = palette.accent,
+                        fontFamily = OracleMono,
+                        fontSize = 8.sp,
+                        letterSpacing = 0.8.sp
+                    )
+                    Text(
+                        segment.text.trimEnd(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 260.dp)
+                            .verticalScroll(rememberScrollState()),
+                        color = palette.text,
+                        fontFamily = OracleMono,
+                        fontSize = 10.sp,
+                        lineHeight = 15.sp
+                    )
+                }
+            } else if (segment.text.isNotBlank()) {
                 Text(
-                    text = message.content,
-                    modifier = Modifier.weight(1f),
+                    text = segment.text.trim(),
                     color = palette.text,
                     fontFamily = OracleSans,
                     fontSize = 15.sp,
@@ -514,18 +744,49 @@ private fun OracleMessageRow(message: AgentMessageEntity, modifier: Modifier = M
     }
 }
 
+private fun splitAssistantMessage(raw: String): List<AssistantMessageSegment> {
+    val fence = 96.toChar().toString().repeat(3)
+    val pattern = Regex(Regex.escape(fence) + "([A-Za-z0-9_+.-]*)" + "\n" + "([\\s\\S]*?)" + Regex.escape(fence))
+    val result = mutableListOf<AssistantMessageSegment>()
+    var cursor = 0
+    pattern.findAll(raw).forEach { match ->
+        if (match.range.first > cursor) {
+            result += AssistantMessageSegment(
+                code = false,
+                language = "",
+                text = raw.substring(cursor, match.range.first)
+            )
+        }
+        result += AssistantMessageSegment(
+            code = true,
+            language = match.groupValues[1].ifBlank { "text" },
+            text = match.groupValues[2]
+        )
+        cursor = match.range.last + 1
+    }
+    if (cursor < raw.length) {
+        result += AssistantMessageSegment(false, "", raw.substring(cursor))
+    }
+    if (result.isEmpty()) result += AssistantMessageSegment(false, "", raw)
+    return result
+}
+
 @Composable
-private fun OracleThinkingIndicator() {
+private fun OracleThinkingIndicator(activity: String? = null) {
     val palette = LocalOraclePalette.current
+    val pulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "oracle-thinking")
     Row(
         modifier = Modifier.padding(start = 33.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         repeat(3) { index ->
-            val interaction = remember { MutableInteractionSource() }
-            val scale by androidx.compose.animation.core.animateFloatAsState(
-                targetValue = 1f,
-                animationSpec = androidx.compose.animation.core.spring(stiffness = 420f),
+            val scale by pulse.animateFloat(
+                initialValue = 0.62f,
+                targetValue = 1.08f,
+                animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                    animation = tween(durationMillis = 560, delayMillis = index * 115),
+                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                ),
                 label = "thinking-dot-$index"
             )
             Box(
@@ -534,12 +795,18 @@ private fun OracleThinkingIndicator() {
                     .size(5.dp)
                     .graphicsLayer { scaleX = scale; scaleY = scale }
                     .clip(CircleShape)
-                    .background(palette.textTertiary.copy(alpha = 0.6f))
+                    .background(palette.accent.copy(alpha = 0.8f))
             )
         }
+        Text(
+            activity ?: "ORACLE IS THINKING",
+            color = palette.textTertiary,
+            fontFamily = OracleMono,
+            fontSize = 8.sp,
+            letterSpacing = 0.55.sp
+        )
     }
 }
-
 @Composable
 private fun OracleErrorNotice(
     message: String,
