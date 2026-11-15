@@ -79,7 +79,7 @@ import studio.oracle.data.AgenticEvent
 import studio.oracle.data.AgenticResult
 import studio.oracle.data.AgenticSettings
 import studio.oracle.data.GeminiAgenticRuntime
-import studio.oracle.data.GeminiFileUploader
+import studio.oracle.data.GeminiFileUploader\nimport studio.oracle.data.GeminiImageGenerator
 import studio.oracle.data.LocalPythonRuntime
 import studio.oracle.data.PhoneWorkspaceTools
 import studio.oracle.data.AgentRepository
@@ -114,7 +114,7 @@ fun OracleScreen(
     val keyStore = remember { SecureKeyStore(context) }
     val api = remember { GeminiApi() }
     val agenticRuntime = remember { GeminiAgenticRuntime() }
-    val fileUploader = remember { GeminiFileUploader() }
+    val fileUploader = remember { GeminiFileUploader() }\n    val imageGenerator = remember { GeminiImageGenerator() }
     val pythonRuntime = remember(context) { LocalPythonRuntime(context) }
     val repository = remember(context, workspaceId) {
         AgentRepository(OracleDatabase.get(context).agentDao(), workspaceId)
@@ -517,8 +517,8 @@ fun OracleScreen(
                 val tavilyKey = withContext(Dispatchers.IO) { runCatching { keyStore.readTavilyKey() }.getOrNull() }
                 val reportCreatedFile: (CreatedAgentFile) -> Unit = { file ->
                     val event = AgenticEvent(
-                        kind = "file_created",
-                        title = "File ready",
+                        kind = file.kind,
+                        title = if (file.kind == "generated_image") "Image generated" else "File ready",
                         detail = file.name + " · " + file.mimeType,
                         payload = file.uri
                     )
@@ -534,6 +534,7 @@ fun OracleScreen(
                     webSearchEnabled = agenticSettings.localTools && agenticSettings.webSearch,
                     phoneFilesEnabled = agenticSettings.localTools && agenticSettings.phoneFiles,
                     localPythonEnabled = agenticSettings.localTools && agenticSettings.localPython,
+                    imageGenerationEnabled = agenticSettings.localTools && agenticSettings.imageGeneration,
                     authorize = { action, group -> authorizeTool(action, group, sessionId) },
                     python = { code ->
                         val before = pythonRuntime.workspaceDirectory().walkTopDown()
@@ -557,6 +558,14 @@ fun OracleScreen(
                             }
                         }
                         resultText
+                    },
+                    generateImage = { prompt, aspectRatio ->
+                        imageGenerator.generate(
+                            apiKey = key,
+                            prompt = prompt,
+                            aspectRatio = aspectRatio,
+                            imageSize = "1K"
+                        )
                     },
                     onFileCreated = reportCreatedFile
                 )
