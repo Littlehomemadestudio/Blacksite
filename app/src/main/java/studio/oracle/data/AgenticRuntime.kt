@@ -21,6 +21,9 @@ data class AgenticSettings(
     val toolChoice: String = "auto",
     val hostedPython: Boolean = true,
     val urlContext: Boolean = true,
+    val webSearch: Boolean = true,
+    val phoneFiles: Boolean = true,
+    val localPython: Boolean = true,
     val localTools: Boolean = true
 ) {
     fun validated() = copy(
