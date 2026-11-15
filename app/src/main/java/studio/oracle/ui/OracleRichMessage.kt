@@ -3,6 +3,9 @@ package studio.oracle.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.platform.LocalClipboardManager
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -34,6 +37,8 @@ private sealed interface RichBlock {
     data class Paragraph(val text: String) : RichBlock
     data class Bullet(val text: String, val number: String? = null) : RichBlock
     data class Code(val language: String, val source: String) : RichBlock
+    data class Flow(val nodes: List<String>) : RichBlock
+    data class RemoteImage(val alt: String, val url: String) : RichBlock
     data class Quote(val text: String) : RichBlock
     data class Table(val header: List<String>, val rows: List<List<String>>) : RichBlock
     data object Divider : RichBlock
@@ -43,7 +48,7 @@ private sealed interface RichBlock {
 fun OracleRichMessage(
     markdown: String,
     modifier: Modifier = Modifier,
-    onOpenUrl: (String) -> Unit = {}
+    onOpenUrl: ((String) -> Unit)? = null
 ) {
     val blocks = remember(markdown) { parseRichBlocks(markdown) }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(11.dp)) {
@@ -73,7 +78,15 @@ fun OracleRichMessage(
                     RichInlineText(block.text, modifier = Modifier.weight(1f), fontSize = 14,
                         color = LocalOraclePalette.current.text, onOpenUrl = onOpenUrl)
                 }
-                is RichBlock.Code -> CodeArtifactCard(block.language, block.source)
+                is RichBlock.Code -> if (block.language.equals("mermaid", true) || block.language.equals("diagram", true)) {
+                    FlowArtifactCard(parseFlowNodes(block.source))
+                } else CodeArtifactCard(block.language, block.source)
+                is RichBlock.Flow -> FlowArtifactCard(block.nodes)
+                is RichBlock.RemoteImage -> AsyncImage(
+                    model = block.url, contentDescription = block.alt,
+                    contentScale = ContentScale.FillWidth,
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp).clip(RoundedCornerShape(13.dp))
+                )
                 is RichBlock.Quote -> Row(
                     Modifier.fillMaxWidth().background(LocalOraclePalette.current.surfaceRaised, RoundedCornerShape(10.dp))
                         .padding(11.dp), verticalAlignment = Alignment.Top
@@ -99,7 +112,7 @@ private fun RichInlineText(
     fontSize: Int = 14,
     weight: FontWeight = FontWeight.Normal,
     color: Color,
-    onOpenUrl: (String) -> Unit
+    onOpenUrl: ((String) -> Unit)?
 ) {
     val uriHandler = LocalUriHandler.current
     val annotated = remember(text, fontSize, weight, color) { inlineMarkdown(text, color) }
@@ -112,7 +125,8 @@ private fun RichInlineText(
         ),
         onClick = { offset ->
             annotated.getStringAnnotations("URL", offset, offset).firstOrNull()?.let { annotation ->
-                runCatching { onOpenUrl(annotation.item) }.recoverCatching { uriHandler.openUri(annotation.item) }
+                if (onOpenUrl != null) onOpenUrl.invoke(annotation.item)
+                else runCatching { uriHandler.openUri(annotation.item) }
             }
         }
     )
@@ -121,6 +135,7 @@ private fun RichInlineText(
 @Composable
 private fun CodeArtifactCard(language: String, source: String) {
     val palette = LocalOraclePalette.current
+    val clipboard = LocalClipboardManager.current
     Column(
         Modifier.fillMaxWidth().background(Color(0xFF171D29), RoundedCornerShape(13.dp))
             .border(1.dp, Color(0xFF374156), RoundedCornerShape(13.dp))
@@ -135,6 +150,9 @@ private fun CodeArtifactCard(language: String, source: String) {
                 fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.8.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.weight(1f))
             Text(source.lines().size.toString() + " lines", color = Color(0xFF768197), fontFamily = OracleMono, fontSize = 9.sp)
+            Spacer(Modifier.width(9.dp))
+            Text("COPY", Modifier.clickable { clipboard.setText(AnnotatedString(source)) },
+                color = Color(0xFF9AABD9), fontFamily = OracleMono, fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF30394B)))
         Text(
@@ -143,6 +161,43 @@ private fun CodeArtifactCard(language: String, source: String) {
             color = Color(0xFFE1E7F2), fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 17.sp
         )
     }
+}
+
+
+@Composable
+private fun FlowArtifactCard(nodes: List<String>) {
+    val palette = LocalOraclePalette.current
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+            .background(palette.surface).border(1.dp, palette.outlineSoft, RoundedCornerShape(14.dp))
+            .padding(11.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text("PROCESS MAP", color = Color(0xFF788CE5), fontFamily = OracleMono,
+            fontSize = 8.sp, letterSpacing = 0.9.sp, fontWeight = FontWeight.SemiBold)
+        nodes.take(9).forEachIndexed { index, node ->
+            Box(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp))
+                    .background(if (index == 0 || index == nodes.lastIndex) Color(0x177B8FE8) else palette.surfaceRaised)
+                    .border(1.dp, if (index == 0 || index == nodes.lastIndex) Color(0x557B8FE8) else palette.outlineSoft, RoundedCornerShape(9.dp))
+                    .padding(horizontal = 11.dp, vertical = 9.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(node, color = palette.text, fontFamily = OracleSans,
+                    fontWeight = FontWeight.Medium, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            }
+            if (index != nodes.lastIndex) Text("↓", color = Color(0xFF788CE5), fontSize = 16.sp, lineHeight = 16.sp)
+        }
+    }
+}
+
+private fun parseFlowNodes(source: String): List<String> {
+    val labels = Regex("\\[([^]]+)]|\\(([^)]+)\\)|\\{([^}]+)}")
+        .findAll(source).map { match ->
+            (match.groups[1]?.value ?: match.groups[2]?.value ?: match.groups[3]?.value ?: "").trim()
+        }.filter { it.isNotBlank() }.distinct().toList()
+    return labels.ifEmpty { listOf("Diagram", "Add node labels in Mermaid square brackets") }
 }
 
 @Composable
@@ -180,6 +235,12 @@ private fun parseRichBlocks(source: String): List<RichBlock> {
         val line = lines[index]
         val trimmed = line.trim()
         if (trimmed.isBlank()) { index++; continue }
+        val imageMatch = Regex("^!\\[([^]]*)]\\((https?://[^ )]+)\\)$").find(trimmed)
+        if (imageMatch != null) {
+            result.add(RichBlock.RemoteImage(imageMatch.groupValues[1], imageMatch.groupValues[2]))
+            index++
+            continue
+        }
         if (trimmed.startsWith("```")) {
             val language = trimmed.removePrefix("```").trim()
             val code = mutableListOf<String>()
