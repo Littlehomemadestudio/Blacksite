@@ -17,6 +17,7 @@ private val Context.agentToolsStore by preferencesDataStore(name = "oracle_agent
  */
 data class AgentToolSettings(
     val googleSearch: Boolean = true,
+    val urlContext: Boolean = false,
     val cloudCodeExecution: Boolean = false,
     val localPython: Boolean = true,
     val phoneFiles: Boolean = false,
@@ -37,6 +38,7 @@ class AgentToolPreferences(context: Context) {
     val settings: Flow<AgentToolSettings> = store.data.map { values ->
         AgentToolSettings(
             googleSearch = values[GOOGLE_SEARCH] ?: true,
+            urlContext = values[URL_CONTEXT] ?: false,
             cloudCodeExecution = values[CLOUD_CODE_EXECUTION] ?: false,
             localPython = values[LOCAL_PYTHON] ?: true,
             phoneFiles = values[PHONE_FILES] ?: false,
@@ -47,6 +49,7 @@ class AgentToolPreferences(context: Context) {
     }
 
     suspend fun setGoogleSearch(enabled: Boolean) = store.edit { it[GOOGLE_SEARCH] = enabled }
+    suspend fun setUrlContext(enabled: Boolean) = store.edit { it[URL_CONTEXT] = enabled }
     suspend fun setCloudCodeExecution(enabled: Boolean) = store.edit { it[CLOUD_CODE_EXECUTION] = enabled }
     suspend fun setLocalPython(enabled: Boolean) = store.edit { it[LOCAL_PYTHON] = enabled }
     suspend fun setPhoneFiles(enabled: Boolean) = store.edit { it[PHONE_FILES] = enabled }
@@ -68,6 +71,7 @@ class AgentToolPreferences(context: Context) {
 
     private companion object {
         val GOOGLE_SEARCH = booleanPreferencesKey("agent_google_search")
+        val URL_CONTEXT = booleanPreferencesKey("agent_url_context")
         val CLOUD_CODE_EXECUTION = booleanPreferencesKey("agent_cloud_code_execution")
         val LOCAL_PYTHON = booleanPreferencesKey("agent_local_python")
         val PHONE_FILES = booleanPreferencesKey("agent_phone_files")
