@@ -6,13 +6,13 @@
 - Native Android, offline-first local workspace, Gemini API key supplied by the user.
 - API credentials are encrypted at rest with AES-GCM; the encryption key is held by Android Keystore.
 - Agent actions are transparent, permission-gated, auditable, and explicitly confirmed before external or destructive effects.
-- Original ORACLE identity: graphite surfaces, warm oxide accents, editorial typography, precise spacing, and progressive disclosure.
+- Original ORACLE identity: a dark-by-default graphite workbench, warm oxide accents, editorial typography, precise spacing, and progressive disclosure. Semantic tertiary text and light-theme accent colors are tuned for stronger contrast.
 
 ## Build
 Open this repository in Android Studio or run:
 
 ```bash
-gradle --no-daemon testDebugUnitTest assembleDebug
+gradle --no-daemon lintDebug testDebugUnitTest assembleDebug
 ```
 
 Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/apk/debug/app-debug.apk`. The agentic runtime bundles CPython 3.13 (arm64-v8a and x86_64 builds). GitHub Actions runs unit tests, builds the debug APK, verifies alignment/signature, and uploads the artifact.
