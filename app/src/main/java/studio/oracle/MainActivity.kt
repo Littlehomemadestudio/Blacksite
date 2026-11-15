@@ -4,6 +4,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
@@ -87,7 +94,15 @@ private fun OracleRoot() {
         destination = OracleDestination.CHAT
     }
 
-    when (destination) {
+    AnimatedContent(
+        targetState = destination,
+        label = "oracle-destination",
+        transitionSpec = {
+            (fadeIn(tween(190)) + slideInHorizontally(tween(240)) { it / 22 }) togetherWith
+                (fadeOut(tween(120)) + slideOutHorizontally(tween(180)) { -it / 22 })
+        }
+    ) { target ->
+        when (target) {
         OracleDestination.CHAT -> OracleScreen(
             onOpenLibrary = { destination = OracleDestination.LIBRARY },
             onOpenSettings = { destination = OracleDestination.SETTINGS },
@@ -118,8 +133,8 @@ private fun OracleRoot() {
         ) {
             SettingsScreen()
         }
-    }
-}
+        }
+    }}
 @Composable
 private fun OracleSection(
     title: String,
