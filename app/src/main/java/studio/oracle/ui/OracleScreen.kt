@@ -1,6 +1,11 @@
 package studio.oracle.ui
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -35,19 +40,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import studio.oracle.data.AgentConversationPolicy
+import studio.oracle.data.AgenticEvent
+import studio.oracle.data.AgenticResult
+import studio.oracle.data.AgenticSettings
+import studio.oracle.data.GeminiAgenticRuntime
+import studio.oracle.data.LocalPythonRuntime
+import studio.oracle.data.PhoneWorkspaceTools
 import studio.oracle.data.AgentRepository
 import studio.oracle.data.AgentTurn
 import studio.oracle.data.GeminiApi
@@ -79,6 +94,8 @@ fun OracleScreen(
     val keyboard = LocalSoftwareKeyboardController.current
     val keyStore = remember { SecureKeyStore(context) }
     val api = remember { GeminiApi() }
+    val agenticRuntime = remember { GeminiAgenticRuntime() }
+    val pythonRuntime = remember(context) { LocalPythonRuntime(context) }
     val repository = remember(context, workspaceId) {
         AgentRepository(OracleDatabase.get(context).agentDao(), workspaceId)
     }
@@ -103,6 +120,32 @@ fun OracleScreen(
     var suppressCancelledPromptRestore by remember { mutableStateOf(false) }
     var drawerOpen by remember { mutableStateOf(false) }
     var modelPanelOpen by remember { mutableStateOf(false) }
+    var agenticSettings by remember { mutableStateOf(AgenticSettings()) }
+    var agentEvents by remember { mutableStateOf(emptyList<AgenticEvent>()) }
+    var grantedTreeUri by remember {
+        mutableStateOf(context.getSharedPreferences("oracle_agent_permissions", Context.MODE_PRIVATE)
+            .getString("phone_tree_uri", null)?.let(Uri::parse))
+    }
+    var pendingApproval by remember { mutableStateOf<String?>(null) }
+    var approvalDeferred by remember { mutableStateOf<CompletableDeferred<Boolean>?>(null) }
+    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) runCatching {
+            context.contentResolver.takePersistableUriPermission(uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            grantedTreeUri = uri
+            context.getSharedPreferences("oracle_agent_permissions", Context.MODE_PRIVATE)
+                .edit().putString("phone_tree_uri", uri.toString()).apply()
+        }.onFailure { error = "Android could not persist access to that folder. Choose it again." }
+    }
+    suspend fun approveTool(action: String): Boolean {
+        val deferred = CompletableDeferred<Boolean>()
+        withContext(Dispatchers.Main.immediate) { pendingApproval = action; approvalDeferred = deferred }
+        return try { deferred.await() } finally {
+            withContext(Dispatchers.Main.immediate) {
+                if (approvalDeferred === deferred) { approvalDeferred = null; pendingApproval = null }
+            }
+        }
+    }
 
     BackHandler(enabled = drawerOpen) {
         drawerOpen = false
@@ -269,18 +312,27 @@ fun OracleScreen(
                     failedPromptPersisted = true
                 }
 
-                when (val result = api.generate(
-                    key,
-                    submitted,
-                    AgentConversationPolicy.context(history),
-                    model
+                val priorContext = AgentConversationPolicy.context(history).joinToString("\n\n") { (role, text) ->
+                    (if (role == "assistant") "ORACLE" else "USER") + ": " + text
+                }
+                val agentPrompt = if (priorContext.isBlank()) submitted else
+                    "Conversation history (use as context):\n" + priorContext + "\n\nCurrent user request:\n" + submitted
+                val executor = PhoneWorkspaceTools(context, grantedTreeUri, ::approveTool) { code ->
+                    pythonRuntime.execute(code)
+                }
+                when (val result = agenticRuntime.run(
+                    apiKey = key, prompt = agentPrompt, model = model,
+                    settings = agenticSettings, executor = executor,
+                    onEvent = { event -> scope.launch(Dispatchers.Main.immediate) {
+                        agentEvents = (agentEvents + event).takeLast(40)
+                    } }
                 )) {
-                    is studio.oracle.data.GeminiReplyResult.Success -> {
+                    is AgenticResult.Success -> {
                         repository.appendMessage(sessionId, "assistant", result.text, result.model)
                         failedPrompt = null
                         failedPromptPersisted = false
                     }
-                    is studio.oracle.data.GeminiReplyResult.Failed -> {
+                    is AgenticResult.Failed -> {
                         error = result.message
                         failedPrompt = submitted
                         failedPromptPersisted = userMessagePersisted
@@ -339,6 +391,9 @@ fun OracleScreen(
                         }
                         if (busy) {
                             item { OracleThinkingIndicator() }
+                        }
+                        if (agentEvents.isNotEmpty()) {
+                            item { AgenticActivityTimeline(agentEvents) }
                         }
                     }
                 }
@@ -413,6 +468,15 @@ fun OracleScreen(
                     drawerOpen = false
                     onOpenWorkflows()
                 }
+            )
+        }
+        if (pendingApproval != null) {
+            AlertDialog(
+                onDismissRequest = { approvalDeferred?.complete(false); approvalDeferred = null; pendingApproval = null },
+                title = { Text("ORACLE wants permission") },
+                text = { Text(pendingApproval.orEmpty()) },
+                confirmButton = { TextButton(onClick = { approvalDeferred?.complete(true); approvalDeferred = null; pendingApproval = null }) { Text("ALLOW ONCE") } },
+                dismissButton = { TextButton(onClick = { approvalDeferred?.complete(false); approvalDeferred = null; pendingApproval = null }) { Text("DENY") } }
             )
         }
     }
