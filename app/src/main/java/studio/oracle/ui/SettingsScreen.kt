@@ -4,6 +4,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,6 +45,9 @@ fun SettingsScreen() {
     val scope = rememberCoroutineScope()
 
     var keyInput by remember { mutableStateOf("") }
+    var keyLabel by remember { mutableStateOf("Primary") }
+    var savedKeyLabels by remember { mutableStateOf(store.keyLabels()) }
+    var activeKeyLabel by remember { mutableStateOf(store.activeKeyLabel()) }
     var showKey by remember { mutableStateOf(false) }
     var stored by remember { mutableStateOf(store.hasKey()) }
     var busy by remember { mutableStateOf(false) }
@@ -127,6 +131,45 @@ fun SettingsScreen() {
                 }
             }
 
+            if (savedKeyLabels.isNotEmpty()) {
+                Text("SAVED KEYS · ACTIVE: ${activeKeyLabel ?: "LEGACY"}", color = palette.textTertiary,
+                    fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.7.sp)
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    savedKeyLabels.forEach { label ->
+                        Text(
+                            label + if (label == activeKeyLabel) "  ✓" else "",
+                            modifier = Modifier.clip(RoundedCornerShape(10.dp))
+                                .background(if (label == activeKeyLabel) palette.accentSoft else palette.canvas)
+                                .border(1.dp, if (label == activeKeyLabel) palette.accent.copy(alpha = 0.5f) else palette.outlineSoft, RoundedCornerShape(10.dp))
+                                .clickable {
+                                    store.setActiveKey(label)
+                                    activeKeyLabel = label
+                                    status = "Active Gemini key switched to $label."
+                                }.padding(horizontal = 12.dp, vertical = 9.dp),
+                            color = if (label == activeKeyLabel) palette.accent else palette.textSecondary,
+                            fontFamily = OracleSans, fontSize = 11.sp
+                        )
+                    }
+                }
+            }
+            Text("KEY LABEL", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.7.sp)
+            BasicTextField(
+                value = keyLabel,
+                onValueChange = { keyLabel = it.take(32) },
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                    .background(palette.canvas).border(1.dp, palette.outlineSoft, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 13.dp, vertical = 12.dp),
+                singleLine = true,
+                textStyle = TextStyle(color = palette.text, fontFamily = OracleSans, fontSize = 12.sp),
+                cursorBrush = SolidColor(palette.accent),
+                decorationBox = { inner ->
+                    Box {
+                        if (keyLabel.isBlank()) Text("e.g. Personal / Backup / Work", color = palette.textTertiary, fontSize = 12.sp)
+                        inner()
+                    }
+                }
+            )
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -195,7 +238,9 @@ fun SettingsScreen() {
                             when (val result = api.validateKey(candidate)) {
                                 is GeminiConnectionResult.Connected -> {
                                     if (enteredKey.isNotBlank()) {
-                                        withContext(Dispatchers.IO) { store.save(candidate) }
+                                        withContext(Dispatchers.IO) { store.saveNamedKey(keyLabel.trim().ifBlank { "Primary" }, candidate) }
+                                        savedKeyLabels = withContext(Dispatchers.IO) { store.keyLabels() }
+                                        activeKeyLabel = withContext(Dispatchers.IO) { store.activeKeyLabel() }
                                         stored = true
                                         keyInput = ""
                                     }
@@ -253,10 +298,15 @@ fun SettingsScreen() {
                             status = "Removing encrypted credential…"
                             success = false
                             try {
-                                withContext(Dispatchers.IO) { store.clear() }
-                                stored = false
+                                withContext(Dispatchers.IO) {
+                                    val active = store.activeKeyLabel()
+                                    if (active != null) store.removeNamedKey(active) else store.clear()
+                                }
+                                savedKeyLabels = withContext(Dispatchers.IO) { store.keyLabels() }
+                                activeKeyLabel = withContext(Dispatchers.IO) { store.activeKeyLabel() }
+                                stored = store.hasKey()
                                 keyInput = ""
-                                status = "Stored key and Keystore alias removed."
+                                status = "Selected key removed. Other saved keys remain available."
                             } catch (cancelled: CancellationException) {
                                 throw cancelled
                             } catch (_: Exception) {
