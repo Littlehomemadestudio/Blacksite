@@ -3,6 +3,20 @@ package studio.oracle.ui
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.graphics.BitmapFactory
+import android.provider.OpenableColumns
+import android.util.Base64
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.material3.Surface
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import studio.oracle.data.AgentAttachmentRef
+import studio.oracle.data.AgenticEventCodec
+import studio.oracle.data.AgentMediaInput
+import studio.oracle.data.CreatedAgentFile
+import java.io.File
+import java.util.UUID
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -121,14 +135,40 @@ fun OracleScreen(
     var suppressCancelledPromptRestore by remember { mutableStateOf(false) }
     var drawerOpen by remember { mutableStateOf(false) }
     var modelPanelOpen by remember { mutableStateOf(false) }
+    var modelBrowserOpen by remember { mutableStateOf(false) }
     var agenticSettings by remember { mutableStateOf(AgenticSettings()) }
     var agentEvents by remember { mutableStateOf(emptyList<AgenticEvent>()) }
+    var selectedAttachments by remember { mutableStateOf(emptyList<AgentAttachmentRef>()) }
+    var sessionToolsApproved by remember { mutableStateOf(false) }
+    var editingFileUri by remember { mutableStateOf<Uri?>(null) }
+    var editingFileName by remember { mutableStateOf("") }
+    var editingFileMime by remember { mutableStateOf("text/plain") }
+    var editingFileContent by remember { mutableStateOf("") }
+    var loadingFile by remember { mutableStateOf(false) }
+    var savingFile by remember { mutableStateOf(false) }
+    var fileEditorError by remember { mutableStateOf<String?>(null) }
     var grantedTreeUri by remember {
         mutableStateOf(context.getSharedPreferences("oracle_agent_permissions", Context.MODE_PRIVATE)
             .getString("phone_tree_uri", null)?.let(Uri::parse))
     }
     var pendingApproval by remember { mutableStateOf<String?>(null) }
-    var approvalDeferred by remember { mutableStateOf<CompletableDeferred<Boolean>?>(null) }
+    var approvalDeferred by remember { mutableStateOf<CompletableDeferred<String>?>(null) }
+    val mediaPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        val added = uris.mapNotNull { uri ->
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
+                val name = runCatching {
+                    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    }
+                }.getOrNull() ?: uri.lastPathSegment?.substringAfterLast('/') ?: "Attachment"
+                AgentAttachmentRef(uri.toString(), name, mime)
+            }.getOrNull()
+        }
+        selectedAttachments = (selectedAttachments + added).distinctBy { it.uri }.take(8)
+    }
+
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) runCatching {
             context.contentResolver.takePersistableUriPermission(uri,
@@ -138,12 +178,76 @@ fun OracleScreen(
                 .edit().putString("phone_tree_uri", uri.toString()).apply()
         }.onFailure { error = "Android could not persist access to that folder. Choose it again." }
     }
-    suspend fun approveTool(action: String): Boolean {
-        val deferred = CompletableDeferred<Boolean>()
-        withContext(Dispatchers.Main.immediate) { pendingApproval = action; approvalDeferred = deferred }
-        return try { deferred.await() } finally {
+    suspend fun authorizeTool(action: String, permissionGroup: String): Boolean {
+        if (sessionToolsApproved) return true
+        val deferred = CompletableDeferred<String>()
+        withContext(Dispatchers.Main.immediate) {
+            pendingApproval = action
+            approvalDeferred = deferred
+        }
+        return try {
+            when (deferred.await()) {
+                "session" -> {
+                    withContext(Dispatchers.Main.immediate) { sessionToolsApproved = true }
+                    true
+                }
+                "once" -> true
+                else -> false
+            }
+        } finally {
             withContext(Dispatchers.Main.immediate) {
-                if (approvalDeferred === deferred) { approvalDeferred = null; pendingApproval = null }
+                if (approvalDeferred === deferred) {
+                    approvalDeferred = null
+                    pendingApproval = null
+                }
+            }
+        }
+    }
+
+    fun openArtifact(uriText: String) {
+        val uri = runCatching { Uri.parse(uriText) }.getOrNull() ?: return
+        scope.launch {
+            loadingFile = true
+            fileEditorError = null
+            editingFileUri = uri
+            try {
+                editingFileName = runCatching {
+                    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    }
+                }.getOrNull() ?: uri.lastPathSegment?.substringAfterLast('/') ?: "Generated file"
+                editingFileMime = context.contentResolver.getType(uri) ?: "text/plain"
+                editingFileContent = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { stream ->
+                        val bytes = stream.readBytes()
+                        require(bytes.size <= 2 * 1024 * 1024) { "In-app editor supports text files up to 2 MB." }
+                        bytes.toString(Charsets.UTF_8)
+                    } ?: error("Could not open this file.")
+                }
+            } catch (exception: Exception) {
+                fileEditorError = exception.message ?: "Could not open this file."
+            } finally {
+                loadingFile = false
+            }
+        }
+    }
+
+    fun saveEditedArtifact() {
+        val uri = editingFileUri ?: return
+        scope.launch {
+            savingFile = true
+            fileEditorError = null
+            try {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri, "wt")?.use {
+                        it.write(editingFileContent.toByteArray(Charsets.UTF_8))
+                    } ?: error("Android could not save this file.")
+                }
+                editingFileUri = null
+            } catch (exception: Exception) {
+                fileEditorError = exception.message ?: "Could not save this file."
+            } finally {
+                savingFile = false
             }
         }
     }
