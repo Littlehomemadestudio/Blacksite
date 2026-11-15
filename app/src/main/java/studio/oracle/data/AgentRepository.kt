@@ -42,7 +42,9 @@ class AgentRepository(
         sessionId: String,
         role: String,
         content: String,
-        model: String
+        model: String,
+        agentTrace: String = "",
+        attachments: String = ""
     ) {
         require(role == "user" || role == "assistant") { "Unsupported message role." }
         require(content.isNotBlank()) { "Message content cannot be blank." }
@@ -52,7 +54,9 @@ class AgentRepository(
                 sessionId = sessionId,
                 role = role,
                 content = content,
-                createdAt = now
+                createdAt = now,
+                agentTrace = agentTrace,
+                attachments = attachments
             )
         )
         val session = dao.findSession(sessionId) ?: return
