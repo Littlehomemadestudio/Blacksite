@@ -1159,14 +1159,14 @@ private fun AgentExecutionTrace(events: List<AgenticEvent>, onOpenFile: (String)
                 Modifier.fillMaxWidth().padding(start = 5.dp, top = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(7.dp)
             ) {
-                visibleEvents.forEach { event -> AgentEventRow(event, onOpenFile) }
+                visibleEvents.forEachIndexed { index, event -> AgentEventRow(index + 1, event, onOpenFile) }
             }
         }
     }
 }
 
 @Composable
-private fun AgentEventRow(event: AgenticEvent, onOpenFile: (String) -> Unit) {
+private fun AgentEventRow(index: Int, event: AgenticEvent, onOpenFile: (String) -> Unit) {
     val palette = LocalOraclePalette.current
     val isFile = event.kind == "file_created"
     val isCode = event.code.isNotBlank()
@@ -1178,8 +1178,19 @@ private fun AgentEventRow(event: AgenticEvent, onOpenFile: (String) -> Unit) {
         else -> Color(0xFF7B8FE8)
     }
     Row(Modifier.fillMaxWidth().heightIn(min = 30.dp), verticalAlignment = Alignment.Top) {
-        Box(Modifier.padding(top = 3.dp).width(2.dp).heightIn(min = 28.dp).background(accent.copy(alpha = 0.75f), RoundedCornerShape(2.dp)))
-        Spacer(Modifier.width(9.dp))
+        Column(Modifier.width(25.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Box(
+                Modifier.size(22.dp).clip(RoundedCornerShape(7.dp))
+                    .background(accent.copy(alpha = 0.13f))
+                    .border(1.dp, accent.copy(alpha = 0.28f), RoundedCornerShape(7.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(index.toString().padStart(2, '0'), color = accent,
+                    fontFamily = OracleMono, fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Box(Modifier.width(2.dp).heightIn(min = 18.dp).background(accent.copy(alpha = 0.45f), RoundedCornerShape(2.dp)))
+        }
+        Spacer(Modifier.width(8.dp))
         Column(
             Modifier.weight(1f).clip(RoundedCornerShape(9.dp))
                 .background(palette.surfaceRaised.copy(alpha = 0.72f))
@@ -1215,8 +1226,7 @@ private fun AgentEventRow(event: AgenticEvent, onOpenFile: (String) -> Unit) {
             }
             if (isCode && expanded) {
                 Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFF171D29)).padding(9.dp)) {
-                    Text(event.code.take(16000), color = Color(0xFFE0E7F2),
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp, lineHeight = 15.sp)
+                    OracleSyntaxCode(event.code.take(16000))
                 }
             }
         }
