@@ -31,6 +31,11 @@ class GeminiAgenticRuntime(private val http:OkHttpClient=OkHttpClient.Builder().
    val request=Request.Builder().url("https://generativelanguage.googleapis.com/v1beta/interactions").header("x-goog-api-key",apiKey).header("Api-Revision","2026-05-20").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()
    val root=try{http.newCall(request).await().use{response->val raw=response.body?.string().orEmpty();if(!response.isSuccessful)return AgenticResult.Failed(apiError(response.code,raw));JSONObject(raw)}}catch(c:CancellationException){throw c}catch(e:IOException){return AgenticResult.Failed("Network error contacting Gemini Interactions API.")}catch(e:Exception){return AgenticResult.Failed(e.message?.take(240)?:"Could not read Gemini interaction.")}
    interactionId=root.optString("id").takeIf{it.isNotBlank()}?:interactionId
+   root.optJSONObject("usage")?.let { usage ->
+    val ledger = listOf("input" to "total_input_tokens", "output" to "total_output_tokens", "thinking" to "total_thought_tokens", "cached" to "total_cached_tokens", "tools" to "total_tool_use_tokens")
+     .mapNotNull { (label,key) -> if (usage.has(key)) label + " " + usage.optInt(key) else null }.joinToString("  ·  ")
+    if (ledger.isNotBlank()) onEvent(AgenticEvent("usage","Context ledger",ledger))
+   }
    val steps=root.optJSONArray("steps")?:JSONArray();val results=JSONArray();var calls=0
    for(i in 0 until steps.length()){
     val s=steps.optJSONObject(i)?:continue
