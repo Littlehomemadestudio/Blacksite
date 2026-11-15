@@ -12,10 +12,10 @@
 Open this repository in Android Studio or run:
 
 ```bash
-gradle --no-daemon testDebugUnitTest assembleDebug
+gradle --no-daemon lintDebug testDebugUnitTest assembleDebug
 ```
 
-Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions runs unit tests, builds the debug APK, verifies alignment/signature, and uploads the artifact.
+Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions runs Android lint and unit tests, builds the debug APK, verifies alignment/signature, and uploads the APK plus verification reports.
 
 ## Implemented
 
@@ -47,7 +47,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Workflow execution is local-only: no Gemini request, network calls, shell access, arbitrary scripts, app launching, scheduled triggers, or background execution.
 
 ### Verification
-- Unit tests cover conversation context, session naming, workspace-name normalization (including Persian text), document chunk boundaries, PDF citations, stable text sections, keyword ranking, and workflow plan validation.
+- Unit tests cover conversation context, session naming, workspace-name normalization (including Persian text), document chunk boundaries, PDF citations, stable text sections, keyword ranking, workflow plan validation, and Room workspace-isolation queries/mutations under Robolectric.
 
 ## In progress / not yet available
 - Office document extraction, image OCR, scanned-PDF OCR, document summaries, flashcards, quizzes, semantic embeddings, and knowledge graph.
