@@ -67,9 +67,22 @@ fun OracleRichMessage(
             when (block) {
                 is RichBlock.Heading -> {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (block.level == 1) Box(
-                            Modifier.size(7.dp).background(Color(0xFF7B8FE8), RoundedCornerShape(2.dp))
-                        )
+                        val headingIcon = when {
+                            block.text.contains("objective", true) || block.text.contains("mission", true) -> "◎"
+                            block.text.contains("step", true) || block.text.contains("process", true) -> "⌘"
+                            block.text.contains("result", true) || block.text.contains("deliver", true) -> "✦"
+                            block.text.contains("architecture", true) || block.text.contains("design", true) -> "⬡"
+                            block.text.contains("summary", true) || block.text.contains("overview", true) -> "◈"
+                            else -> "◆"
+                        }
+                        Box(
+                            Modifier.size(if (block.level == 1) 25.dp else 20.dp)
+                                .background(Color(0x187B8FE8), RoundedCornerShape(7.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(headingIcon, color = Color(0xFF7B8FE8), fontSize = if (block.level == 1) 15.sp else 12.sp,
+                                fontWeight = FontWeight.SemiBold)
+                        }
                         RichInlineText(block.text, fontSize = when (block.level) { 1 -> 21; 2 -> 18; else -> 15 },
                             weight = FontWeight.SemiBold, color = LocalOraclePalette.current.text, onOpenUrl = onOpenUrl)
                     }
