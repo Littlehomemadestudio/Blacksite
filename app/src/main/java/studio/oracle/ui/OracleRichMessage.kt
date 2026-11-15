@@ -286,7 +286,7 @@ private fun parseRichBlocks(source: String): List<RichBlock> {
                 continue
             }
         }
-        val headingMatch = Regex("^(#{1,3})\s+(.+)$").find(trimmed)
+        val headingMatch = Regex("^(#{1,3})\\s+(.+)$").find(trimmed)
         if (headingMatch != null) {
             result.add(RichBlock.Heading(headingMatch.groupValues[2], headingMatch.groupValues[1].length))
             index++; continue
@@ -295,12 +295,12 @@ private fun parseRichBlocks(source: String): List<RichBlock> {
             result.add(RichBlock.Quote(trimmed.removePrefix(">").trim()))
             index++; continue
         }
-        val ordered = Regex("^(\d+)[.)]\s+(.+)$").find(trimmed)
+        val ordered = Regex("^(\\d+)[.)]\\s+(.+)$").find(trimmed)
         if (ordered != null) {
             result.add(RichBlock.Bullet(ordered.groupValues[2], ordered.groupValues[1] + "."))
             index++; continue
         }
-        val bullet = Regex("^[-*+]\s+(.+)$").find(trimmed)
+        val bullet = Regex("^[-*+]\\s+(.+)$").find(trimmed)
         if (bullet != null) {
             result.add(RichBlock.Bullet(bullet.groupValues[1]))
             index++; continue
@@ -310,7 +310,7 @@ private fun parseRichBlocks(source: String): List<RichBlock> {
         while (index < lines.size && lines[index].isNotBlank()) {
             val next = lines[index].trim()
             if (next.startsWith("```") || next.startsWith("#") || next.startsWith(">") ||
-                Regex("^[-*+]\s+").containsMatchIn(next) || Regex("^\d+[.)]\s+").containsMatchIn(next) ||
+                Regex("^[-*+]\\s+").containsMatchIn(next) || Regex("^\\d+[.)]\\s+").containsMatchIn(next) ||
                 next == "---" || next.startsWith("|")) break
             paragraph.add(next); index++
         }
