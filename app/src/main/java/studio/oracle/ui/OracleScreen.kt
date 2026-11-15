@@ -79,6 +79,7 @@ import studio.oracle.data.AgenticEvent
 import studio.oracle.data.AgenticResult
 import studio.oracle.data.AgenticSettings
 import studio.oracle.data.GeminiAgenticRuntime
+import studio.oracle.data.GeminiFileUploader
 import studio.oracle.data.LocalPythonRuntime
 import studio.oracle.data.PhoneWorkspaceTools
 import studio.oracle.data.AgentRepository
@@ -113,6 +114,7 @@ fun OracleScreen(
     val keyStore = remember { SecureKeyStore(context) }
     val api = remember { GeminiApi() }
     val agenticRuntime = remember { GeminiAgenticRuntime() }
+    val fileUploader = remember { GeminiFileUploader() }
     val pythonRuntime = remember(context) { LocalPythonRuntime(context) }
     val repository = remember(context, workspaceId) {
         AgentRepository(OracleDatabase.get(context).agentDao(), workspaceId)
@@ -423,22 +425,41 @@ fun OracleScreen(
                     return@launch
                 }
 
+                val textAttachmentContext = mutableListOf<String>()
                 val mediaInputs = try {
-                    withContext(Dispatchers.IO) {
-                        var totalBytes = 0L
-                        attachmentSnapshot.map { attachment ->
+                    var totalBytes = 0L
+                    buildList {
+                        for (attachment in attachmentSnapshot) {
                             val uri = Uri.parse(attachment.uri)
-                            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                                ?: error("Could not read " + attachment.name)
+                            val bytes = withContext(Dispatchers.IO) {
+                                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                            } ?: error("Could not read " + attachment.name)
                             totalBytes += bytes.size
-                            require(bytes.size <= 20 * 1024 * 1024 && totalBytes <= 30 * 1024 * 1024) {
-                                "Attachments exceed the 30 MB combined request limit. Send fewer or smaller files."
+                            require(bytes.size <= 30 * 1024 * 1024 && totalBytes <= 30 * 1024 * 1024) {
+                                "Attachments exceed the 30 MB combined limit. Send fewer or smaller files."
                             }
-                            AgentMediaInput(
-                                name = attachment.name,
-                                mimeType = attachment.mimeType,
-                                base64Data = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                            )
+                            val mime = attachment.mimeType.lowercase()
+                            when {
+                                mime.startsWith("video/") -> {
+                                    val uploaded = fileUploader.upload(key, attachment.name, mime, bytes)
+                                    add(AgentMediaInput(attachment.name, mime, fileUri = uploaded.uri))
+                                }
+                                mime.startsWith("image/") || mime.startsWith("audio/") ||
+                                    mime == "application/pdf" || mime == "text/csv" -> {
+                                    add(AgentMediaInput(
+                                        name = attachment.name,
+                                        mimeType = mime,
+                                        base64Data = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                                    ))
+                                }
+                                mime == "text/plain" || mime == "text/markdown" || mime == "application/json" -> {
+                                    textAttachmentContext.add(
+                                        "ATTACHED TEXT FILE: " + attachment.name + "\n" +
+                                            bytes.toString(Charsets.UTF_8).take(200000)
+                                    )
+                                }
+                                else -> error("Gemini cannot read this attachment type directly: " + attachment.mimeType)
+                            }
                         }
                     }
                 } catch (cancelled: CancellationException) {
@@ -467,8 +488,11 @@ fun OracleScreen(
                 val priorContext = AgentConversationPolicy.context(history).joinToString("\n\n") { (role, text) ->
                     (if (role == "assistant") "ORACLE" else "USER") + ": " + text
                 }
-                val agentPrompt = if (priorContext.isBlank()) submitted else
-                    "Conversation history (use as context):\n" + priorContext + "\n\nCurrent user request:\n" + submitted
+                val historyText = if (priorContext.isBlank()) "" else
+                    "Conversation history (use as context):\n" + priorContext + "\n\n"
+                val attachedText = if (textAttachmentContext.isEmpty()) "" else
+                    "\n\n" + textAttachmentContext.joinToString("\n\n")
+                val agentPrompt = historyText + "Current user request:\n" + submitted + attachedText
                 val tavilyKey = withContext(Dispatchers.IO) { runCatching { keyStore.readTavilyKey() }.getOrNull() }
                 val executor = PhoneWorkspaceTools(
                     context = context,
