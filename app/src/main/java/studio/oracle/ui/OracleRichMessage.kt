@@ -1,5 +1,10 @@
 package studio.oracle.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -53,7 +58,12 @@ fun OracleRichMessage(
 ) {
     val blocks = remember(markdown) { parseRichBlocks(markdown) }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(11.dp)) {
-        blocks.forEach { block ->
+        blocks.forEachIndexed { blockIndex, block ->
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(tween(180, delayMillis = (blockIndex.coerceAtMost(4) * 35))) +
+                    expandVertically(tween(240, delayMillis = (blockIndex.coerceAtMost(4) * 35)))
+            ) {
             when (block) {
                 is RichBlock.Heading -> {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -101,6 +111,7 @@ fun OracleRichMessage(
                     Modifier.fillMaxWidth().padding(vertical = 4.dp).height(1.dp)
                         .background(LocalOraclePalette.current.outlineSoft)
                 )
+            }
             }
         }
     }
