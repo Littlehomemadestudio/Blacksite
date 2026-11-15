@@ -34,10 +34,12 @@ fun AgentCapabilitiesPanel(
     model: GeminiModel?,
     folderGranted: Boolean,
     onGoogleSearch: (Boolean) -> Unit,
+    onUrlContext: (Boolean) -> Unit,
     onCloudPython: (Boolean) -> Unit,
     onLocalPython: (Boolean) -> Unit,
     onPhoneFiles: (Boolean) -> Unit,
     onGrantFolder: () -> Unit,
+    onRevokeFolder: () -> Unit,
     onThinking: (String) -> Unit,
     onContext: (Int) -> Unit,
     onOutput: (Int) -> Unit,
@@ -87,6 +89,12 @@ fun AgentCapabilitiesPanel(
             onGoogleSearch
         )
         CapabilityToggle(
+            "URL Context",
+            "Open and analyze a URL supplied in the conversation",
+            settings.urlContext,
+            onUrlContext
+        )
+        CapabilityToggle(
             "Google Python",
             "Google-hosted code execution for analysis",
             settings.cloudCodeExecution,
@@ -122,6 +130,12 @@ fun AgentCapabilitiesPanel(
                     onClick = onGrantFolder
                 )
                 if (folderGranted) {
+                    Spacer(Modifier.width(6.dp))
+                    CapabilityChip(
+                        label = "REVOKE",
+                        active = false,
+                        onClick = onRevokeFolder
+                    )
                     Spacer(Modifier.width(6.dp))
                     CapabilityChip(
                         label = if (settings.phoneFiles) "ON" else "OFF",
