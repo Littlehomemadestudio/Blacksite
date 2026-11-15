@@ -5,6 +5,11 @@ import android.content.Intent
 import android.net.Uri
 import android.graphics.BitmapFactory
 import android.provider.OpenableColumns
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import android.os.Bundle
 import android.util.Base64
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.material3.Surface
@@ -19,6 +24,7 @@ import studio.oracle.data.AgentMediaInput
 import studio.oracle.data.CreatedAgentFile
 import java.io.File
 import java.util.UUID
+import java.util.Locale
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -131,6 +137,12 @@ fun OracleScreen(
     var activeSessionId by remember { mutableStateOf<String?>(null) }
     var messages by remember { mutableStateOf(emptyList<AgentMessageEntity>()) }
     var prompt by remember { mutableStateOf("") }
+    var voiceReplyEnabled by remember { mutableStateOf(false) }
+    var ttsReady by remember { mutableStateOf(false) }
+    val textToSpeech = remember(context) { TextToSpeech(context) { status -> ttsReady = status == TextToSpeech.SUCCESS } }
+    val speechRecognizer = remember(context) { if (SpeechRecognizer.isRecognitionAvailable(context)) SpeechRecognizer.createSpeechRecognizer(context) else null }
+    DisposableEffect(textToSpeech) { onDispose { textToSpeech.stop(); textToSpeech.shutdown() } }
+    DisposableEffect(speechRecognizer) { onDispose { speechRecognizer?.destroy() } }
     var availableModels by remember {
         mutableStateOf(listOf(GeminiModel(ModelPreferences.DEFAULT_MODEL, "Gemini 3.5 Flash-Lite")))
     }
@@ -627,6 +639,10 @@ fun OracleScreen(
                         )
                         failedPrompt = null
                         failedPromptPersisted = false
+                        if (voiceReplyEnabled && ttsReady) {
+                            textToSpeech.language = Locale.getDefault()
+                            textToSpeech.speak(result.text.take(5000), TextToSpeech.QUEUE_FLUSH, null, "oracle-voice-reply")
+                        }
                     }
                     is AgenticResult.Failed -> {
                         error = result.message
@@ -653,6 +669,53 @@ fun OracleScreen(
                 requestJob = null
             }
         }
+    }
+
+    fun startVoiceInput() {
+        val recognizer = speechRecognizer
+        if (recognizer == null) {
+            error = "Speech recognition is not available on this Android device."
+            return
+        }
+        recognizer.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) { error = null }
+            override fun onBeginningOfSpeech() { }
+            override fun onRmsChanged(rmsdB: Float) { }
+            override fun onBufferReceived(buffer: ByteArray?) { }
+            override fun onEndOfSpeech() { }
+            override fun onError(errorCode: Int) {
+                error = when (errorCode) {
+                    SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "I didn't catch that. Tap the microphone and try again."
+                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission is required for voice input."
+                    else -> "Voice recognition stopped. Please try again."
+                }
+            }
+            override fun onResults(results: Bundle?) {
+                val spoken = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+                if (spoken.isNotBlank()) {
+                    prompt = spoken
+                    scope.launch { kotlinx.coroutines.delay(180); submitPrompt() }
+                }
+            }
+            override fun onPartialResults(partialResults: Bundle?) {
+                partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let { prompt = it }
+            }
+            override fun onEvent(eventType: Int, params: Bundle?) { }
+        })
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
+        }
+        runCatching { recognizer.startListening(intent) }
+            .onFailure { error = "Could not start microphone input. Try again." }
+    }
+
+    val microphonePermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) startVoiceInput() else error = "Allow microphone access to use voice input."
     }
 
     Box(
@@ -731,6 +794,9 @@ fun OracleScreen(
                 attachments = selectedAttachments,
                 onAttachClick = { mediaPicker.launch(arrayOf("*/*")) },
                 onRemoveAttachment = { attachment -> selectedAttachments = selectedAttachments.filterNot { it.uri == attachment.uri } },
+                onVoiceClick = { microphonePermission.launch(android.Manifest.permission.RECORD_AUDIO) },
+                voiceReplyEnabled = voiceReplyEnabled,
+                onVoiceReplyToggle = { voiceReplyEnabled = !voiceReplyEnabled },
                 modifier = Modifier
                     .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 10.dp)
             )
