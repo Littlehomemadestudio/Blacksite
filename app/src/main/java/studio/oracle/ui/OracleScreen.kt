@@ -1485,6 +1485,8 @@ private fun ModelChoice(
 }
 
 private fun modelArt(model: String): String = when {
+    model.contains("flash-image", ignoreCase = true) ->
+        "https://storage.googleapis.com/generativeai-downloads/images/gemini_3_1_flash_image.png"
     model.contains("3.8", ignoreCase = true) ->
         "https://iweaver-sv-1402138190.cos.na-siliconvalley.myqcloud.com/docx/2026/09/03/8806aaac-cfb7-464a-a254-3ea0d9231c5c/gemini-3-8-flash.webp"
     model.contains("4-", ignoreCase = true) || model.contains("gemini-4", ignoreCase = true) ->
@@ -1494,6 +1496,7 @@ private fun modelArt(model: String): String = when {
 }
 
 private fun modelDescription(model: GeminiModel): String = model.description?.takeIf { it.isNotBlank() } ?: when {
+    model.name.contains("flash-image", true) -> "A dedicated image-generation model for creating and editing high-quality visual assets. Returns text and inline generated images."
     model.name.contains("3.8-flash", true) -> "A versatile agent model for coding, long-running tasks, advanced reasoning and multimodal understanding."
     model.name.contains("flash-lite", true) -> "A lighter, throughput-oriented model for fast everyday work and high-volume tasks."
     model.name.contains("pro", true) -> "A higher-capability reasoning model for demanding analysis and complex knowledge work."
@@ -1510,7 +1513,7 @@ private fun modelTags(model: GeminiModel): List<String> = buildList {
     if (model.name.contains("flash", true)) add("FAST")
     if (model.name.contains("pro", true) || model.name.contains("hydrogen", true)) add("REASONING")
     if (model.name.contains("audio", true) || model.name.contains("live", true)) add("AUDIO")
-    if (model.name.contains("image", true)) add("IMAGE")
+    if (model.name.contains("image", true)) add("IMAGE GEN")
     if (isEmpty()) add("GEMINI API")
 }
 
