@@ -23,6 +23,9 @@ class PhoneWorkspaceTools(
     private val context: Context,
     private val grantedTree: Uri?,
     private val tavilyKey: String?,
+    private val webSearchEnabled: Boolean = true,
+    private val phoneFilesEnabled: Boolean = true,
+    private val localPythonEnabled: Boolean = true,
     private val authorize: suspend (action: String, permissionGroup: String) -> Boolean,
     private val python: suspend (String) -> String,
     private val onFileCreated: (CreatedAgentFile) -> Unit = {}
@@ -35,12 +38,18 @@ class PhoneWorkspaceTools(
         .build()
 
     override fun declarations(): JSONArray = JSONArray().apply {
-        put(function("web_search", "Search the live web using Tavily for current facts, documentation and research. Return concise findings with original source URLs.", schema("query" to property("The exact search query to run.")), arrayOf("query")))
-        put(function("list_phone_files", "List files and folders beneath the folder the user explicitly granted to ORACLE.", schema("path" to property("Relative folder path. Empty means the granted root.")), arrayOf("path")))
-        put(function("read_phone_file", "Read a UTF-8 text file under the granted phone folder. Contents are sent to Gemini for this task.", schema("path" to property("Relative file path under the granted folder.")), arrayOf("path")))
-        put(function("create_phone_file", "Create a text, Markdown, JSON, HTML or CSV file under the granted phone folder. ORACLE displays it as an editable in-chat artifact.", schema("path" to property("Relative path including filename."), "content" to property("Complete UTF-8 contents."), "mime_type" to property("Optional MIME type, e.g. text/markdown or application/json.")), arrayOf("path", "content")))
-        put(function("append_phone_file", "Append text to an existing UTF-8 file under the granted phone folder.", schema("path" to property("Relative file path."), "content" to property("Text to append.")), arrayOf("path", "content")))
-        put(function("run_local_python", "Run Python 3 on-device in ORACLE's bundled CPython runtime. Network access and normal Python standard-library imports are enabled. Use it for calculations, data processing, code and downloads.", schema("code" to property("Python 3 source code to execute.")), arrayOf("code")))
+        if (webSearchEnabled) {
+            put(function("web_search", "Search the live web using Tavily for current facts, documentation and research. Return concise findings with original source URLs.", schema("query" to property("The exact search query to run.")), arrayOf("query")))
+        }
+        if (phoneFilesEnabled) {
+            put(function("list_phone_files", "List files and folders beneath the folder the user explicitly granted to ORACLE.", schema("path" to property("Relative folder path. Empty means the granted root.")), arrayOf("path")))
+            put(function("read_phone_file", "Read a UTF-8 text file under the granted phone folder. Contents are sent to Gemini for this task.", schema("path" to property("Relative file path under the granted folder.")), arrayOf("path")))
+            put(function("create_phone_file", "Create a text, Markdown, JSON, HTML or CSV file under the granted phone folder. ORACLE displays it as an editable in-chat artifact.", schema("path" to property("Relative path including filename."), "content" to property("Complete UTF-8 contents."), "mime_type" to property("Optional MIME type, e.g. text/markdown or application/json.")), arrayOf("path", "content")))
+            put(function("append_phone_file", "Append text to an existing UTF-8 file under the granted phone folder.", schema("path" to property("Relative file path."), "content" to property("Text to append.")), arrayOf("path", "content")))
+        }
+        if (localPythonEnabled) {
+            put(function("run_local_python", "Run Python 3 on-device in ORACLE's bundled CPython runtime. Network access and normal Python standard-library imports are enabled. Use it for calculations, data processing, code and downloads.", schema("code" to property("Python 3 source code to execute.")), arrayOf("code")))
+        }
     }
 
     override suspend fun execute(name: String, arguments: JSONObject): String = withContext(Dispatchers.IO) {
