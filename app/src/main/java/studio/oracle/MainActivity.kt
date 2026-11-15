@@ -392,7 +392,7 @@ private fun AgentScreen(
                                 fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, letterSpacing = 1.8.sp)
                             Spacer(Modifier.height(13.dp))
                             Text(
-                                "Find the signal.\\nIgnore the noise.",
+                                "Find the signal.\nIgnore the noise.",
                                 color = OracleText, fontSize = 35.sp, lineHeight = 40.sp,
                                 fontWeight = FontWeight.Normal, fontFamily = FontFamily.Serif,
                                 letterSpacing = (-1.1).sp
