@@ -68,6 +68,26 @@ class WorkflowWorkspaceIsolationTest {
     }
 
     @Test
+    fun updateAndDeleteCannotTargetAnotherWorkspacesWorkflow() = runBlocking {
+        val dao = database.workflowDao()
+        dao.insertWorkflow(workflow("workflow-a", "workspace-a"))
+        dao.insertWorkflow(workflow("workflow-b", "workspace-b"))
+
+        val updated = dao.updateWorkflow(
+            id = "workflow-b",
+            workspaceId = "workspace-a",
+            title = "Hijacked",
+            description = "",
+            updatedAt = 5L
+        )
+        val deleted = dao.deleteWorkflow("workflow-b", "workspace-a")
+
+        assertEquals(0, updated)
+        assertEquals(0, deleted)
+        assertEquals("workflow-b", dao.findWorkflow("workflow-b", "workspace-b")?.title)
+    }
+
+    @Test
     fun noteTitlesAreUniqueOnlyInsideTheirWorkspace() = runBlocking {
         val dao = database.workflowDao()
         dao.insertNote(note("note-a", "workspace-a", "Physics plan"))
