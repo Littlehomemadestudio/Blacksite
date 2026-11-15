@@ -30,6 +30,9 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 dependencies {
@@ -50,5 +53,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("androidx.test:core:1.6.1")
+    testImplementation("org.robolectric:robolectric:4.14.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
