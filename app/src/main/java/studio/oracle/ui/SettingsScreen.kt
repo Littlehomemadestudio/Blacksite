@@ -54,6 +54,12 @@ fun SettingsScreen() {
         )
     }
     var success by remember { mutableStateOf(false) }
+    var tavilyInput by remember { mutableStateOf("") }
+    var showTavilyKey by remember { mutableStateOf(false) }
+    var tavilyStored by remember { mutableStateOf(store.hasTavilyKey()) }
+    var tavilyStatus by remember {
+        mutableStateOf(if (tavilyStored) "Web search credential encrypted on this device." else "No independent web-search credential connected.")
+    }
 
     Column(
         modifier = Modifier
@@ -263,6 +269,99 @@ fun SettingsScreen() {
                     enabled = !busy,
                     accent = false
                 )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(22.dp))
+                .background(palette.surface)
+                .border(1.dp, palette.outlineSoft, RoundedCornerShape(22.dp))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OracleGlyphIcon(OracleGlyph.Search, Modifier.size(17.dp), palette.textSecondary)
+                Spacer(Modifier.width(9.dp))
+                Text("INDEPENDENT WEB SEARCH", color = palette.text, fontFamily = OracleMono,
+                    fontSize = 10.sp, letterSpacing = 0.5.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.weight(1f))
+                if (tavilyStored) Text("ENCRYPTED", color = palette.success, fontFamily = OracleMono, fontSize = 9.sp)
+            }
+            Text(
+                "ORACLE uses Tavily Search as its own web-search tool. It does not use Gemini Google Search grounding.",
+                color = palette.textSecondary, fontFamily = OracleSans, fontSize = 12.sp, lineHeight = 18.sp
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                    .background(palette.canvas).border(1.dp, palette.outline, RoundedCornerShape(14.dp))
+                    .padding(start = 14.dp, end = 5.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                BasicTextField(
+                    value = tavilyInput,
+                    onValueChange = { tavilyInput = it },
+                    modifier = Modifier.weight(1f).padding(vertical = 10.dp),
+                    singleLine = true,
+                    textStyle = TextStyle(color = palette.text, fontFamily = OracleMono, fontSize = 11.sp),
+                    cursorBrush = SolidColor(palette.accent),
+                    visualTransformation = if (showTavilyKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    decorationBox = { inner ->
+                        Box {
+                            if (tavilyInput.isEmpty()) Text(
+                                if (tavilyStored) "Paste a replacement Tavily key" else "Paste Tavily API key",
+                                color = palette.textTertiary, fontFamily = OracleSans, fontSize = 12.sp
+                            )
+                            inner()
+                        }
+                    }
+                )
+                OracleIconButton(
+                    glyph = if (showTavilyKey) OracleGlyph.EyeOff else OracleGlyph.Eye,
+                    description = if (showTavilyKey) "Hide Tavily key" else "Show Tavily key",
+                    onClick = { showTavilyKey = !showTavilyKey },
+                    size = 38.dp
+                )
+            }
+            OracleSolidAction(
+                label = "SAVE SEARCH KEY ENCRYPTED",
+                onClick = {
+                    scope.launch {
+                        try {
+                            withContext(Dispatchers.IO) { store.saveTavilyKey(tavilyInput.trim()) }
+                            tavilyStored = true
+                            tavilyInput = ""
+                            tavilyStatus = "Tavily key saved using Android Keystore encryption."
+                        } catch (_: Exception) {
+                            tavilyStatus = "Could not securely store the Tavily key."
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = tavilyInput.isNotBlank()
+            )
+            Text(
+                tavilyStatus,
+                color = palette.textSecondary, fontFamily = OracleSans, fontSize = 11.sp, lineHeight = 16.sp
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                OracleTextAction("GET TAVILY KEY", onClick = {
+                    runCatching {
+                        context.startActivity(android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse("https://app.tavily.com/")
+                        ))
+                    }
+                }, accent = true)
+                if (tavilyStored) OracleTextAction("REMOVE KEY", onClick = {
+                    scope.launch {
+                        withContext(Dispatchers.IO) { store.clearTavilyKey() }
+                        tavilyStored = false
+                        tavilyStatus = "Tavily key removed from this device."
+                    }
+                }, accent = false)
             }
         }
 
