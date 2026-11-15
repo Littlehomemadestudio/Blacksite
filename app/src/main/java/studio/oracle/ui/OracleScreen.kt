@@ -683,6 +683,89 @@ private fun OracleMessageRow(message: AgentMessageEntity, modifier: Modifier = M
     }
 }
 
+private data class AssistantMessageSegment(
+    val code: Boolean,
+    val language: String,
+    val text: String
+)
+
+@Composable
+private fun OracleAssistantContent(text: String, modifier: Modifier = Modifier) {
+    val palette = LocalOraclePalette.current
+    val segments = remember(text) { splitAssistantMessage(text) }
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        segments.forEach { segment ->
+            if (segment.code) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(13.dp))
+                        .background(palette.surfaceRaised)
+                        .border(1.dp, palette.outlineSoft, RoundedCornerShape(13.dp))
+                        .padding(horizontal = 11.dp, vertical = 9.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        segment.language.uppercase().ifBlank { "OUTPUT" },
+                        color = palette.accent,
+                        fontFamily = OracleMono,
+                        fontSize = 8.sp,
+                        letterSpacing = 0.8.sp
+                    )
+                    Text(
+                        segment.text.trimEnd(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 260.dp)
+                            .verticalScroll(rememberScrollState()),
+                        color = palette.text,
+                        fontFamily = OracleMono,
+                        fontSize = 10.sp,
+                        lineHeight = 15.sp
+                    )
+                }
+            } else if (segment.text.isNotBlank()) {
+                Text(
+                    text = segment.text.trim(),
+                    color = palette.text,
+                    fontFamily = OracleSans,
+                    fontSize = 15.sp,
+                    lineHeight = 24.sp
+                )
+            }
+        }
+    }
+}
+
+private fun splitAssistantMessage(raw: String): List<AssistantMessageSegment> {
+    val pattern = Regex("""\`\`\`([A-Za-z0-9_+.-]*)\n([\s\S]*?)\`\`\`""")
+    val result = mutableListOf<AssistantMessageSegment>()
+    var cursor = 0
+    pattern.findAll(raw).forEach { match ->
+        if (match.range.first > cursor) {
+            result += AssistantMessageSegment(
+                code = false,
+                language = "",
+                text = raw.substring(cursor, match.range.first)
+            )
+        }
+        result += AssistantMessageSegment(
+            code = true,
+            language = match.groupValues[1].ifBlank { "text" },
+            text = match.groupValues[2]
+        )
+        cursor = match.range.last + 1
+    }
+    if (cursor < raw.length) {
+        result += AssistantMessageSegment(false, "", raw.substring(cursor))
+    }
+    if (result.isEmpty()) result += AssistantMessageSegment(false, "", raw)
+    return result
+}
+
 @Composable
 private fun OracleThinkingIndicator() {
     val palette = LocalOraclePalette.current
