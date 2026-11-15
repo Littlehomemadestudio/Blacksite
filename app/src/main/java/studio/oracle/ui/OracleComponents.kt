@@ -488,10 +488,18 @@ fun DeepSeekInputPill(
                 scaleY = scale
                 translationY = if (pressed) 1.dp.toPx() else 0f
             }
-            .shadow(elevation, RoundedCornerShape(22.dp))
+             .shadow(elevation + 2.dp, RoundedCornerShape(22.dp))
             .clip(RoundedCornerShape(22.dp))
-            .background(palette.surface)
-            .border(1.dp, borderColor, RoundedCornerShape(22.dp))
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xF9FFFFFF),
+                        Color(0xEAF0F3FC),
+                        Color(0xF5FFFFFF)
+                    )
+                )
+            )
+            .border(1.dp, borderColor.copy(alpha = 0.82f), RoundedCornerShape(22.dp))
             .padding(start = 17.dp, end = 10.dp, top = 12.dp, bottom = 10.dp)
     ) {
         if (attachments.isNotEmpty()) {
