@@ -104,3 +104,5 @@ Room schema v5 retains the existing agent, document, and workflow data while add
 - Generated files appear as extension-aware, tappable artifact cards that open the exact local file in the ORACLE editor.
 - The agent loop has no fixed tool-round ceiling. Transient connection, response-stream, and retryable HTTP failures use exponential backoff; the user can cancel a run at any time.
 - The Gemini API key vault supports multiple encrypted named keys and switching the active key without re-entering credentials.
+
+- Voice listener state is lifecycle-safe and microphone permission is declared once in the Android manifest.
