@@ -56,7 +56,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
 import studio.oracle.data.AgentConversationPolicy
 import studio.oracle.data.AgenticEvent
 import studio.oracle.data.AgenticResult
@@ -426,7 +425,7 @@ fun OracleScreen(
                 busy = busy,
                 onSend = { submitPrompt() },
                 onCancel = { requestJob?.cancel() },
-                onThinkClick = { modelPanelOpen = !modelPanelOpen },
+                onThinkClick = { modelPanelOpen = !modelPanelOpen; keyboard?.hide() },
                 thinkExpanded = modelPanelOpen,
                 modifier = Modifier
                     .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 10.dp)
