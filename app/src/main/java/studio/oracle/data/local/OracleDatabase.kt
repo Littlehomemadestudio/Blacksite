@@ -103,13 +103,18 @@ data class DocumentChunkEntity(
     val content: String
 )
 
-@Entity(tableName = "workflows", indices = [Index(value = ["updatedAt"])])
+@Entity(
+    tableName = "workflows",
+    indices = [Index(value = ["workspaceId", "updatedAt"])]
+)
 data class WorkflowEntity(
     @PrimaryKey val id: String,
     val title: String,
     val description: String,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    @ColumnInfo(defaultValue = "'workspace-default'")
+    val workspaceId: String = "workspace-default"
 )
 
 @Entity(
@@ -135,14 +140,19 @@ data class WorkflowStepEntity(
 
 @Entity(
     tableName = "local_notes",
-    indices = [Index(value = ["title"], unique = true), Index(value = ["updatedAt"])]
+    indices = [
+        Index(value = ["workspaceId", "title"], unique = true),
+        Index(value = ["workspaceId", "updatedAt"])
+    ]
 )
 data class LocalNoteEntity(
     @PrimaryKey val id: String,
     val title: String,
     val content: String,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    @ColumnInfo(defaultValue = "'workspace-default'")
+    val workspaceId: String = "workspace-default"
 )
 
 @Entity(
@@ -282,35 +292,65 @@ interface WorkspaceDao {
 
 @Dao
 interface WorkflowDao {
-    @Query("SELECT * FROM workflows ORDER BY updatedAt DESC")
-    fun observeWorkflows(): Flow<List<WorkflowEntity>>
+    @Query("SELECT * FROM workflows WHERE workspaceId = :workspaceId ORDER BY updatedAt DESC")
+    fun observeWorkflows(workspaceId: String): Flow<List<WorkflowEntity>>
 
-    @Query("SELECT * FROM workflows WHERE id = :id LIMIT 1")
-    suspend fun findWorkflow(id: String): WorkflowEntity?
+    @Query("SELECT * FROM workflows WHERE id = :id AND workspaceId = :workspaceId LIMIT 1")
+    suspend fun findWorkflow(id: String, workspaceId: String): WorkflowEntity?
 
-    @Query("SELECT * FROM workflow_steps WHERE workflowId = :workflowId ORDER BY position ASC")
-    suspend fun stepsFor(workflowId: String): List<WorkflowStepEntity>
+    @Query(
+        "SELECT workflow_steps.* FROM workflow_steps " +
+            "INNER JOIN workflows ON workflows.id = workflow_steps.workflowId " +
+            "WHERE workflow_steps.workflowId = :workflowId AND workflows.workspaceId = :workspaceId " +
+            "ORDER BY workflow_steps.position ASC"
+    )
+    suspend fun stepsFor(workflowId: String, workspaceId: String): List<WorkflowStepEntity>
 
-    @Query("SELECT * FROM local_notes ORDER BY updatedAt DESC")
-    fun observeNotes(): Flow<List<LocalNoteEntity>>
+    @Query("SELECT * FROM local_notes WHERE workspaceId = :workspaceId ORDER BY updatedAt DESC")
+    fun observeNotes(workspaceId: String): Flow<List<LocalNoteEntity>>
 
-    @Query("SELECT * FROM local_notes WHERE title = :title COLLATE NOCASE LIMIT 1")
-    suspend fun findNoteByTitle(title: String): LocalNoteEntity?
+    @Query("SELECT * FROM local_notes WHERE workspaceId = :workspaceId AND title = :title COLLATE NOCASE LIMIT 1")
+    suspend fun findNoteByTitle(title: String, workspaceId: String): LocalNoteEntity?
 
-    @Query("SELECT * FROM workflow_runs ORDER BY startedAt DESC LIMIT 100")
-    fun observeRuns(): Flow<List<WorkflowRunEntity>>
+    @Query(
+        "SELECT workflow_runs.* FROM workflow_runs " +
+            "INNER JOIN workflows ON workflows.id = workflow_runs.workflowId " +
+            "WHERE workflows.workspaceId = :workspaceId " +
+            "ORDER BY workflow_runs.startedAt DESC LIMIT 100"
+    )
+    fun observeRuns(workspaceId: String): Flow<List<WorkflowRunEntity>>
 
-    @Query("SELECT * FROM workflow_runs WHERE workflowId = :workflowId ORDER BY startedAt DESC LIMIT 50")
-    fun observeRunsForWorkflow(workflowId: String): Flow<List<WorkflowRunEntity>>
+    @Query(
+        "SELECT workflow_runs.* FROM workflow_runs " +
+            "INNER JOIN workflows ON workflows.id = workflow_runs.workflowId " +
+            "WHERE workflow_runs.workflowId = :workflowId AND workflows.workspaceId = :workspaceId " +
+            "ORDER BY workflow_runs.startedAt DESC LIMIT 50"
+    )
+    fun observeRunsForWorkflow(workflowId: String, workspaceId: String): Flow<List<WorkflowRunEntity>>
 
-    @Query("SELECT * FROM workflow_run_logs WHERE runId = :runId ORDER BY createdAt ASC, id ASC")
-    suspend fun logsForRun(runId: String): List<WorkflowRunLogEntity>
+    @Query(
+        "SELECT workflow_run_logs.* FROM workflow_run_logs " +
+            "INNER JOIN workflow_runs ON workflow_runs.id = workflow_run_logs.runId " +
+            "INNER JOIN workflows ON workflows.id = workflow_runs.workflowId " +
+            "WHERE workflow_run_logs.runId = :runId AND workflows.workspaceId = :workspaceId " +
+            "ORDER BY workflow_run_logs.createdAt ASC, workflow_run_logs.id ASC"
+    )
+    suspend fun logsForRun(runId: String, workspaceId: String): List<WorkflowRunLogEntity>
 
     @Insert
     suspend fun insertWorkflow(workflow: WorkflowEntity)
 
-    @Query("UPDATE workflows SET title = :title, description = :description, updatedAt = :updatedAt WHERE id = :id")
-    suspend fun updateWorkflow(id: String, title: String, description: String, updatedAt: Long)
+    @Query(
+        "UPDATE workflows SET title = :title, description = :description, updatedAt = :updatedAt " +
+            "WHERE id = :id AND workspaceId = :workspaceId"
+    )
+    suspend fun updateWorkflow(
+        id: String,
+        workspaceId: String,
+        title: String,
+        description: String,
+        updatedAt: Long
+    ): Int
 
     @Insert
     suspend fun insertSteps(steps: List<WorkflowStepEntity>)
@@ -324,11 +364,29 @@ interface WorkflowDao {
         if (steps.isNotEmpty()) insertSteps(steps)
     }
 
+    @Transaction
+    suspend fun saveWorkflowAndSteps(
+        id: String,
+        workspaceId: String,
+        title: String,
+        description: String,
+        updatedAt: Long,
+        steps: List<WorkflowStepEntity>
+    ): Boolean {
+        if (updateWorkflow(id, workspaceId, title, description, updatedAt) != 1) return false
+        replaceSteps(id, steps)
+        return true
+    }
+
     @Insert
     suspend fun insertNote(note: LocalNoteEntity)
 
-    @Query("UPDATE local_notes SET content = CASE WHEN content = '' THEN :suffix ELSE content || char(10) || char(10) || :suffix END, updatedAt = :now WHERE id = :id")
-    suspend fun appendToNote(id: String, suffix: String, now: Long): Int
+    @Query(
+        "UPDATE local_notes SET content = CASE WHEN content = '' THEN :suffix " +
+            "ELSE content || char(10) || char(10) || :suffix END, updatedAt = :now " +
+            "WHERE id = :id AND workspaceId = :workspaceId"
+    )
+    suspend fun appendToNote(id: String, workspaceId: String, suffix: String, now: Long): Int
 
     @Insert
     suspend fun insertRun(run: WorkflowRunEntity)
@@ -339,10 +397,9 @@ interface WorkflowDao {
     @Insert
     suspend fun insertRunLog(log: WorkflowRunLogEntity)
 
-    @Query("DELETE FROM workflows WHERE id = :workflowId")
-    suspend fun deleteWorkflow(workflowId: String)
+    @Query("DELETE FROM workflows WHERE id = :workflowId AND workspaceId = :workspaceId")
+    suspend fun deleteWorkflow(workflowId: String, workspaceId: String): Int
 }
-
 @Database(
     entities = [
         WorkspaceEntity::class,
@@ -356,7 +413,7 @@ interface WorkflowDao {
         WorkflowRunEntity::class,
         WorkflowRunLogEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class OracleDatabase : RoomDatabase() {
@@ -485,6 +542,37 @@ abstract class OracleDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                if (!database.hasColumn("workflows", "workspaceId")) {
+                    database.execSQL(
+                        "ALTER TABLE workflows ADD COLUMN workspaceId TEXT NOT NULL DEFAULT 'workspace-default'"
+                    )
+                }
+                database.execSQL("DROP INDEX IF EXISTS index_workflows_updatedAt")
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_workflows_workspaceId_updatedAt " +
+                        "ON workflows(workspaceId, updatedAt)"
+                )
+
+                if (!database.hasColumn("local_notes", "workspaceId")) {
+                    database.execSQL(
+                        "ALTER TABLE local_notes ADD COLUMN workspaceId TEXT NOT NULL DEFAULT 'workspace-default'"
+                    )
+                }
+                database.execSQL("DROP INDEX IF EXISTS index_local_notes_title")
+                database.execSQL("DROP INDEX IF EXISTS index_local_notes_updatedAt")
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_local_notes_workspaceId_title " +
+                        "ON local_notes(workspaceId, title)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_local_notes_workspaceId_updatedAt " +
+                        "ON local_notes(workspaceId, updatedAt)"
+                )
+            }
+        }
+
         private fun SupportSQLiteDatabase.hasColumn(table: String, column: String): Boolean =
             query("PRAGMA table_info($table)").use { cursor ->
                 val nameIndex = cursor.getColumnIndex("name")
@@ -504,7 +592,7 @@ abstract class OracleDatabase : RoomDatabase() {
                     OracleDatabase::class.java,
                     "oracle_studio.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
                     .also { instance = it }
             }
