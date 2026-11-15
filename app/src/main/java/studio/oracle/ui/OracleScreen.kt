@@ -565,15 +565,34 @@ fun OracleScreen(
                     executor = executor,
                     media = mediaInputs,
                     onEvent = { sourceEvent ->
-                        val event = if (sourceEvent.kind == "generated_image" && sourceEvent.payload.isNotBlank()) {
+                        val event = if (
+                            sourceEvent.kind in setOf("generated_image", "generated_audio", "generated_video", "generated_document") &&
+                            sourceEvent.payload.isNotBlank() &&
+                            !sourceEvent.payload.startsWith("http") &&
+                            !sourceEvent.payload.startsWith("content://") &&
+                            !sourceEvent.payload.startsWith("file://")
+                        ) {
                             runCatching {
                                 val directory = File(context.filesDir, "oracle-generated").apply { mkdirs() }
                                 val bytes = Base64.decode(sourceEvent.payload, Base64.DEFAULT)
-                                val extension = if (sourceEvent.detail.contains("jpeg", true)) "jpg" else "png"
+                                require(bytes.size <= 40 * 1024 * 1024) { "Generated media exceeds 40 MB." }
+                                val mime = sourceEvent.detail.lowercase()
+                                val extension = when {
+                                    mime.contains("jpeg") -> "jpg"
+                                    mime.contains("audio/wav") -> "wav"
+                                    mime.contains("audio/ogg") -> "ogg"
+                                    sourceEvent.kind == "generated_audio" -> "mp3"
+                                    sourceEvent.kind == "generated_video" -> "mp4"
+                                    sourceEvent.kind == "generated_document" && mime.contains("pdf") -> "pdf"
+                                    sourceEvent.kind == "generated_document" && mime.contains("json") -> "json"
+                                    sourceEvent.kind == "generated_document" && mime.contains("markdown") -> "md"
+                                    sourceEvent.kind == "generated_document" && mime.contains("text") -> "txt"
+                                    else -> "png"
+                                }
                                 val file = File(directory, UUID.randomUUID().toString() + "." + extension)
                                 file.writeBytes(bytes)
                                 sourceEvent.copy(payload = file.absolutePath)
-                            }.getOrDefault(sourceEvent.copy(detail = "Image output could not be saved locally."))
+                            }.getOrDefault(sourceEvent.copy(detail = "Media output could not be saved locally."))
                         } else sourceEvent
                         runEvents.add(event)
                         scope.launch(Dispatchers.Main.immediate) {
@@ -958,12 +977,13 @@ private fun AudioArtifactCard(event: AgenticEvent) {
     val palette = LocalOraclePalette.current
     val context = LocalContext.current
     var playing by remember(event.payload) { mutableStateOf(false) }
+    var prepared by remember(event.payload) { mutableStateOf(false) }
     val player = remember(event.payload) {
         android.media.MediaPlayer().apply {
             setDataSource(event.payload)
             setOnCompletionListener { playing = false }
+            setOnPreparedListener { prepared = true }
             prepareAsync()
-            setOnPreparedListener { /* prepared on demand */ }
         }
     }
     androidx.compose.runtime.DisposableEffect(player) { onDispose { runCatching { player.release() } } }
@@ -999,6 +1019,12 @@ private fun AudioArtifactCard(event: AgenticEvent) {
 @Composable
 private fun VideoArtifactCard(event: AgenticEvent) {
     val palette = LocalOraclePalette.current
+    val context = LocalContext.current
+    val uri = remember(event.payload) {
+        if (event.payload.startsWith("http") || event.payload.startsWith("content://") || event.payload.startsWith("file://")) {
+            Uri.parse(event.payload)
+        } else Uri.fromFile(File(event.payload))
+    }
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp))
             .background(palette.surfaceRaised).padding(10.dp),
@@ -1006,13 +1032,15 @@ private fun VideoArtifactCard(event: AgenticEvent) {
     ) {
         Text("GENERATED VIDEO", color = Color(0xFF7B8FE8), fontFamily = OracleMono, fontSize = 8.sp)
         Text(event.detail, color = palette.textSecondary, fontSize = 10.sp)
-        if (event.payload.startsWith("http")) {
-            Text("Open video", Modifier.clickable {
-                runCatching {
-                    context?.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(event.payload)))
+        androidx.compose.ui.viewinterop.AndroidView(
+            factory = { viewContext ->
+                android.widget.VideoView(viewContext).apply {
+                    setVideoURI(uri)
+                    setMediaController(android.widget.MediaController(viewContext).also { it.setAnchorView(this) })
                 }
-            }, color = Color(0xFF7B8FE8), fontSize = 10.sp)
-        } else Text("Video file stored in ORACLE workspace.", color = palette.textTertiary, fontSize = 9.sp)
+            },
+            modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(10.dp))
+        )
     }
 }
 
