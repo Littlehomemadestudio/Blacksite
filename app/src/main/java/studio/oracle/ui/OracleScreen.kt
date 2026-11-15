@@ -1208,7 +1208,7 @@ private fun AgentEventRow(event: AgenticEvent, onOpenFile: (String) -> Unit) {
                     }
                     Text("↗", color = Color(0xFF42A68A), fontSize = 16.sp)
                 }
-            } else if (event.detail.isNotBlank() && !isImage) {
+            } else if (event.detail.isNotBlank() && event.kind != "generated_image") {
                 Text(event.detail.take(if (expanded) 16000 else 180), color = palette.textSecondary,
                     fontFamily = if (event.kind.contains("python")) OracleMono else OracleSans,
                     fontSize = 10.sp, lineHeight = 15.sp)
