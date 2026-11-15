@@ -140,6 +140,8 @@ fun OracleScreen(
     var activeSessionId by remember { mutableStateOf<String?>(null) }
     var messages by remember { mutableStateOf(emptyList<AgentMessageEntity>()) }
     var prompt by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    val busyLatest by rememberUpdatedState(busy)
     var voiceReplyEnabled by remember { mutableStateOf(false) }
     var voiceInputStarter by remember { mutableStateOf<(() -> Unit)?>(null) }
     var ttsReady by remember { mutableStateOf(false) }
@@ -163,8 +165,6 @@ fun OracleScreen(
         mutableStateOf(listOf(GeminiModel(ModelPreferences.DEFAULT_MODEL, "Gemini 3.5 Flash-Lite")))
     }
     var syncingModels by remember { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(false) }
-    val busyLatest by rememberUpdatedState(busy)
     var requestJob by remember { mutableStateOf<Job?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var failedPrompt by remember { mutableStateOf<String?>(null) }
