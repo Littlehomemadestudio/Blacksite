@@ -1,7 +1,8 @@
 package studio.oracle.ui
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
