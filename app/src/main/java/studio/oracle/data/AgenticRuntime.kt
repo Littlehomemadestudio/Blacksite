@@ -103,6 +103,9 @@ class GeminiAgenticRuntime(
 
         val cfg = settings.validated()
         val imageOnlyModel = model.contains("flash-image", ignoreCase = true)
+        if (imageOnlyModel && media.any { it.mimeType.startsWith("audio/") }) {
+            return AgenticResult.Failed("Gemini Flash Image does not accept audio input. Switch to the main Gemini agent model for audio.")
+        }
         val tools = JSONArray().apply {
             if (!imageOnlyModel && cfg.hostedPython) put(JSONObject().put("type", "code_execution"))
             if (!imageOnlyModel && cfg.urlContext) put(JSONObject().put("type", "url_context"))
@@ -122,7 +125,6 @@ class GeminiAgenticRuntime(
             val body = JSONObject()
                 .put("model", model)
                 .put("input", input)
-                .put("tools", tools)
                 .put(
                     "system_instruction",
                     "You are ORACLE, a capable multimodal AI operator inside an Android workspace. " +
@@ -141,6 +143,7 @@ class GeminiAgenticRuntime(
                         .put("thinking_summaries", cfg.thinkingSummaries)
                         .put("max_output_tokens", cfg.maxOutputTokens)
                 )
+            if (tools.length() > 0) body.put("tools", tools)
             if (!imageOnlyModel) body.getJSONObject("generation_config").put("tool_choice", cfg.toolChoice)
             if (imageOnlyModel) {
                 body.put(
