@@ -23,7 +23,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Chat-first Jetpack Compose workbench with animated navigation, thread drawer, message history, and expandable model controls.
 - Gemini API key validation and AES-GCM encryption backed by Android Keystore. No API key is embedded in source or APK.
 - Stateful Gemini Agent using the Interactions API, with model-directed Google Search, URL context, hosted Python execution, and custom Android tool calls. Tool requests are executed by the app and returned to Gemini in bounded multi-step loops.
-- Model controls in the composer: thinking level and summaries, temperature, top-p/top-k, output-token limit, model-reported input/output limits, Google Search, URL context, hosted code execution, and local tools.
+- Model controls in the composer: thinking level and summaries, tool-choice mode, output-token limit, model-reported input/output limits, Google Search, URL context, hosted code execution, and local tools.
 - A live context ledger reports input, output, thinking, cached, and tool-use token counts when the API returns usage metadata.
 - Agent activity cards show web-search activity, Python source and execution output, local tool requests, results, and approval prompts.
 - Persistent agent threads and messages in Room; thread titles are generated locally from the first user prompt.
