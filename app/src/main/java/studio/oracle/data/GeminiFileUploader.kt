@@ -84,7 +84,7 @@ class GeminiFileUploader(
                 .get()
                 .build()
             val state = http.newCall(request).await().use { response ->
-                if (!response.isSuccessful) return
+                if (!response.isSuccessful) throw IOException("Could not check uploaded video processing state (HTTP " + response.code + ").")
                 JSONObject(response.body?.string().orEmpty()).optString("state")
             }
             when (state.uppercase()) {
