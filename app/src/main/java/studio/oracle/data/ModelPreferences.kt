@@ -29,3 +29,22 @@ class ModelPreferences(context: Context) {
         private val MODEL_KEY = stringPreferencesKey("selected_gemini_model")
     }
 }
+
+
+/** Persists the active local workspace independently from the Gemini model choice. */
+class WorkspacePreferences(context: Context) {
+    private val store = context.applicationContext.oraclePreferences
+
+    val activeWorkspaceId: Flow<String?> = store.data.map { preferences ->
+        preferences[ACTIVE_WORKSPACE_KEY]
+    }
+
+    suspend fun setActiveWorkspaceId(id: String) {
+        require(id.isNotBlank()) { "Workspace id cannot be blank." }
+        store.edit { preferences -> preferences[ACTIVE_WORKSPACE_KEY] = id }
+    }
+
+    companion object {
+        private val ACTIVE_WORKSPACE_KEY = stringPreferencesKey("active_workspace_id")
+    }
+}

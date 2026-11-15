@@ -1,35 +1,33 @@
 package studio.oracle.ui
 
+import android.text.format.Formatter
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.UploadFile
-import androidx.compose.material3.*
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import android.text.format.Formatter
+import androidx.compose.material3.Text
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -43,21 +41,16 @@ import studio.oracle.data.local.DocumentChunkEntity
 import studio.oracle.data.local.DocumentEntity
 import studio.oracle.data.local.OracleDatabase
 import studio.oracle.security.SecureKeyStore
-
-private val LibraryInk = Color(0xFF101113)
-private val LibraryPanel = Color(0xFF17191C)
-private val LibraryRaised = Color(0xFF202328)
-private val LibraryLine = Color(0xFF2A2D32)
-private val LibraryPaper = Color(0xFFE9E9E7)
-private val LibraryMuted = Color(0xFF858A93)
-private val LibraryAccent = Color(0xFFC6F36B)
-private val LibraryViolet = Color(0xFFB5A4FF)
+import studio.oracle.ui.theme.LocalOraclePalette
+import studio.oracle.ui.theme.OracleMono
+import studio.oracle.ui.theme.OracleSans
 
 @Composable
-fun LibraryScreen() {
+fun LibraryScreen(workspaceId: String) {
+    val palette = LocalOraclePalette.current
     val context = LocalContext.current
-    val repository = remember(context) {
-        DocumentRepository(context, OracleDatabase.get(context).documentDao())
+    val repository = remember(context, workspaceId) {
+        DocumentRepository(context, OracleDatabase.get(context).documentDao(), workspaceId)
     }
     val keyStore = remember(context) { SecureKeyStore(context) }
     val api = remember { GeminiApi() }
@@ -194,23 +187,21 @@ fun LibraryScreen() {
     }
 
     Column(
-        Modifier.fillMaxSize().background(LibraryInk).padding(horizontal = 13.dp, vertical = 10.dp),
+        Modifier.fillMaxSize().background(palette.canvas).padding(horizontal = 13.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(9.dp)
     ) {
         if (selectedDocumentId != null) {
             val selected = documents.firstOrNull { it.id == selectedDocumentId }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { selectedDocumentId = null }, modifier = Modifier.size(34.dp)) {
-                    Icon(Icons.Default.ArrowBack, "Back to library", tint = LibraryAccent)
-                }
+                OracleIconButton(OracleGlyph.Back, "Back to library", onClick = { selectedDocumentId = null }, tint = palette.accent, size = 36.dp)
                 Column(Modifier.weight(1f)) {
-                    Text("DOCUMENT READER", color = LibraryAccent, fontSize = 9.sp, letterSpacing = 1.5.sp)
+                    Text("DOCUMENT READER", color = palette.accent, fontSize = 9.sp, letterSpacing = 1.5.sp)
                     Text(selected?.title ?: "Document", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             Text(
                 "Extracted text · original file remains in app-private storage",
-                color = LibraryMuted, fontSize = 9.sp
+                color = palette.textSecondary, fontSize = 9.sp
             )
             LazyColumn(
                 Modifier.weight(1f).fillMaxWidth(),
@@ -218,18 +209,14 @@ fun LibraryScreen() {
             ) {
                 if (selectedChunks.isEmpty()) {
                     item {
-                        Text("No extracted passages are available for this document.", color = LibraryMuted, fontSize = 11.sp)
+                        Text("No extracted passages are available for this document.", color = palette.textSecondary, fontSize = 11.sp)
                     }
                 }
                 items(selectedChunks, key = { it.id }) { chunk ->
-                    Surface(
-                        color = LibraryPanel,
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, LibraryLine)
-                    ) {
-                        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                            Text(chunk.sectionLabel.uppercase(), color = LibraryAccent, fontSize = 8.sp, letterSpacing = 1.2.sp)
-                            Text(chunk.content, color = LibraryPaper, fontSize = 11.sp, lineHeight = 17.sp)
+                    LibraryCard(padding = 12.dp, radius = 13.dp) {
+                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                            Text(chunk.sectionLabel.uppercase(), color = palette.accent, fontFamily = OracleMono, fontSize = 8.sp, letterSpacing = 1.2.sp)
+                            Text(chunk.content, color = palette.text, fontFamily = OracleSans, fontSize = 13.sp, lineHeight = 19.sp)
                         }
                     }
                 }
@@ -237,113 +224,97 @@ fun LibraryScreen() {
         } else {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("DOCUMENT INTELLIGENCE", color = LibraryAccent, fontSize = 9.sp, letterSpacing = 1.6.sp)
+                    Text("DOCUMENT INTELLIGENCE", color = palette.accent, fontSize = 9.sp, letterSpacing = 1.6.sp)
                     Text("Your knowledge, indexed.", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                    Text("${documents.size} local documents · searchable offline", color = LibraryMuted, fontSize = 10.sp)
+                    Text("${documents.size} local documents · searchable offline", color = palette.textSecondary, fontSize = 10.sp)
                 }
-                Button(
+                OracleSolidAction(
+                    label = if (importing) "INDEXING…" else "IMPORT",
                     onClick = {
                         picker.launch(arrayOf("application/pdf", "text/plain", "text/markdown", "text/x-markdown"))
                     },
-                    enabled = !importing && !asking,
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 11.dp, vertical = 9.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = LibraryAccent, contentColor = LibraryInk)
-                ) {
-                    if (importing) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = LibraryInk)
-                    else Icon(Icons.Default.UploadFile, null, modifier = Modifier.size(15.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(if (importing) "INDEXING" else "IMPORT", fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                }
+                    enabled = !importing && !asking
+                )
             }
 
-            Surface(
-                color = LibraryPanel,
-                shape = RoundedCornerShape(9.dp),
-                border = BorderStroke(1.dp, LibraryLine)
-            ) {
-                Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    OutlinedTextField(
-                        value = query,
-                        enabled = !asking,
-                        onValueChange = { query = it.take(300); searchHits = emptyList(); answer = null; answerError = null; answerSources = emptyList() },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Search passages, concepts, or names…", color = LibraryMuted, fontSize = 11.sp) },
-                        leadingIcon = { Icon(Icons.Default.Search, null, tint = LibraryMuted, modifier = Modifier.size(17.dp)) },
-                        singleLine = true,
-                        shape = RoundedCornerShape(7.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = LibraryAccent,
-                            unfocusedBorderColor = LibraryLine,
-                            focusedTextColor = LibraryPaper,
-                            unfocusedTextColor = LibraryPaper
+            LibraryCard(padding = 11.dp, radius = 16.dp) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(15.dp))
+                            .background(palette.canvas)
+                            .border(1.dp, palette.outline, RoundedCornerShape(15.dp))
+                            .padding(horizontal = 13.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OracleGlyphIcon(OracleGlyph.Search, Modifier.size(17.dp), palette.textTertiary)
+                        Spacer(Modifier.width(10.dp))
+                        BasicTextField(
+                            value = query,
+                            onValueChange = {
+                                query = it.take(300)
+                                searchHits = emptyList()
+                                answer = null
+                                answerError = null
+                                answerSources = emptyList()
+                            },
+                            enabled = !asking,
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            textStyle = TextStyle(color = palette.text, fontFamily = OracleSans, fontSize = 13.sp),
+                            cursorBrush = SolidColor(palette.accent),
+                            decorationBox = { inner ->
+                                Box {
+                                    if (query.isEmpty()) {
+                                        Text("Search passages, concepts, or names…", color = palette.textTertiary, fontSize = 12.sp)
+                                    }
+                                    inner()
+                                }
+                            }
                         )
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        OutlinedButton(
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OracleTextAction(
+                            label = "SEARCH OFFLINE",
                             onClick = { runLocalSearch() },
                             enabled = query.isNotBlank() && !asking,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(7.dp),
-                            contentPadding = PaddingValues(vertical = 8.dp),
-                            border = BorderStroke(1.dp, LibraryLine)
-                        ) {
-                            Icon(Icons.Default.Search, null, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(5.dp))
-                            Text("SEARCH OFFLINE", fontSize = 8.sp)
-                        }
-                        Button(
+                            modifier = Modifier.weight(1f)
+                        )
+                        OracleSolidAction(
+                            label = "ASK GEMINI",
                             onClick = { requestLibraryAnswer() },
                             enabled = query.isNotBlank() && !asking,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(7.dp),
-                            contentPadding = PaddingValues(vertical = 8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = LibraryViolet, contentColor = LibraryInk)
-                        ) {
-                            Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(5.dp))
-                            Text("ASK GEMINI", fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                        }
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                     Text(
                         "PDF · TXT · MD  /  Office, image OCR, and scanned-PDF OCR are not supported yet.",
-                        color = LibraryMuted, fontSize = 8.sp, lineHeight = 12.sp
+                        color = palette.textTertiary, fontFamily = OracleMono, fontSize = 8.sp, lineHeight = 12.sp
                     )
                 }
             }
 
             if (answer != null || answerError != null || asking) {
-                Surface(
-                    color = LibraryPanel,
-                    shape = RoundedCornerShape(9.dp),
-                    border = BorderStroke(1.dp, LibraryViolet.copy(alpha = .45f))
-                ) {
-                    Column(Modifier.fillMaxWidth().padding(11.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LibraryCard(padding = 13.dp, radius = 16.dp) {
+                    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("LIBRARY ANSWER", color = LibraryViolet, fontSize = 9.sp, letterSpacing = 1.2.sp, modifier = Modifier.weight(1f))
-                            if (asking) {
-                                TextButton(onClick = { askJob?.cancel() }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp)) {
-                                    Text("CANCEL", color = LibraryAccent, fontSize = 8.sp)
-                                }
-                            }
+                            Text("LIBRARY ANSWER", color = palette.accent, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 1.2.sp, modifier = Modifier.weight(1f))
+                            if (asking) OracleTextAction("CANCEL", onClick = { askJob?.cancel() }, accent = true)
                         }
                         if (asking) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                CircularProgressIndicator(Modifier.size(15.dp), color = LibraryViolet, strokeWidth = 2.dp)
+                                OracleSpinner(Modifier.size(15.dp), palette.accent)
                                 Spacer(Modifier.width(8.dp))
-                                Text("Retrieving an answer from the selected passages…", color = LibraryMuted, fontSize = 10.sp)
+                                Text("Retrieving selected passages…", color = palette.textSecondary, fontSize = 11.sp)
                             }
                         }
-                        answerError?.let { Text(it, color = Color(0xFFFF9B91), fontSize = 10.sp) }
-                        answer?.let { Text(it, Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState()), color = LibraryPaper, fontSize = 11.sp, lineHeight = 17.sp) }
+                        answerError?.let { Text(it, color = palette.error, fontFamily = OracleSans, fontSize = 11.sp) }
+                        answer?.let { Text(it, Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState()), color = palette.text, fontFamily = OracleSans, fontSize = 13.sp, lineHeight = 19.sp) }
                         if (answerSources.isNotEmpty()) {
-                            HorizontalDivider(color = LibraryLine)
-                            Text("RETRIEVED SOURCES", color = LibraryMuted, fontSize = 8.sp, letterSpacing = 1.sp)
+                            LibraryDivider()
+                            Text("RETRIEVED SOURCES", color = palette.textSecondary, fontFamily = OracleMono, fontSize = 8.sp, letterSpacing = 1.sp)
                             answerSources.forEachIndexed { index, hit ->
-                                Text(
-                                    "[S${index + 1}] ${hit.document.title} · ${hit.chunk.sectionLabel}",
-                                    color = LibraryAccent, fontSize = 9.sp
-                                )
+                                Text("[S${index + 1}] ${hit.document.title} · ${hit.chunk.sectionLabel}", color = palette.accent, fontFamily = OracleMono, fontSize = 9.sp)
                             }
                         }
                     }
@@ -351,9 +322,9 @@ fun LibraryScreen() {
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(if (searchHits.isEmpty()) "YOUR LIBRARY" else "SEARCH RESULTS", color = LibraryMuted, fontSize = 8.sp, letterSpacing = 1.3.sp)
+                Text(if (searchHits.isEmpty()) "YOUR LIBRARY" else "SEARCH RESULTS", color = palette.textSecondary, fontSize = 8.sp, letterSpacing = 1.3.sp)
                 Spacer(Modifier.weight(1f))
-                Text(status, color = LibraryMuted, fontSize = 8.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(status, color = palette.textSecondary, fontSize = 8.sp, fontFamily = OracleMono, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
 
             LazyColumn(
@@ -362,28 +333,23 @@ fun LibraryScreen() {
             ) {
                 if (searchHits.isNotEmpty()) {
                     items(searchHits, key = { "hit-${it.chunk.id}" }) { hit ->
-                        Surface(
-                            onClick = { selectedDocumentId = hit.document.id },
-                            color = LibraryPanel,
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, LibraryLine)
-                        ) {
-                            Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        LibraryClickableCard(onClick = { selectedDocumentId = hit.document.id }, padding = 10.dp, radius = 14.dp) {
+                            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(hit.document.title, color = LibraryPaper, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(hit.chunk.sectionLabel, color = LibraryAccent, fontSize = 8.sp)
+                                    Text(hit.document.title, color = palette.text, fontFamily = OracleSans, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(hit.chunk.sectionLabel, color = palette.accent, fontFamily = OracleMono, fontSize = 8.sp)
                                 }
-                                Text(hit.chunk.content.take(260), color = LibraryMuted, fontSize = 9.sp, lineHeight = 14.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                                Text(hit.chunk.content.take(260), color = palette.textSecondary, fontFamily = OracleSans, fontSize = 11.sp, lineHeight = 16.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
                 } else if (documents.isEmpty()) {
                     item {
-                        Surface(color = LibraryPanel, shape = RoundedCornerShape(10.dp), border = BorderStroke(1.dp, LibraryLine)) {
-                            Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Icon(Icons.Default.FolderOpen, null, tint = LibraryAccent, modifier = Modifier.size(28.dp))
-                                Text("NO DOCUMENTS YET", color = LibraryPaper, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                                Text("Import a PDF, plain-text file, or Markdown document. Extraction and indexing happen on this device.", color = LibraryMuted, fontSize = 10.sp, lineHeight = 15.sp)
+                        LibraryCard(padding = 20.dp, radius = 18.dp) {
+                            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OracleGlyphIcon(OracleGlyph.Library, Modifier.size(28.dp), palette.accent)
+                                Text("NO DOCUMENTS YET", color = palette.text, fontFamily = OracleMono, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                Text("Import a PDF, plain-text file, or Markdown document. Extraction and indexing happen on this device.", color = palette.textSecondary, fontFamily = OracleSans, fontSize = 11.sp, lineHeight = 16.sp)
                             }
                         }
                     }
@@ -397,64 +363,54 @@ fun LibraryScreen() {
     }
 
     if (showAskConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showAskConfirmation = false },
-            containerColor = LibraryRaised,
-            title = {
-                Text("SEND SELECTED EXCERPTS?", color = LibraryPaper, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            },
-            text = {
+        Dialog(onDismissRequest = { showAskConfirmation = false }) {
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(palette.surfaceRaised)
+                    .border(1.dp, palette.outline, RoundedCornerShape(24.dp))
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(11.dp)
+            ) {
+                Text("SEND SELECTED EXCERPTS?", color = palette.text, fontFamily = OracleMono, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 Column(
                     Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(7.dp)
+                    verticalArrangement = Arrangement.spacedBy(9.dp)
                 ) {
-                    Text("QUESTION · ${query.trim()}", color = LibraryPaper, fontSize = 10.sp, lineHeight = 15.sp)
+                    Text("QUESTION · ${query.trim()}", color = palette.text, fontFamily = OracleSans, fontSize = 12.sp, lineHeight = 17.sp)
                     Text(
-                        "The following exact passages and your question will be sent to Google Gemini using $model. Original files and the rest of your library stay on this device.",
-                        color = LibraryMuted, fontSize = 10.sp, lineHeight = 15.sp
+                        "The selected passages and question will be sent to Google Gemini using $model. Original files and the rest of your library stay on this device.",
+                        color = palette.textSecondary, fontFamily = OracleSans, fontSize = 11.sp, lineHeight = 16.sp
                     )
                     confirmationHits.forEachIndexed { index, hit ->
-                        HorizontalDivider(color = LibraryLine)
-                        Text(
-                            "[S${index + 1}] ${hit.document.title} · ${hit.chunk.sectionLabel}",
-                            color = LibraryAccent, fontSize = 9.sp, fontWeight = FontWeight.SemiBold
-                        )
-                        Text(hit.chunk.content, color = LibraryPaper, fontSize = 9.sp, lineHeight = 14.sp)
+                        LibraryDivider()
+                        Text("[S${index + 1}] ${hit.document.title} · ${hit.chunk.sectionLabel}", color = palette.accent, fontFamily = OracleMono, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+                        Text(hit.chunk.content, color = palette.text, fontFamily = OracleSans, fontSize = 11.sp, lineHeight = 16.sp)
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { sendLibraryQuestion() }) {
-                    Text("SEND EXCERPTS", color = LibraryAccent, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAskConfirmation = false }) {
-                    Text("KEEP LOCAL", color = LibraryMuted)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                    OracleTextAction("KEEP LOCAL", onClick = { showAskConfirmation = false })
+                    OracleSolidAction("SEND EXCERPTS", onClick = { sendLibraryQuestion() })
                 }
             }
-        )
+        }
     }
 }
 
 @Composable
 private fun DocumentRow(document: DocumentEntity, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        color = LibraryPanel,
-        shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, LibraryLine)
-    ) {
-        Row(
-            Modifier.fillMaxWidth().padding(11.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(color = LibraryRaised, shape = RoundedCornerShape(7.dp)) {
-                Icon(Icons.Default.Description, null, tint = LibraryAccent, modifier = Modifier.padding(9.dp).size(17.dp))
+    val palette = LocalOraclePalette.current
+    LibraryClickableCard(onClick = onClick, padding = 11.dp, radius = 14.dp) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(palette.surfaceRaised),
+                contentAlignment = Alignment.Center
+            ) {
+                OracleGlyphIcon(OracleGlyph.Library, Modifier.size(17.dp), palette.accent)
             }
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(document.title, color = LibraryPaper, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.width(11.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(document.title, color = palette.text, fontFamily = OracleSans, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 val type = when (document.mimeType) {
                     "application/pdf" -> "PDF · ${document.pageCount} pages"
                     "text/markdown" -> "MARKDOWN"
@@ -462,9 +418,57 @@ private fun DocumentRow(document: DocumentEntity, onClick: () -> Unit) {
                 }
                 Text(
                     "$type · ${Formatter.formatShortFileSize(LocalContext.current, document.sizeBytes)} · ${document.extractedCharacters} chars",
-                    color = LibraryMuted, fontSize = 8.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis
+                    color = palette.textSecondary,
+                    fontSize = 9.sp,
+                    fontFamily = OracleMono,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
     }
+}
+
+@Composable
+private fun LibraryCard(
+    modifier: Modifier = Modifier,
+    padding: Dp = 12.dp,
+    radius: Dp = 16.dp,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val palette = LocalOraclePalette.current
+    Column(
+        modifier = modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(radius))
+            .background(palette.surface)
+            .border(1.dp, palette.outlineSoft, RoundedCornerShape(radius))
+            .padding(padding),
+        content = content
+    )
+}
+
+@Composable
+private fun LibraryClickableCard(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    padding: Dp = 12.dp,
+    radius: Dp = 16.dp,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val palette = LocalOraclePalette.current
+    Column(
+        modifier = modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(radius))
+            .background(palette.surface)
+            .border(1.dp, palette.outlineSoft, RoundedCornerShape(radius))
+            .clickable(onClick = onClick)
+            .padding(padding),
+        content = content
+    )
+}
+
+@Composable
+private fun LibraryDivider() {
+    val palette = LocalOraclePalette.current
+    Box(Modifier.fillMaxWidth().height(1.dp).background(palette.outlineSoft))
 }

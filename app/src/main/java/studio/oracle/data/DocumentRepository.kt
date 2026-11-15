@@ -39,12 +39,13 @@ sealed interface DocumentImportResult {
  */
 class DocumentRepository(
     context: Context,
-    private val dao: DocumentDao
+    private val dao: DocumentDao,
+    private val workspaceId: String
 ) {
     private val appContext = context.applicationContext
     private val documentsDirectory = File(appContext.filesDir, "documents")
 
-    val documents: Flow<List<DocumentEntity>> = dao.observeDocuments()
+    val documents: Flow<List<DocumentEntity>> = dao.observeDocuments(workspaceId)
 
     suspend fun importFrom(uri: Uri): DocumentImportResult = withContext(Dispatchers.IO) {
         var temporaryFile: File? = null
@@ -120,7 +121,8 @@ class DocumentRepository(
                 sizeBytes = destination.length(),
                 pageCount = pages.size,
                 extractedCharacters = extractedCharacters,
-                importedAt = System.currentTimeMillis()
+                importedAt = System.currentTimeMillis(),
+                workspaceId = workspaceId
             )
             val chunks = drafts.map { draft ->
                 DocumentChunkEntity(
@@ -158,8 +160,8 @@ class DocumentRepository(
         withContext(Dispatchers.IO) {
             val terms = DocumentTextProcessor.tokenize(query).take(8)
             if (terms.isEmpty()) return@withContext emptyList()
-            val documentsById = dao.documentsSnapshot().associateBy { it.id }
-            terms.flatMap { dao.chunksMatching(it) }
+            val documentsById = dao.documentsSnapshot(workspaceId).associateBy { it.id }
+            terms.flatMap { dao.chunksMatching(workspaceId, it) }
                 .distinctBy { it.id }
                 .mapNotNull { chunk ->
                     val document = documentsById[chunk.documentId] ?: return@mapNotNull null

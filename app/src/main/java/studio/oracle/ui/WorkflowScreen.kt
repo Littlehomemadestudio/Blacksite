@@ -1,26 +1,22 @@
 package studio.oracle.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Notes
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,6 +30,9 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import studio.oracle.data.DocumentRepository
+import studio.oracle.ui.theme.LocalOraclePalette
+import studio.oracle.ui.theme.OracleMono
+import studio.oracle.ui.theme.OracleSans
 import studio.oracle.data.LocalWorkflowRunner
 import studio.oracle.data.WorkflowAction
 import studio.oracle.data.WorkflowRepository
@@ -44,23 +43,13 @@ import studio.oracle.data.local.WorkflowRunLogEntity
 import studio.oracle.data.local.WorkflowStepEntity
 import java.util.UUID
 
-private val FlowInk = Color(0xFF101318)
-private val FlowPanel = Color(0xFF181D24)
-private val FlowRaised = Color(0xFF222A34)
-private val FlowLine = Color(0xFF303A46)
-private val FlowText = Color(0xFFE9EDF2)
-private val FlowMuted = Color(0xFF9AA6B2)
-private val FlowAccent = Color(0xFFB9E66A)
-private val FlowBlue = Color(0xFF8CB9F4)
-private val FlowDanger = Color(0xFFFF8B83)
-
 @Composable
-fun WorkflowScreen() {
+fun WorkflowScreen(workspaceId: String) {
     val context = LocalContext.current
     val database = remember(context) { OracleDatabase.get(context) }
     val repository = remember(database) { WorkflowRepository(database.workflowDao()) }
     val documentRepository = remember(context, database) {
-        DocumentRepository(context, database.documentDao())
+        DocumentRepository(context, database.documentDao(), workspaceId)
     }
     val runner = remember(database, documentRepository) {
         LocalWorkflowRunner(database.workflowDao(), documentRepository)
@@ -153,17 +142,18 @@ fun WorkflowScreen() {
     }
 
     Column(
-        Modifier.fillMaxSize().background(FlowInk).padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier.fillMaxSize().background(LocalOraclePalette.current.canvas).imePadding().animateContentSize().padding(horizontal = 14.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("AUTOMATION STUDIO", color = FlowAccent, fontSize = 9.sp, letterSpacing = 1.7.sp, fontWeight = FontWeight.Bold)
-                Text("Workflows", color = FlowText, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-                Text("Local actions · explicit manual runs", color = FlowMuted, fontSize = 10.sp)
+                Text("AUTOMATION STUDIO", color = LocalOraclePalette.current.accent, fontSize = 9.sp, letterSpacing = 1.7.sp, fontWeight = FontWeight.Bold)
+                Text("Workflows", color = LocalOraclePalette.current.text, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+                Text("Local actions · explicit manual runs", color = LocalOraclePalette.current.textSecondary, fontSize = 10.sp)
             }
             if (tab == "WORKFLOWS" && selectedWorkflowId == null) {
-                Button(
+                OracleSolidAction(
+                    label = "NEW WORKFLOW",
                     onClick = {
                         scope.launch {
                             try {
@@ -174,20 +164,13 @@ fun WorkflowScreen() {
                                 status = "COULD NOT CREATE WORKFLOW"
                             }
                         }
-                    },
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = FlowAccent, contentColor = FlowInk)
-                ) {
-                    Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(5.dp))
-                    Text("New", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
+                    }
+                )
             }
         }
 
         Row(
-            Modifier.fillMaxWidth().background(FlowPanel, RoundedCornerShape(9.dp)).padding(4.dp),
+            Modifier.fillMaxWidth().background(LocalOraclePalette.current.surface, RoundedCornerShape(14.dp)).padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             FlowTab("Workflows", tab == "WORKFLOWS", Modifier.weight(1f)) {
@@ -205,11 +188,11 @@ fun WorkflowScreen() {
                 } else {
                     LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(notes, key = { it.id }) { note ->
-                            Surface(color = FlowPanel, shape = RoundedCornerShape(9.dp), border = BorderStroke(1.dp, FlowLine)) {
+                            Surface(color = LocalOraclePalette.current.surface, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft), modifier = Modifier.animateContentSize()) {
                                 Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                    Text(note.title, color = FlowText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                    Text(note.content, color = FlowMuted, fontSize = 11.sp, lineHeight = 16.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
-                                    Text("${note.content.length} CHARACTERS · LOCAL NOTE", color = FlowAccent, fontSize = 8.sp, letterSpacing = .8.sp)
+                                    Text(note.title, color = LocalOraclePalette.current.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(note.content, color = LocalOraclePalette.current.textSecondary, fontSize = 11.sp, lineHeight = 16.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                                    Text("${note.content.length} CHARACTERS · LOCAL NOTE", color = LocalOraclePalette.current.accent, fontSize = 8.sp, letterSpacing = .8.sp)
                                 }
                             }
                         }
@@ -225,9 +208,9 @@ fun WorkflowScreen() {
                         items(runs, key = { it.id }) { run ->
                             val name = workflows.firstOrNull { it.id == run.workflowId }?.title ?: "Deleted workflow"
                             Surface(
-                                color = FlowPanel,
-                                shape = RoundedCornerShape(9.dp),
-                                border = BorderStroke(1.dp, FlowLine),
+                                color = LocalOraclePalette.current.surface,
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft),
                                 modifier = Modifier.fillMaxWidth().clickable {
                                     viewingRunId = run.id
                                     viewingRunTitle = name
@@ -235,11 +218,11 @@ fun WorkflowScreen() {
                             ) {
                                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(name, color = FlowText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                                        Text(name, color = LocalOraclePalette.current.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                                         RunStatus(run.status)
                                     }
-                                    Text(run.summary, color = FlowMuted, fontSize = 10.sp)
-                                    Text("TAP TO INSPECT EXECUTION LOG", color = FlowBlue, fontSize = 8.sp, letterSpacing = .8.sp)
+                                    Text(run.summary, color = LocalOraclePalette.current.textSecondary, fontSize = 10.sp)
+                                    Text("TAP TO INSPECT EXECUTION LOG", color = LocalOraclePalette.current.accent, fontSize = 8.sp, letterSpacing = .8.sp)
                                 }
                             }
                         }
@@ -255,9 +238,9 @@ fun WorkflowScreen() {
                         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(workflows, key = { it.id }) { workflow ->
                                 Surface(
-                                    color = FlowPanel,
-                                    shape = RoundedCornerShape(9.dp),
-                                    border = BorderStroke(1.dp, FlowLine),
+                                    color = LocalOraclePalette.current.surface,
+                                    shape = RoundedCornerShape(14.dp),
+                                    border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft),
                                     modifier = Modifier.fillMaxWidth().clickable {
                                         selectedWorkflowId = workflow.id
                                         status = "EDITING · ${workflow.title}"
@@ -267,13 +250,13 @@ fun WorkflowScreen() {
                                         Modifier.fillMaxWidth().padding(13.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(Icons.Default.Tune, null, tint = FlowAccent, modifier = Modifier.size(20.dp))
+                                        OracleGlyphIcon(OracleGlyph.Settings, Modifier.size(20.dp), LocalOraclePalette.current.textSecondary)
                                         Spacer(Modifier.width(10.dp))
                                         Column(Modifier.weight(1f)) {
-                                            Text(workflow.title, color = FlowText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            Text(workflow.description.ifBlank { "Manual workflow · local only" }, color = FlowMuted, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                            Text(workflow.title, color = LocalOraclePalette.current.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text(workflow.description.ifBlank { "Manual workflow · local only" }, color = LocalOraclePalette.current.textSecondary, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                         }
-                                        Icon(Icons.Default.ArrowBack, null, tint = FlowMuted, modifier = Modifier.size(16.dp))
+                                        OracleGlyphIcon(OracleGlyph.Back, Modifier.size(16.dp), LocalOraclePalette.current.textSecondary)
                                     }
                                 }
                             }
@@ -281,14 +264,12 @@ fun WorkflowScreen() {
                     }
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { selectedWorkflowId = null }, modifier = Modifier.size(34.dp)) {
-                            Icon(Icons.Default.ArrowBack, "Back to workflows", tint = FlowAccent)
-                        }
+                        OracleIconButton(OracleGlyph.Back, "Back to workflows", onClick = { selectedWorkflowId = null }, tint = LocalOraclePalette.current.accent, size = 34.dp)
                         Column(Modifier.weight(1f)) {
-                            Text("WORKFLOW BUILDER", color = FlowAccent, fontSize = 9.sp, letterSpacing = 1.2.sp)
-                            Text("Edit steps", color = FlowText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text("WORKFLOW BUILDER", color = LocalOraclePalette.current.accent, fontSize = 9.sp, letterSpacing = 1.2.sp)
+                            Text("Edit steps", color = LocalOraclePalette.current.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                         }
-                        Text("${steps.size}/${WorkflowRules.MAX_STEPS}", color = FlowMuted, fontSize = 10.sp)
+                        Text("${steps.size}/${WorkflowRules.MAX_STEPS}", color = LocalOraclePalette.current.textSecondary, fontSize = 10.sp)
                     }
 
                     LazyColumn(
@@ -311,11 +292,11 @@ fun WorkflowScreen() {
                                     singleLine = false,
                                     minLines = 2
                                 )
-                                Surface(color = FlowRaised, shape = RoundedCornerShape(7.dp), border = BorderStroke(1.dp, FlowLine)) {
+                                Surface(color = LocalOraclePalette.current.surfaceRaised, shape = RoundedCornerShape(11.dp), border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft)) {
                                     Row(Modifier.fillMaxWidth().padding(9.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Tune, null, tint = FlowAccent, modifier = Modifier.size(16.dp))
+                                        OracleGlyphIcon(OracleGlyph.Settings, Modifier.size(16.dp), LocalOraclePalette.current.textSecondary)
                                         Spacer(Modifier.width(7.dp))
-                                        Text("MANUAL TRIGGER  ·  ON-DEVICE EXECUTION  ·  NO NETWORK", color = FlowMuted, fontSize = 8.sp, letterSpacing = .35.sp)
+                                        Text("MANUAL TRIGGER  ·  ON-DEVICE EXECUTION  ·  NO NETWORK", color = LocalOraclePalette.current.textSecondary, fontSize = 8.sp, letterSpacing = .35.sp)
                                     }
                                 }
                             }
@@ -331,9 +312,10 @@ fun WorkflowScreen() {
                             )
                         }
                         item {
-                            OutlinedButton(
+                            OracleTextAction(
+                                label = "ADD STEP",
                                 onClick = {
-                                    val id = selectedWorkflowId ?: return@OutlinedButton
+                                    val id = selectedWorkflowId ?: return@OracleTextAction
                                     if (steps.size >= WorkflowRules.MAX_STEPS) {
                                         status = "MAXIMUM ${WorkflowRules.MAX_STEPS} STEPS"
                                     } else {
@@ -348,29 +330,24 @@ fun WorkflowScreen() {
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, FlowLine),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = FlowAccent)
-                            ) {
-                                Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Add step", fontSize = 12.sp)
-                            }
+                                accent = true
+                            )
                         }
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedButton(
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OracleTextAction(
+                            label = "DELETE",
                             onClick = { showDeleteConfirmation = true },
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, FlowLine),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 9.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = FlowDanger)
-                        ) {
-                            Icon(Icons.Default.DeleteOutline, null, modifier = Modifier.size(16.dp))
-                        }
+                            accent = false
+                        )
                         Spacer(Modifier.weight(1f))
-                        OutlinedButton(
+                        OracleTextAction(
+                            label = if (saving) "SAVING…" else "SAVE",
                             onClick = {
                                 val issue = WorkflowRules.validate(steps)
                                 if (issue != null) status = issue else {
@@ -390,53 +367,39 @@ fun WorkflowScreen() {
                                 }
                             },
                             enabled = !saving && !running,
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, FlowLine),
-                            contentPadding = PaddingValues(horizontal = 11.dp, vertical = 9.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = FlowText)
-                        ) {
-                            Icon(Icons.Default.Save, null, modifier = Modifier.size(15.dp))
-                            Spacer(Modifier.width(5.dp))
-                            Text("Save", fontSize = 11.sp)
-                        }
-                        Button(
+                            accent = true
+                        )
+                        OracleSolidAction(
+                            label = if (running) "RUNNING…" else "RUN",
                             onClick = {
                                 val issue = WorkflowRules.validate(steps)
                                 if (issue != null) status = issue else showRunConfirmation = true
                             },
-                            enabled = !saving && !running && selectedWorkflow != null,
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = FlowAccent, contentColor = FlowInk)
-                        ) {
-                            if (running) CircularProgressIndicator(Modifier.size(14.dp), color = FlowInk, strokeWidth = 2.dp)
-                            else Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(if (running) "Running" else "Run", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
+                            enabled = !saving && !running && selectedWorkflow != null
+                        )
                     }
                 }
             }
         }
 
-        Text(status, color = FlowMuted, fontSize = 8.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(status, color = LocalOraclePalette.current.textSecondary, fontSize = 8.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 
     if (showRunConfirmation) {
         AlertDialog(
             onDismissRequest = { showRunConfirmation = false },
-            containerColor = FlowPanel,
-            titleContentColor = FlowText,
-            textContentColor = FlowMuted,
+            containerColor = LocalOraclePalette.current.surface,
+            titleContentColor = LocalOraclePalette.current.text,
+            textContentColor = LocalOraclePalette.current.textSecondary,
             title = { Text("Run this workflow locally?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                     Text("${steps.size} ordered step(s) will run after your confirmation.")
                     steps.sortedBy { it.position }.forEachIndexed { index, step ->
                         val action = WorkflowAction.from(step.actionType)
-                        Text("${index + 1}. ${action?.label ?: "Unknown action"} — ${step.title}", color = FlowText, fontSize = 11.sp)
+                        Text("${index + 1}. ${action?.label ?: "Unknown action"} — ${step.title}", color = LocalOraclePalette.current.text, fontSize = 11.sp)
                     }
-                    Text("No Gemini request, network access, app launch, file sharing or scheduled trigger is involved.", color = FlowAccent, fontSize = 10.sp)
+                    Text("No Gemini request, network access, app launch, file sharing or scheduled trigger is involved.", color = LocalOraclePalette.current.accent, fontSize = 10.sp)
                 }
             },
             confirmButton = {
@@ -461,18 +424,18 @@ fun WorkflowScreen() {
                             running = false
                         }
                     }
-                }) { Text("Confirm run", color = FlowAccent) }
+                }) { Text("Confirm run", color = LocalOraclePalette.current.accent) }
             },
-            dismissButton = { TextButton(onClick = { showRunConfirmation = false }) { Text("Cancel", color = FlowMuted) } }
+            dismissButton = { TextButton(onClick = { showRunConfirmation = false }) { Text("Cancel", color = LocalOraclePalette.current.textSecondary) } }
         )
     }
 
     if (showDeleteConfirmation) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation = false },
-            containerColor = FlowPanel,
-            titleContentColor = FlowText,
-            textContentColor = FlowMuted,
+            containerColor = LocalOraclePalette.current.surface,
+            titleContentColor = LocalOraclePalette.current.text,
+            textContentColor = LocalOraclePalette.current.textSecondary,
             title = { Text("Delete workflow?") },
             text = { Text("This permanently deletes the workflow, its steps and its run history. Local notes created by previous runs are not deleted.") },
             confirmButton = {
@@ -484,52 +447,61 @@ fun WorkflowScreen() {
                         selectedWorkflowId = null
                         status = "WORKFLOW DELETED · NOTES PRESERVED"
                     }
-                }) { Text("Delete", color = FlowDanger) }
+                }) { Text("Delete", color = LocalOraclePalette.current.error) }
             },
-            dismissButton = { TextButton(onClick = { showDeleteConfirmation = false }) { Text("Cancel", color = FlowMuted) } }
+            dismissButton = { TextButton(onClick = { showDeleteConfirmation = false }) { Text("Cancel", color = LocalOraclePalette.current.textSecondary) } }
         )
     }
 
     if (viewingRunId != null) {
         AlertDialog(
             onDismissRequest = { viewingRunId = null },
-            containerColor = FlowPanel,
-            titleContentColor = FlowText,
-            textContentColor = FlowMuted,
+            containerColor = LocalOraclePalette.current.surface,
+            titleContentColor = LocalOraclePalette.current.text,
+            textContentColor = LocalOraclePalette.current.textSecondary,
             title = { Text("Execution log · $viewingRunTitle") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     viewingLogs.forEach { log ->
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(log.status, color = when (log.status) {
-                                "SUCCESS" -> FlowAccent
-                                "FAILED" -> FlowDanger
-                                else -> FlowBlue
+                                "SUCCESS" -> LocalOraclePalette.current.accent
+                                "FAILED" -> LocalOraclePalette.current.error
+                                else -> LocalOraclePalette.current.accent
                             }, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                            Text(log.detail, color = FlowText, fontSize = 11.sp, lineHeight = 16.sp)
+                            Text(log.detail, color = LocalOraclePalette.current.text, fontSize = 11.sp, lineHeight = 16.sp)
                         }
                     }
-                    if (viewingLogs.isEmpty()) Text("No log entries were stored.", color = FlowMuted, fontSize = 11.sp)
+                    if (viewingLogs.isEmpty()) Text("No log entries were stored.", color = LocalOraclePalette.current.textSecondary, fontSize = 11.sp)
                 }
             },
-            confirmButton = { TextButton(onClick = { viewingRunId = null }) { Text("Close", color = FlowAccent) } }
+            confirmButton = { TextButton(onClick = { viewingRunId = null }) { Text("Close", color = LocalOraclePalette.current.accent) } }
         )
     }
 }
 
 @Composable
 private fun FlowTab(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    TextButton(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(7.dp),
-        colors = ButtonDefaults.textButtonColors(
-            containerColor = if (selected) FlowRaised else Color.Transparent,
-            contentColor = if (selected) FlowAccent else FlowMuted
-        ),
-        contentPadding = PaddingValues(vertical = 7.dp)
+    val palette = LocalOraclePalette.current
+    val target = if (selected) palette.surfaceRaised else Color.Transparent
+    val background by animateColorAsState(target, tween(180), label = "workflow-tab")
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(background)
+            .clickable(onClick = onClick)
+            .padding(vertical = 9.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, fontSize = 10.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+        Text(
+            label.uppercase(),
+            color = if (selected) palette.accent else palette.textSecondary,
+            fontFamily = OracleMono,
+            fontSize = 9.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            letterSpacing = .45.sp
+        )
     }
 }
 
@@ -540,9 +512,9 @@ private fun FlowEmptyState(title: String, description: String) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Icon(Icons.Default.Tune, null, tint = FlowAccent, modifier = Modifier.size(30.dp))
-        Text(title, color = FlowText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-        Text(description, color = FlowMuted, fontSize = 11.sp, lineHeight = 17.sp)
+        OracleGlyphIcon(OracleGlyph.Settings, Modifier.size(30.dp), LocalOraclePalette.current.textSecondary)
+        Text(title, color = LocalOraclePalette.current.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Text(description, color = LocalOraclePalette.current.textSecondary, fontSize = 11.sp, lineHeight = 17.sp)
     }
 }
 
@@ -557,22 +529,23 @@ private fun WorkflowStepCard(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val action = WorkflowAction.from(step.actionType)
-    Surface(color = FlowPanel, shape = RoundedCornerShape(9.dp), border = BorderStroke(1.dp, FlowLine)) {
+    Surface(color = LocalOraclePalette.current.surface, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft), modifier = Modifier.animateContentSize()) {
         Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${(index + 1).toString().padStart(2, '0')}", color = FlowAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                Text("${(index + 1).toString().padStart(2, '0')}", color = LocalOraclePalette.current.accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
                 Spacer(Modifier.width(8.dp))
                 Box {
-                    TextButton(onClick = { menuExpanded = true }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 2.dp)) {
-                        Text(action?.label ?: "Unsupported action", color = FlowBlue, fontSize = 10.sp)
-                        Icon(Icons.Default.Tune, null, tint = FlowBlue, modifier = Modifier.size(13.dp))
-                    }
+                    OracleTextAction(
+                        label = action?.label?.uppercase() ?: "UNSUPPORTED ACTION",
+                        onClick = { menuExpanded = true },
+                        accent = true
+                    )
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                         WorkflowAction.entries.forEach { candidate ->
                             DropdownMenuItem(
                                 text = { Column {
-                                    Text(candidate.label, color = FlowText, fontSize = 11.sp)
-                                    Text(candidate.help, color = FlowMuted, fontSize = 9.sp)
+                                    Text(candidate.label, color = LocalOraclePalette.current.text, fontSize = 11.sp)
+                                    Text(candidate.help, color = LocalOraclePalette.current.textSecondary, fontSize = 9.sp)
                                 } },
                                 onClick = {
                                     menuExpanded = false
@@ -583,15 +556,9 @@ private fun WorkflowStepCard(
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                IconButton(onClick = onMoveUp, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.ArrowUpward, "Move step up", tint = FlowMuted, modifier = Modifier.size(15.dp))
-                }
-                IconButton(onClick = onMoveDown, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.ArrowDownward, "Move step down", tint = FlowMuted, modifier = Modifier.size(15.dp))
-                }
-                IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.DeleteOutline, "Remove step", tint = FlowDanger, modifier = Modifier.size(15.dp))
-                }
+                OracleIconButton(OracleGlyph.ArrowUp, "Move step up", onMoveUp, tint = LocalOraclePalette.current.textSecondary, size = 28.dp)
+                OracleIconButton(OracleGlyph.ChevronDown, "Move step down", onMoveDown, tint = LocalOraclePalette.current.textSecondary, size = 28.dp)
+                OracleIconButton(OracleGlyph.Trash, "Remove step", onRemove, tint = LocalOraclePalette.current.error, size = 28.dp)
             }
             FlowField(
                 value = step.title,
@@ -608,7 +575,7 @@ private fun WorkflowStepCard(
                     minLines = 3
                 )
             } else {
-                Text("Searches the existing on-device document index. Results are recorded in the run log.", color = FlowMuted, fontSize = 9.sp)
+                Text("Searches the existing on-device document index. Results are recorded in the run log.", color = LocalOraclePalette.current.textSecondary, fontSize = 9.sp)
             }
         }
     }
@@ -622,35 +589,50 @@ private fun FlowField(
     singleLine: Boolean,
     minLines: Int = 1
 ) {
-    OutlinedTextField(
+    val palette = LocalOraclePalette.current
+    val shape = RoundedCornerShape(12.dp)
+    BasicTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth(),
-        placeholder = { Text(placeholder, color = FlowMuted, fontSize = 11.sp) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(palette.canvas)
+            .border(1.dp, palette.outline, shape)
+            .padding(horizontal = 12.dp, vertical = 11.dp),
         singleLine = singleLine,
         minLines = minLines,
         maxLines = if (singleLine) 1 else 5,
-        textStyle = LocalTextStyle.current.copy(color = FlowText, fontSize = 11.sp, lineHeight = 16.sp),
-        shape = RoundedCornerShape(7.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = FlowBlue,
-            unfocusedBorderColor = FlowLine,
-            focusedTextColor = FlowText,
-            unfocusedTextColor = FlowText,
-            cursorColor = FlowAccent,
-            focusedContainerColor = FlowInk,
-            unfocusedContainerColor = FlowInk
-        )
+        textStyle = TextStyle(
+            color = palette.text,
+            fontFamily = OracleSans,
+            fontSize = 12.sp,
+            lineHeight = 18.sp
+        ),
+        cursorBrush = SolidColor(palette.accent),
+        decorationBox = { inner ->
+            Box {
+                if (value.isEmpty()) {
+                    Text(
+                        placeholder,
+                        color = palette.textTertiary,
+                        fontFamily = OracleSans,
+                        fontSize = 12.sp
+                    )
+                }
+                inner()
+            }
+        }
     )
 }
 
 @Composable
 private fun RunStatus(status: String) {
     val color = when (status) {
-        "SUCCEEDED" -> FlowAccent
-        "FAILED" -> FlowDanger
-        "RUNNING" -> FlowBlue
-        else -> FlowMuted
+        "SUCCEEDED" -> LocalOraclePalette.current.accent
+        "FAILED" -> LocalOraclePalette.current.error
+        "RUNNING" -> LocalOraclePalette.current.accent
+        else -> LocalOraclePalette.current.textSecondary
     }
     Surface(color = color.copy(alpha = .12f), shape = RoundedCornerShape(5.dp)) {
         Text(status, Modifier.padding(horizontal = 6.dp, vertical = 3.dp), color = color, fontSize = 8.sp, fontWeight = FontWeight.Bold)

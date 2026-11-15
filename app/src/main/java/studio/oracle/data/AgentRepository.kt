@@ -10,14 +10,17 @@ import java.util.UUID
  * Local-first agent history. Conversation text stays in Room until the user
  * explicitly submits a turn to Gemini.
  */
-class AgentRepository(private val dao: AgentDao) {
-    val sessions: Flow<List<AgentSessionEntity>> = dao.observeSessions()
+class AgentRepository(
+    private val dao: AgentDao,
+    private val workspaceId: String
+) {
+    val sessions: Flow<List<AgentSessionEntity>> = dao.observeSessions(workspaceId)
 
     fun messages(sessionId: String): Flow<List<AgentMessageEntity>> =
         dao.observeMessages(sessionId)
 
     suspend fun ensureSession(model: String): String =
-        dao.sessionsSnapshot().firstOrNull()?.id ?: createSession(model)
+        dao.sessionsSnapshot(workspaceId).firstOrNull()?.id ?: createSession(model)
 
     suspend fun createSession(model: String): String {
         val now = System.currentTimeMillis()
@@ -28,7 +31,8 @@ class AgentRepository(private val dao: AgentDao) {
                 title = AgentConversationPolicy.DEFAULT_TITLE,
                 model = model,
                 createdAt = now,
-                updatedAt = now
+                updatedAt = now,
+                workspaceId = workspaceId
             )
         )
         return id
