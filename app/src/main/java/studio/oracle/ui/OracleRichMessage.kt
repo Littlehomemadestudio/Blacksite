@@ -180,10 +180,9 @@ private fun CodeArtifactCard(language: String, source: String) {
                 color = Color(0xFF9AABD9), fontFamily = OracleMono, fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF30394B)))
-        Text(
-            source,
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(13.dp),
-            color = Color(0xFFE1E7F2), fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 17.sp
+        OracleSyntaxCode(
+            source = source,
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(13.dp)
         )
     }
 }
@@ -346,6 +345,47 @@ private fun inlineMarkdown(source: String, color: Color): AnnotatedString = buil
                 pop(); pop()
             }
         }
+        cursor = match.range.last + 1
+    }
+    append(source.substring(cursor))
+}
+
+
+/** Lightweight syntax coloring for generated and executed code blocks. */
+@Composable
+fun OracleSyntaxCode(source: String, modifier: Modifier = Modifier) {
+    val annotated = remember(source) { colorizeSource(source) }
+    Text(
+        text = annotated,
+        modifier = modifier,
+        style = androidx.compose.ui.text.TextStyle(
+            fontFamily = FontFamily.Monospace,
+            fontSize = 11.sp,
+            lineHeight = 17.sp,
+            color = Color(0xFFE1E7F2)
+        )
+    )
+}
+
+private fun colorizeSource(source: String): AnnotatedString = buildAnnotatedString {
+    val token = Regex(
+        """(?m)(#.*$|//.*$)|("(?:\\\\.|[^"\\\\])*"|'(?:\\\\.|[^'\\\\])*')|(\\b(?:def|class|return|if|elif|else|for|while|in|not|and|or|is|import|from|as|try|except|finally|with|async|await|yield|pass|break|continue|lambda|raise|new|fun|val|var|const|let|function|public|private|static|suspend|override|when|object|interface|package)\\b)|(\\b(?:True|False|None|null|true|false|undefined)\\b)|(\\b\\d+(?:\\.\\d+)?\\b)|(\\b[A-Za-z_][A-Za-z_0-9]*(?=\\s*\\())"""
+    )
+    var cursor = 0
+    token.findAll(source).forEach { match ->
+        append(source.substring(cursor, match.range.first))
+        val color = when {
+            match.groups[1] != null -> Color(0xFF8190A9)
+            match.groups[2] != null -> Color(0xFFA6D6A5)
+            match.groups[3] != null -> Color(0xFFC6A5F7)
+            match.groups[4] != null -> Color(0xFF78C6E8)
+            match.groups[5] != null -> Color(0xFFE6B477)
+            match.groups[6] != null -> Color(0xFF85B8F5)
+            else -> Color(0xFFE1E7F2)
+        }
+        pushStyle(SpanStyle(color = color, fontWeight = if (match.groups[3] != null) FontWeight.SemiBold else FontWeight.Normal))
+        append(match.value)
+        pop()
         cursor = match.range.last + 1
     }
     append(source.substring(cursor))
