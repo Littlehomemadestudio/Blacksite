@@ -18,6 +18,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +34,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import kotlinx.coroutines.CancellationException
@@ -46,6 +50,9 @@ import studio.oracle.data.GeminiApi
 import studio.oracle.data.GeminiModel
 import studio.oracle.data.GeminiModelsResult
 import studio.oracle.data.ModelPreferences
+import studio.oracle.data.WorkspaceCreateResult
+import studio.oracle.data.WorkspacePolicy
+import studio.oracle.data.local.WorkspaceEntity
 import studio.oracle.data.local.AgentMessageEntity
 import studio.oracle.data.local.OracleDatabase
 import studio.oracle.security.SecureKeyStore
@@ -56,15 +63,19 @@ import studio.oracle.ui.theme.OracleSans
 @Composable
 fun OracleScreen(
     onOpenLibrary: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    workspaceId: String,
+    workspaces: List<WorkspaceEntity>,
+    onWorkspaceChange: (String) -> Unit,
+    onCreateWorkspace: suspend (String) -> WorkspaceCreateResult
 ) {
     val context = LocalContext.current
     val palette = LocalOraclePalette.current
     val keyboard = LocalSoftwareKeyboardController.current
     val keyStore = remember { SecureKeyStore(context) }
     val api = remember { GeminiApi() }
-    val repository = remember(context) {
-        AgentRepository(OracleDatabase.get(context).agentDao())
+    val repository = remember(context, workspaceId) {
+        AgentRepository(OracleDatabase.get(context).agentDao(), workspaceId)
     }
     val modelPreferences = remember(context) { ModelPreferences(context) }
     val scope = rememberCoroutineScope()
@@ -91,7 +102,14 @@ fun OracleScreen(
         drawerOpen = false
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(workspaceId) {
+        requestJob?.cancel()
+        busy = false
+        activeSessionId = null
+        messages = emptyList()
+        error = null
+        failedPrompt = null
+        failedPromptPersisted = false
         activeSessionId = repository.ensureSession(model)
     }
 
@@ -355,6 +373,10 @@ fun OracleScreen(
             OracleThreadDrawer(
                 sessions = sessions,
                 activeSessionId = activeSessionId,
+                workspaces = workspaces,
+                activeWorkspaceId = workspaceId,
+                onWorkspaceChange = onWorkspaceChange,
+                onCreateWorkspace = onCreateWorkspace,
                 onClose = { drawerOpen = false },
                 onNewThread = { createNewThread(closeDrawer = true) },
                 onSelectThread = ::selectThread,
@@ -628,6 +650,10 @@ private fun ModelChoice(
 private fun OracleThreadDrawer(
     sessions: List<studio.oracle.data.local.AgentSessionEntity>,
     activeSessionId: String?,
+    workspaces: List<WorkspaceEntity>,
+    activeWorkspaceId: String,
+    onWorkspaceChange: (String) -> Unit,
+    onCreateWorkspace: suspend (String) -> WorkspaceCreateResult,
     onClose: () -> Unit,
     onNewThread: () -> Unit,
     onSelectThread: (String) -> Unit,
@@ -635,6 +661,13 @@ private fun OracleThreadDrawer(
     onOpenSettings: () -> Unit
 ) {
     val palette = LocalOraclePalette.current
+    val scope = rememberCoroutineScope()
+    var workspaceListExpanded by remember { mutableStateOf(false) }
+    var workspaceComposerExpanded by remember { mutableStateOf(false) }
+    var workspaceName by remember { mutableStateOf("") }
+    var workspaceError by remember { mutableStateOf<String?>(null) }
+    var workspaceSaving by remember { mutableStateOf(false) }
+    val activeWorkspace = workspaces.firstOrNull { it.id == activeWorkspaceId }
     Box(Modifier.fillMaxSize()) {
         Box(
             Modifier
@@ -676,7 +709,190 @@ private fun OracleThreadDrawer(
                     )
                 }
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(18.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "WORKSPACE",
+                            color = palette.textTertiary,
+                            fontFamily = OracleMono,
+                            fontSize = 9.sp,
+                            letterSpacing = 1.1.sp
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            activeWorkspace?.name ?: "Loading workspace",
+                            color = palette.text,
+                            fontFamily = OracleSans,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 14.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    DrawerInlineAction(
+                        label = if (workspaceListExpanded) "CLOSE" else "SWITCH",
+                        onClick = { workspaceListExpanded = !workspaceListExpanded }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    DrawerInlineAction(
+                        label = if (workspaceComposerExpanded) "CANCEL" else "NEW",
+                        onClick = {
+                            workspaceComposerExpanded = !workspaceComposerExpanded
+                            workspaceError = null
+                        },
+                        accent = true
+                    )
+                }
+
+                if (workspaceListExpanded) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 150.dp)
+                            .clip(RoundedCornerShape(13.dp))
+                            .background(palette.canvas)
+                            .verticalScroll(rememberScrollState())
+                            .padding(5.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        workspaces.forEach { workspace ->
+                            val selected = workspace.id == activeWorkspaceId
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .background(if (selected) palette.accentSoft else Color.Transparent)
+                                    .clickable {
+                                        onWorkspaceChange(workspace.id)
+                                        workspaceListExpanded = false
+                                        onClose()
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    workspace.name,
+                                    modifier = Modifier.weight(1f),
+                                    color = if (selected) palette.accent else palette.textSecondary,
+                                    fontFamily = OracleSans,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (selected) {
+                                    Text("ACTIVE", color = palette.accent, fontFamily = OracleMono, fontSize = 8.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (workspaceComposerExpanded) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(13.dp))
+                            .background(palette.surfaceRaised)
+                            .padding(11.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "CREATE WORKSPACE",
+                            color = palette.textTertiary,
+                            fontFamily = OracleMono,
+                            fontSize = 9.sp,
+                            letterSpacing = 1.sp
+                        )
+                        BasicTextField(
+                            value = workspaceName,
+                            onValueChange = {
+                                workspaceName = it.take(WorkspacePolicy.MAX_NAME_LENGTH)
+                                workspaceError = null
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(palette.canvas)
+                                .padding(horizontal = 11.dp, vertical = 10.dp),
+                            singleLine = true,
+                            textStyle = TextStyle(
+                                color = palette.text,
+                                fontFamily = OracleSans,
+                                fontSize = 13.sp
+                            ),
+                            cursorBrush = SolidColor(palette.accent),
+                            decorationBox = { innerTextField ->
+                                Box {
+                                    if (workspaceName.isBlank()) {
+                                        Text(
+                                            "Workspace name",
+                                            color = palette.textTertiary,
+                                            fontFamily = OracleSans,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            }
+                        )
+                        if (workspaceError != null) {
+                            Text(
+                                workspaceError.orEmpty(),
+                                color = palette.error,
+                                fontFamily = OracleSans,
+                                fontSize = 10.sp
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            DrawerInlineAction(
+                                label = "CANCEL",
+                                onClick = {
+                                    workspaceComposerExpanded = false
+                                    workspaceName = ""
+                                    workspaceError = null
+                                }
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            DrawerInlineAction(
+                                label = if (workspaceSaving) "SAVING" else "CREATE",
+                                accent = true,
+                                enabled = !workspaceSaving && workspaceName.isNotBlank(),
+                                onClick = {
+                                    scope.launch {
+                                        workspaceSaving = true
+                                        try {
+                                            when (val result = onCreateWorkspace(workspaceName)) {
+                                                is WorkspaceCreateResult.Success -> {
+                                                    onWorkspaceChange(result.workspace.id)
+                                                    workspaceName = ""
+                                                    workspaceComposerExpanded = false
+                                                    workspaceListExpanded = false
+                                                    onClose()
+                                                }
+                                                is WorkspaceCreateResult.Failure -> {
+                                                    workspaceError = result.message
+                                                }
+                                            }
+                                        } catch (cancelled: CancellationException) {
+                                            throw cancelled
+                                        } catch (_: Exception) {
+                                            workspaceError = "Could not create this workspace. Try again."
+                                        } finally {
+                                            workspaceSaving = false
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
 
                 Row(
                     modifier = Modifier
@@ -750,6 +966,27 @@ private fun OracleThreadDrawer(
             }
         }
     }
+}
+
+@Composable
+private fun DrawerInlineAction(
+    label: String,
+    onClick: () -> Unit,
+    accent: Boolean = false,
+    enabled: Boolean = true
+) {
+    val palette = LocalOraclePalette.current
+    Text(
+        label,
+        modifier = Modifier
+            .clip(RoundedCornerShape(7.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 5.dp, vertical = 5.dp),
+        color = if (enabled && accent) palette.accent else palette.textTertiary,
+        fontFamily = OracleMono,
+        fontSize = 9.sp,
+        fontWeight = FontWeight.Medium
+    )
 }
 
 @Composable

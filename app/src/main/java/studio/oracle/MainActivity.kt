@@ -12,6 +12,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
+import studio.oracle.data.WorkspacePreferences
+import studio.oracle.data.WorkspacePolicy
+import studio.oracle.data.WorkspaceRepository
+import studio.oracle.data.WorkspaceCreateResult
+import studio.oracle.data.local.OracleDatabase
 import studio.oracle.ui.HandcraftedLogo
 import studio.oracle.ui.LibraryScreen
 import studio.oracle.ui.OracleGlyph
@@ -41,7 +48,39 @@ private enum class OracleDestination {
 
 @Composable
 private fun OracleRoot() {
+    val context = LocalContext.current
+    val database = remember(context) { OracleDatabase.get(context) }
+    val workspaceRepository = remember(database) { WorkspaceRepository(database.workspaceDao()) }
+    val workspacePreferences = remember(context) { WorkspacePreferences(context) }
+    val scope = rememberCoroutineScope()
+    val workspaces by workspaceRepository.workspaces.collectAsState(initial = emptyList())
+    val savedWorkspaceId by workspacePreferences.activeWorkspaceId.collectAsState(initial = null)
+    var activeWorkspaceId by remember { mutableStateOf(WorkspacePolicy.DEFAULT_WORKSPACE_ID) }
+    var workspaceSelectionRestored by remember { mutableStateOf(false) }
     var destination by remember { mutableStateOf(OracleDestination.CHAT) }
+
+    LaunchedEffect(Unit) {
+        workspaceRepository.ensureDefaultWorkspace()
+    }
+
+    LaunchedEffect(workspaces, savedWorkspaceId) {
+        if (workspaces.isNotEmpty() &&
+            (!workspaceSelectionRestored || workspaces.none { it.id == activeWorkspaceId })
+        ) {
+            val resolved = savedWorkspaceId?.takeIf { id -> workspaces.any { it.id == id } }
+                ?: workspaces.first().id
+            activeWorkspaceId = resolved
+            workspaceSelectionRestored = true
+            if (savedWorkspaceId != resolved) {
+                workspacePreferences.setActiveWorkspaceId(resolved)
+            }
+        }
+    }
+
+    fun selectWorkspace(id: String) {
+        activeWorkspaceId = id
+        scope.launch { workspacePreferences.setActiveWorkspaceId(id) }
+    }
 
     BackHandler(enabled = destination != OracleDestination.CHAT) {
         destination = OracleDestination.CHAT
@@ -50,14 +89,18 @@ private fun OracleRoot() {
     when (destination) {
         OracleDestination.CHAT -> OracleScreen(
             onOpenLibrary = { destination = OracleDestination.LIBRARY },
-            onOpenSettings = { destination = OracleDestination.SETTINGS }
+            onOpenSettings = { destination = OracleDestination.SETTINGS },
+            workspaceId = activeWorkspaceId,
+            workspaces = workspaces,
+            onWorkspaceChange = ::selectWorkspace,
+            onCreateWorkspace = { name -> workspaceRepository.create(name) }
         )
 
         OracleDestination.LIBRARY -> OracleSection(
             title = "Library",
             onBack = { destination = OracleDestination.CHAT }
         ) {
-            LibraryScreen()
+            LibraryScreen(workspaceId = activeWorkspaceId)
         }
 
         OracleDestination.SETTINGS -> OracleSection(
@@ -68,7 +111,6 @@ private fun OracleRoot() {
         }
     }
 }
-
 @Composable
 private fun OracleSection(
     title: String,

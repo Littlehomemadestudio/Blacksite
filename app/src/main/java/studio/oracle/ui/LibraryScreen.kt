@@ -46,11 +46,11 @@ import studio.oracle.ui.theme.OracleMono
 import studio.oracle.ui.theme.OracleSans
 
 @Composable
-fun LibraryScreen() {
+fun LibraryScreen(workspaceId: String) {
     val palette = LocalOraclePalette.current
     val context = LocalContext.current
-    val repository = remember(context) {
-        DocumentRepository(context, OracleDatabase.get(context).documentDao())
+    val repository = remember(context, workspaceId) {
+        DocumentRepository(context, OracleDatabase.get(context).documentDao(), workspaceId)
     }
     val keyStore = remember(context) { SecureKeyStore(context) }
     val api = remember { GeminiApi() }

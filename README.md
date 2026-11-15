@@ -24,6 +24,8 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Gemini API key validation and AES-GCM encryption backed by Android Keystore. No API key is embedded in source or APK.
 - Live Gemini Agent console using `generateContent`, with visible request status and API/network errors.
 - Persistent agent threads and message history in Room; thread titles are generated locally from the first user prompt.
+- First-class local workspaces with a Personal default, create/switch controls in the conversation drawer, and DataStore-backed active-workspace selection.
+- Agent threads and imported documents are scoped to the active workspace; a Room 2→3 migration assigns existing content to Personal without losing history.
 - Selected Gemini model stored in DataStore. The Agent can refresh the models exposed to the connected key using Google's models endpoint and choose a model that supports `generateContent`.
 - Cancellable OkHttp requests: an explicit **Cancel** control cancels the in-flight network call. Failed/cancelled prompts remain in the local thread and retry without duplicating the saved user turn.
 - Bounded conversation context (last 12 messages) with a send-point disclosure in the chat composer; Library Q&A displays the exact retrieved excerpts and requires confirmation before sending them.
@@ -34,7 +36,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 
 ## In progress / not yet available
 - Office document extraction, image OCR, scanned-PDF OCR, document summaries, flashcards, quizzes, semantic embeddings, and knowledge graph.
-- Multi-project workspace management beyond persistent Agent threads.
+- Workspace rename and deletion controls, workspace-level export, and project-specific settings are not available yet.
 - Visual workflow authoring, triggers, local action execution, approval gates, and run history.
 - Audio recording, transcription, searchable archive, and task/decision extraction.
 - Agent tool execution. The current Agent is a Gemini chat/planning interface; it does not silently access files, apps, or perform device actions.
@@ -54,4 +56,4 @@ These planned modules are not presented as working features in the app.
 - PDFs with no selectable text are rejected; image-only pages in mixed PDFs are skipped. OCR, standalone images, DOC/DOCX, spreadsheets, and presentations are not supported yet.
 - The reader displays extracted text and citation labels; it is not yet a rendered PDF page viewer.
 - Retrieval currently uses on-device lexical keyword matching, not embeddings or semantic vector search. PDF answers cite original page numbers; text and Markdown answers cite indexed sections.
-- User-facing thread deletion and full workspace export are not available yet. Uninstalling the app removes its app-private data.
+- User-facing thread deletion, workspace deletion, and full workspace export are not available yet. Uninstalling the app removes its app-private data.
