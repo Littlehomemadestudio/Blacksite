@@ -26,7 +26,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Model controls in the composer: thinking level and summaries, tool-choice mode, output-token limit, model-reported input/output limits, Google Search, URL context, hosted code execution, and local tools.
 - A live context ledger reports input, output, thinking, cached, and tool-use token counts when the API returns usage metadata.
 - The assistant response supports rich Markdown blocks: headings, inline emphasis, numbered/bulleted lists, tables, quotations, code blocks, clickable links, embedded remote images, and simple rendered process diagrams.
-- A compact colored plan/work rail sits above the assistant answer. Expanding it reveals the user-facing execution summary and actual tool/code/result log; private model reasoning traces are not exposed.
+- The model may emit a single user-facing plan summary per tool run; a compact colored plan/work rail sits above the assistant answer. Expanding it reveals the user-facing execution summary and actual tool/code/result log; private model reasoning traces are not exposed.
 - Context/token usage is a small circular control with a detailed breakdown on tap, not a large metadata card.
 - Tool outputs and generated artifacts are rendered inline: Python source/output, generated image/audio/video/document results, and editable file cards.
 - The model/tool composer uses a translucent glass-style surface and expands a quick-controls panel. Explore Models opens a full-screen model atlas with model metadata, limits, descriptions and artwork.
