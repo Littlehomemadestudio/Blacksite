@@ -2,7 +2,7 @@
 import ast, contextlib, io, sys
 _ALLOWED={"math","statistics","decimal","fractions","itertools","collections","functools","re","json","datetime","random","string","textwrap"}
 _BLOCKED={"open","exec","eval","compile","input","breakpoint","globals","locals","vars","getattr","setattr","delattr"}
-_SAFE={"abs","all","any","bool","bytes","callable","chr","dict","divmod","enumerate","filter","float","format","frozenset","hash","hex","int","isinstance","issubclass","iter","len","list","map","max","min","next","oct","ord","pow","print","range","repr","reversed","round","set","slice","sorted","str","sum","tuple","type","zip","Exception","ArithmeticError","AssertionError","AttributeError","IndexError","KeyError","NameError","RuntimeError","TypeError","ValueError","ZeroDivisionError"}
+_SAFE={"abs","all","any","bool","bytes","callable","chr","dict","divmod","enumerate","filter","float","format","frozenset","hash","hex","int","isinstance","issubclass","iter","len","list","map","max","min","next","oct","ord","pow","print","range","repr","reversed","round","set","slice","sorted","str","sum","tuple","type","zip","Exception","BaseException","StopIteration","NotImplementedError","object","property","classmethod","staticmethod","super","ArithmeticError","AssertionError","AttributeError","IndexError","KeyError","NameError","RuntimeError","TypeError","ValueError","ZeroDivisionError"}
 class _Budget(Exception): pass
 def _import(name,globals=None,locals=None,fromlist=(),level=0):
     if level or name.split(".")[0] not in _ALLOWED: raise ImportError("Module is disabled: "+name)
