@@ -30,7 +30,8 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 ### Workspaces
 - A Personal default workspace plus local create/switch controls in the conversation drawer.
 - Active workspace selection persists in DataStore.
-- Agent threads and imported documents are scoped to the active workspace.
+- Agent threads, imported documents, workflows, notes, workflow run history, and execution logs are scoped to the active workspace.
+- Identically named workflows and notes can exist independently in separate workspaces; a workspace cannot update or delete another workspace's workflows through repository operations.
 
 ### Document Library
 - Imports PDF with selectable text, UTF-8 plain text, and Markdown from Android's document picker; originals are copied into app-private storage.
@@ -70,4 +71,4 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - User-facing thread deletion, workspace deletion, and full workspace export are not available yet. Uninstalling the app removes its app-private data.
 
 ## Database compatibility
-Room schema v4 retains both the workspace and workflow data models. Its 3→4 migration is idempotent across the two earlier v3 layouts: it adds any missing workspace columns and creates workflow tables only when they do not already exist.
+Room schema v5 retains the existing agent, document, and workflow data while adding workspace ownership to workflows and local notes. The 4→5 migration assigns existing workflows and notes to the Personal workspace, replaces global note-title uniqueness with per-workspace uniqueness, and adds workspace-aware indexes. Earlier 3→4 compatibility remains idempotent across the two v3 layouts.
