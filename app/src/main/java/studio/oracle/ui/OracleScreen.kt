@@ -2264,7 +2264,7 @@ private fun OracleEmptyState(onPrompt: (String) -> Unit) {
                     .padding(horizontal = 13.dp, vertical = 13.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(listOf("⌕", "▤", "⌘", "✳")[index], color = palette.accent, fontSize = 17.sp)
+                Text(listOf("⌕", "▤", "⌘", "✳", "↗")[index], color = palette.accent, fontSize = 17.sp)
                 Spacer(Modifier.width(11.dp))
                 Text(pair.first, modifier = Modifier.weight(1f), color = palette.text, fontFamily = OracleSans, fontSize = 12.sp)
                 Text("↗", color = palette.textTertiary, fontSize = 14.sp)
