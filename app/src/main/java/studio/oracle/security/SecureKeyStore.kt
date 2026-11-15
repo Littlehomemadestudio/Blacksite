@@ -38,18 +38,25 @@ class SecureKeyStore(context: Context) {
         val iv = payload.copyOfRange(0, GCM_IV_BYTES)
         val ciphertext = payload.copyOfRange(GCM_IV_BYTES, payload.size)
         val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.DECRYPT_MODE, getOrCreateSecretKey(), GCMParameterSpec(GCM_TAG_BITS, iv))
+        cipher.init(Cipher.DECRYPT_MODE, getExistingSecretKey(), GCMParameterSpec(GCM_TAG_BITS, iv))
         return cipher.doFinal(ciphertext).toString(Charsets.UTF_8)
     }
 
     fun clear() {
+        // Delete the key first. If Keystore refuses, keep the ciphertext so the UI can
+        // report failure and the user can retry instead of claiming a partial removal.
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+        keyStore.deleteEntry(alias)
+        check(!keyStore.containsAlias(alias)) { "Could not remove the Android Keystore key." }
         check(prefs.edit().remove(KEY_CIPHERTEXT).commit()) {
             "Could not remove the encrypted API key."
         }
-        // Remove the non-exportable key as well; a future credential gets a fresh alias.
-        runCatching {
-            KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }.deleteEntry(alias)
-        }
+    }
+
+    private fun getExistingSecretKey(): SecretKey {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+        return keyStore.getKey(alias, null) as? SecretKey
+            ?: throw IllegalStateException("The encryption key is missing. Remove the stored credential and reconnect.")
     }
 
     private fun getOrCreateSecretKey(): SecretKey {
