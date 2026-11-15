@@ -25,6 +25,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.expandVertically
@@ -131,7 +132,7 @@ fun OracleScreen(
     var messages by remember { mutableStateOf(emptyList<AgentMessageEntity>()) }
     var prompt by remember { mutableStateOf("") }
     var availableModels by remember {
-        mutableStateOf(listOf(GeminiModel(ModelPreferences.DEFAULT_MODEL, "Gemini 3.8 Flash")))
+        mutableStateOf(listOf(GeminiModel(ModelPreferences.DEFAULT_MODEL, "Gemini 3.5 Flash-Lite")))
     }
     var syncingModels by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -698,6 +699,8 @@ fun OracleScreen(
                             item { OracleThinkingIndicator() }
                         }
                     }
+                } else {
+                    OracleEmptyState(onPrompt = { prompt = it })
                 }
             }
 
@@ -2099,5 +2102,87 @@ private fun DrawerAction(
             fontFamily = OracleSans,
             fontSize = 13.sp
         )
+    }
+}
+
+
+@Composable
+private fun OracleEmptyState(onPrompt: (String) -> Unit) {
+    val palette = LocalOraclePalette.current
+    val motion = rememberInfiniteTransition(label = "empty-state-orbit")
+    val orbit by motion.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.tween(18000, easing = androidx.compose.animation.core.LinearEasing)
+        ),
+        label = "orbit"
+    )
+    val breathe by motion.animateFloat(
+        initialValue = 0.94f,
+        targetValue = 1.04f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.tween(2600),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "breathe"
+    )
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(Modifier.size(172.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(154.dp).rotate(orbit).border(1.dp, palette.accent.copy(alpha = 0.24f), CircleShape))
+            Box(Modifier.size(116.dp).rotate(-orbit * 0.7f).border(1.dp, palette.outlineSoft, RoundedCornerShape(36.dp)))
+            Box(Modifier.size(86.dp).scale(breathe).clip(CircleShape).background(palette.accent.copy(alpha = 0.10f)), contentAlignment = Alignment.Center) {
+                HandcraftedLogo(Modifier.size(49.dp), palette.accent)
+            }
+            Box(Modifier.offset(x = 57.dp, y = (-53).dp).size(9.dp).clip(CircleShape).background(palette.accent))
+            Box(Modifier.offset(x = (-65).dp, y = 37.dp).size(6.dp).clip(CircleShape).background(palette.accent.copy(alpha = 0.65f)))
+        }
+        Spacer(Modifier.height(22.dp))
+        Text(
+            "A clear field. A capable mind.",
+            color = palette.text,
+            fontFamily = OracleSans,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 21.sp,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            "Research, build, calculate, create. Give ORACLE a direction.",
+            modifier = Modifier.padding(top = 9.dp, bottom = 24.dp).widthIn(max = 300.dp),
+            color = palette.textSecondary,
+            fontFamily = OracleSans,
+            fontSize = 12.sp,
+            lineHeight = 18.sp,
+            textAlign = TextAlign.Center
+        )
+        Text("START WITH A MISSION", color = palette.accent, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 1.2.sp)
+        Spacer(Modifier.height(12.dp))
+        listOf(
+            "Research a topic and build a cited report" to "Research a topic and create a concise report with reliable sources.",
+            "Analyze a file on my phone" to "Help me analyze a file I choose from my phone.",
+            "Write and run a Python script" to "Write a useful Python script, run it, and explain the output.",
+            "Create an image or visual concept" to "Create an original visual concept for my idea."
+        ).forEachIndexed { index, pair ->
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(palette.surface.copy(alpha = 0.82f))
+                    .border(1.dp, palette.outlineSoft, RoundedCornerShape(14.dp))
+                    .clickable { onPrompt(pair.second) }
+                    .padding(horizontal = 13.dp, vertical = 13.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(listOf("⌕", "▤", "⌘", "✳")[index], color = palette.accent, fontSize = 17.sp)
+                Spacer(Modifier.width(11.dp))
+                Text(pair.first, modifier = Modifier.weight(1f), color = palette.text, fontFamily = OracleSans, fontSize = 12.sp)
+                Text("↗", color = palette.textTertiary, fontSize = 14.sp)
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+        Text("YOUR WORKSPACE · YOUR TOOLS · YOUR CONTROL", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 8.sp, letterSpacing = 0.6.sp, textAlign = TextAlign.Center)
     }
 }
