@@ -43,7 +43,8 @@ data class AgenticEvent(
 data class AgentMediaInput(
     val name: String,
     val mimeType: String,
-    val base64Data: String
+    val base64Data: String = "",
+    val fileUri: String? = null
 ) {
     fun toContentBlock(): JSONObject {
         val contentType = when {
@@ -53,10 +54,11 @@ data class AgentMediaInput(
             mimeType == "application/pdf" || mimeType == "text/csv" -> "document"
             else -> "document"
         }
-        return JSONObject()
-            .put("type", contentType)
-            .put("mime_type", mimeType)
-            .put("data", base64Data)
+        return JSONObject().apply {
+            put("type", contentType)
+            put("mime_type", mimeType)
+            if (!fileUri.isNullOrBlank()) put("uri", fileUri) else put("data", base64Data)
+        }
     }
 }
 
