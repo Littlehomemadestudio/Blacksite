@@ -15,13 +15,14 @@ data class SubmissionHistory(
  * Keeping this policy pure makes context limits and session naming testable.
  */
 object AgentConversationPolicy {
+    const val DEFAULT_CONTEXT_MESSAGES = 12
     const val MAX_CONTEXT_MESSAGES = 48
     const val DEFAULT_TITLE = "New thread"
     const val MAX_TITLE_LENGTH = 42
 
     fun context(
         turns: List<AgentTurn>,
-        maxMessages: Int = MAX_CONTEXT_MESSAGES
+        maxMessages: Int = DEFAULT_CONTEXT_MESSAGES
     ): List<Pair<String, String>> =
         turns.takeLast(maxMessages.coerceIn(1, MAX_CONTEXT_MESSAGES))
             .map { it.role to it.content }
