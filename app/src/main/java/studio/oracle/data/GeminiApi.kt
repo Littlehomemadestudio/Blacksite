@@ -278,10 +278,7 @@ class GeminiApi(
                     if (functionCall != null) calls += part to functionCall
                 }
 
-                val hasSearchGrounding = responsePayload.optJSONObject("groundingMetadata") != null ||
-                    responsePayload.optJSONObject("candidates")
-                        ?.optJSONObject(0)
-                        ?.optJSONObject("groundingMetadata") != null
+
 
                 if (calls.isEmpty()) {
                     finalCandidateContent = candidateContent
