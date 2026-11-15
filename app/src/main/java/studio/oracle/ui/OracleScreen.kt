@@ -11,6 +11,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import studio.oracle.data.AgentAttachmentRef
 import studio.oracle.data.AgenticEventCodec
 import studio.oracle.data.AgentMediaInput
@@ -679,11 +681,53 @@ fun OracleScreen(
         }
         if (pendingApproval != null) {
             AlertDialog(
-                onDismissRequest = { approvalDeferred?.complete(false); approvalDeferred = null; pendingApproval = null },
-                title = { Text("ORACLE wants permission") },
+                onDismissRequest = { approvalDeferred?.complete("deny"); approvalDeferred = null; pendingApproval = null },
+                title = { Text("ORACLE requests access") },
                 text = { Text(pendingApproval.orEmpty()) },
-                confirmButton = { TextButton(onClick = { approvalDeferred?.complete(true); approvalDeferred = null; pendingApproval = null }) { Text("ALLOW ONCE") } },
-                dismissButton = { TextButton(onClick = { approvalDeferred?.complete(false); approvalDeferred = null; pendingApproval = null }) { Text("DENY") } }
+                confirmButton = {
+                    TextButton(onClick = {
+                        approvalDeferred?.complete("session")
+                        approvalDeferred = null
+                        pendingApproval = null
+                    }) { Text("ALLOW FOR SESSION") }
+                },
+                dismissButton = {
+                    Row {
+                        TextButton(onClick = {
+                            approvalDeferred?.complete("once")
+                            approvalDeferred = null
+                            pendingApproval = null
+                        }) { Text("ONCE") }
+                        TextButton(onClick = {
+                            approvalDeferred?.complete("deny")
+                            approvalDeferred = null
+                            pendingApproval = null
+                        }) { Text("DENY") }
+                    }
+                }
+            )
+        }
+        if (modelBrowserOpen) {
+            ModelBrowserDialog(
+                models = menuModels,
+                selectedModel = model,
+                refreshing = syncingModels,
+                onRefresh = ::refreshModels,
+                onSelect = ::chooseModel,
+                onDismiss = { modelBrowserOpen = false }
+            )
+        }
+        if (editingFileUri != null) {
+            AgentFileEditorDialog(
+                fileName = editingFileName,
+                mimeType = editingFileMime,
+                content = editingFileContent,
+                loading = loadingFile,
+                saving = savingFile,
+                error = fileEditorError,
+                onContentChange = { editingFileContent = it },
+                onSave = ::saveEditedArtifact,
+                onDismiss = { if (!savingFile) editingFileUri = null }
             )
         }
     }
@@ -1183,6 +1227,216 @@ private fun ModelChoice(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+private fun modelArt(model: String): String = when {
+    model.contains("3.8", ignoreCase = true) ->
+        "https://iweaver-sv-1402138190.cos.na-siliconvalley.myqcloud.com/docx/2026/09/03/8806aaac-cfb7-464a-a254-3ea0d9231c5c/gemini-3-8-flash.webp"
+    model.contains("4-", ignoreCase = true) || model.contains("gemini-4", ignoreCase = true) ->
+        "https://lh3.googleusercontent.com/O-rDY-Ewk6zMN3iWhEOHonHtrN1_xmxVJy3LZZVRdZkV7KaWo_MUX_UsCYyGOgj_9HPHCMhep1zoObX8fGpfsUyYriw8KHkjWfSo5JCeyERADq4FFQ=w1440-rw-lo"
+    else ->
+        "https://puzzleout.net/_emdash/api/media/file/01M1QNY5YJ98KNT5ZS29MDZXA0.png"
+}
+
+private fun modelDescription(model: String): String = when {
+    model.contains("3.8-flash", true) -> "A versatile agent model for coding, long-running tasks, advanced reasoning and multimodal understanding."
+    model.contains("flash-lite", true) -> "A lighter, throughput-oriented model for fast everyday work and high-volume tasks."
+    model.contains("pro", true) -> "A higher-capability reasoning model for demanding analysis and complex knowledge work."
+    model.contains("4-hydrogen", true) -> "A frontier reasoning model for difficult, long-horizon problems and complex agent workflows."
+    model.contains("4-carbon", true) -> "A powerful general model with strong reasoning and multimodal capabilities."
+    model.contains("audio", true) || model.contains("live", true) -> "A model family optimized for realtime audio input and conversational output."
+    else -> "A Gemini model available to the connected API key. Its capabilities and limits are determined by Google's model metadata."
+}
+
+private fun modelTags(model: GeminiModel): List<String> = buildList {
+    if (model.inputTokenLimit != null) add(if (model.inputTokenLimit >= 1_000_000) "1M CONTEXT" else "%,d TOKENS".format(model.inputTokenLimit))
+    if (model.outputTokenLimit != null) add("%,d OUTPUT".format(model.outputTokenLimit))
+    if (model.name.contains("3.8", true) || model.name.contains("4-", true)) add("AGENTIC")
+    if (model.name.contains("flash", true)) add("FAST")
+    if (model.name.contains("pro", true) || model.name.contains("hydrogen", true)) add("REASONING")
+    if (model.name.contains("audio", true) || model.name.contains("live", true)) add("AUDIO")
+    if (model.name.contains("image", true)) add("IMAGE")
+    if (isEmpty()) add("GEMINI API")
+}
+
+@Composable
+private fun ModelBrowserDialog(
+    models: List<GeminiModel>,
+    selectedModel: String,
+    refreshing: Boolean,
+    onRefresh: () -> Unit,
+    onSelect: (GeminiModel) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val palette = LocalOraclePalette.current
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            Modifier.fillMaxWidth(0.97f).fillMaxHeight(0.95f),
+            shape = RoundedCornerShape(25.dp),
+            color = Color(0xFFF4F5F9),
+            shadowElevation = 22.dp
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxWidth().height(190.dp)) {
+                    AsyncImage(
+                        model = "https://lh3.googleusercontent.com/RS81idLV6JRFjwwmuD4bLlWWaFoL0zT_syXKzTqG9wZtUG2Y6ky8cdh0ksrC4Pwc6HfEqoasrK_9L-DEZVpbioahVBYivjVMmgHm-_LoU_oG1PuyUA=w1440-rw-lo",
+                        contentDescription = "Google Gemini model family artwork",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    Column(Modifier.fillMaxSize().background(Color(0x5507111F)).padding(17.dp),
+                        verticalArrangement = Arrangement.SpaceBetween) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("ORACLE  /  MODEL ATLAS", color = Color.White, fontFamily = OracleMono,
+                                fontSize = 9.sp, letterSpacing = 1.0.sp)
+                            Spacer(Modifier.weight(1f))
+                            OracleIconButton(OracleGlyph.Close, "Close model browser", onDismiss,
+                                tint = Color.White, size = 36.dp)
+                        }
+                        Column {
+                            Text("Choose your engine.", color = Color.White, fontFamily = OracleSans,
+                                fontWeight = FontWeight.SemiBold, fontSize = 24.sp)
+                            Text("Models exposed by your connected Gemini API key.",
+                                color = Color(0xFFD8E0F0), fontFamily = OracleSans, fontSize = 11.sp)
+                        }
+                    }
+                }
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text(models.size.toString() + " AVAILABLE MODELS", color = palette.textTertiary,
+                        fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.8.sp)
+                    Spacer(Modifier.weight(1f))
+                    OracleTextAction(if (refreshing) "SYNCING…" else "REFRESH",
+                        onRefresh, enabled = !refreshing, accent = true)
+                }
+                androidx.compose.foundation.lazy.LazyColumn(
+                    Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 18.dp)
+                ) {
+                    items(models, key = { it.name }) { candidate ->
+                        val active = candidate.name == selectedModel
+                        Column(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                                .background(Color.White)
+                                .border(1.dp, if (active) Color(0x777B8FE8) else Color(0x1F25324A), RoundedCornerShape(16.dp))
+                                .padding(11.dp),
+                            verticalArrangement = Arrangement.spacedBy(9.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                AsyncImage(
+                                    model = modelArt(candidate.name),
+                                    contentDescription = candidate.displayName + " model artwork",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.size(76.dp).clip(RoundedCornerShape(12.dp))
+                                )
+                                Spacer(Modifier.width(11.dp))
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(candidate.displayName, color = Color(0xFF20283A),
+                                        fontFamily = OracleSans, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(candidate.name, color = Color(0xFF788195),
+                                        fontFamily = OracleMono, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(modelDescription(candidate.name), color = Color(0xFF596273),
+                                        fontFamily = OracleSans, fontSize = 10.sp, lineHeight = 14.sp)
+                                }
+                            }
+                            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                modelTags(candidate).forEach { tag ->
+                                    Box(Modifier.clip(RoundedCornerShape(7.dp)).background(Color(0xFFEFF1F8))
+                                        .padding(horizontal = 7.dp, vertical = 5.dp)) {
+                                        Text(tag, color = Color(0xFF6878B5), fontFamily = OracleMono,
+                                            fontSize = 8.sp, fontWeight = FontWeight.Medium)
+                                    }
+                                }
+                                if (active) Box(Modifier.clip(RoundedCornerShape(7.dp)).background(Color(0xFFE4F3EC))
+                                    .padding(horizontal = 7.dp, vertical = 5.dp)) {
+                                    Text("ACTIVE", color = Color(0xFF2D8A68), fontFamily = OracleMono, fontSize = 8.sp)
+                                }
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    (candidate.inputTokenLimit?.let { "%,d in".format(it) } ?: "Input limit n/a") +
+                                        "   ·   " + (candidate.outputTokenLimit?.let { "%,d out".format(it) } ?: "Output n/a"),
+                                    Modifier.weight(1f), color = Color(0xFF848C9C), fontFamily = OracleMono, fontSize = 8.sp
+                                )
+                                OracleSolidAction(
+                                    label = if (active) "SELECTED" else "USE MODEL",
+                                    onClick = { onSelect(candidate); onDismiss() },
+                                    enabled = !active,
+                                    modifier = Modifier.widthIn(min = 100.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                Text("Model availability and supported features are determined by the connected API key.",
+                    Modifier.fillMaxWidth().padding(horizontal = 17.dp, vertical = 10.dp),
+                    color = palette.textTertiary, fontFamily = OracleSans, fontSize = 9.sp, textAlign = TextAlign.Center)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgentFileEditorDialog(
+    fileName: String,
+    mimeType: String,
+    content: String,
+    loading: Boolean,
+    saving: Boolean,
+    error: String?,
+    onContentChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val palette = LocalOraclePalette.current
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxWidth(0.97f).fillMaxHeight(0.92f),
+            shape = RoundedCornerShape(21.dp), color = palette.canvas, shadowElevation = 22.dp) {
+            Column(Modifier.fillMaxSize().imePadding().padding(13.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("GENERATED ARTIFACT", color = palette.accent, fontFamily = OracleMono,
+                            fontSize = 8.sp, letterSpacing = 0.9.sp)
+                        Text(fileName, color = palette.text, fontFamily = OracleSans,
+                            fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(mimeType, color = palette.textTertiary, fontFamily = OracleMono, fontSize = 8.sp)
+                    }
+                    OracleIconButton(OracleGlyph.Close, "Close file editor", onDismiss, tint = palette.textSecondary)
+                }
+                Box(Modifier.fillMaxWidth().height(1.dp).background(palette.outlineSoft))
+                when {
+                    loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        OracleSpinner(Modifier.size(23.dp))
+                    }
+                    else -> BasicTextField(
+                        value = content,
+                        onValueChange = onContentChange,
+                        modifier = Modifier.weight(1f).fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp)).background(Color(0xFF171D29)).padding(12.dp),
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            color = Color(0xFFE1E7F2),
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontSize = 11.sp, lineHeight = 17.sp
+                        ),
+                        cursorBrush = SolidColor(Color(0xFF9AAAF4)),
+                        decorationBox = { inner -> Box(Modifier.fillMaxSize()) { inner() } }
+                    )
+                }
+                error?.let { Text(it, color = palette.error, fontFamily = OracleSans, fontSize = 11.sp) }
+                Row(horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OracleTextAction("CLOSE", onDismiss, enabled = !saving, accent = false)
+                    Spacer(Modifier.weight(1f))
+                    OracleSolidAction(
+                        label = if (saving) "SAVING…" else "SAVE CHANGES",
+                        onClick = onSave, enabled = !loading && !saving,
+                        modifier = Modifier.widthIn(min = 140.dp)
+                    )
+                }
+            }
+        }
     }
 }
 
