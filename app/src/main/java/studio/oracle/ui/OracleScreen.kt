@@ -31,6 +31,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -732,54 +733,214 @@ private fun CustomTopBar(
 }
 
 @Composable
-private fun OracleMessageRow(message: AgentMessageEntity, modifier: Modifier = Modifier) {
+private fun OracleMessageRow(
+    message: AgentMessageEntity,
+    onOpenFile: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
     val palette = LocalOraclePalette.current
+    val attachments = remember(message.attachments) { AgenticEventCodec.decodeAttachments(message.attachments) }
+    val events = remember(message.agentTrace) { AgenticEventCodec.decodeTrace(message.agentTrace) }
     androidx.compose.animation.AnimatedVisibility(
         visible = true,
         modifier = modifier,
-        enter = fadeIn(tween(180)) + slideInVertically(tween(220)) { it / 14 },
-        exit = fadeOut(tween(100))
+        enter = fadeIn(tween(220)) + slideInVertically(tween(300)) { it / 18 },
+        exit = fadeOut(tween(130))
     ) {
         if (message.role == "user") {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                Box(
-                    modifier = Modifier
-                        .widthIn(max = 320.dp)
-                        .clip(RoundedCornerShape(20.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Column(
+                    Modifier.widthIn(max = 340.dp)
+                        .clip(RoundedCornerShape(21.dp))
                         .background(palette.surfaceRaised)
-                        .padding(horizontal = 17.dp, vertical = 12.dp)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = message.content,
-                        color = palette.text,
-                        fontFamily = OracleSans,
-                        fontSize = 15.sp,
-                        lineHeight = 23.sp
+                    if (message.content.isNotBlank()) Text(
+                        message.content,
+                        color = palette.text, fontFamily = OracleSans, fontSize = 15.sp, lineHeight = 23.sp
                     )
+                    attachments.forEach { attachment ->
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                                .background(palette.surface).padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                when {
+                                    attachment.mimeType.startsWith("image/") -> "▧"
+                                    attachment.mimeType.startsWith("video/") -> "▶"
+                                    attachment.mimeType.startsWith("audio/") -> "♫"
+                                    else -> "▤"
+                                },
+                                color = palette.accent, fontSize = 14.sp
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(attachment.name, color = palette.text, fontSize = 11.sp,
+                                    fontFamily = OracleSans, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(attachment.mimeType, color = palette.textTertiary,
+                                    fontSize = 9.sp, fontFamily = OracleMono)
+                            }
+                        }
+                    }
                 }
             }
         } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top
-            ) {
-                HandcraftedLogo(
-                    modifier = Modifier.padding(top = 3.dp).size(21.dp),
-                    color = palette.accent
-                )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                HandcraftedLogo(Modifier.padding(top = 3.dp).size(22.dp), palette.accent)
                 Spacer(Modifier.width(12.dp))
-                Text(
-                    text = message.content,
-                    modifier = Modifier.weight(1f),
-                    color = palette.text,
-                    fontFamily = OracleSans,
-                    fontSize = 15.sp,
-                    lineHeight = 24.sp
-                )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("ORACLE", color = palette.text, fontFamily = OracleMono,
+                            fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.7.sp)
+                        Spacer(Modifier.weight(1f))
+                        events.firstOrNull { it.kind == "usage" }?.let { TokenUsageChip(it.detail) }
+                    }
+                    if (events.isNotEmpty()) AgentExecutionTrace(events, onOpenFile)
+                    OracleRichMessage(message.content)
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun TokenUsageChip(detail: String) {
+    val input = Regex("input\\s+(\\d+)").find(detail)?.groupValues?.getOrNull(1)
+    val output = Regex("output\\s+(\\d+)").find(detail)?.groupValues?.getOrNull(1)
+    val total = (input?.toIntOrNull() ?: 0) + (output?.toIntOrNull() ?: 0)
+    val label = if (total > 0) if (total >= 1000) "%.1fk".format(total / 1000f) else total.toString() else "i"
+    Box(
+        Modifier.size(30.dp).clip(CircleShape)
+            .background(Color(0x187B8FE8)).border(1.dp, Color(0x397B8FE8), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = Color(0xFF7488E2), fontFamily = OracleMono, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun AgentExecutionTrace(events: List<AgenticEvent>, onOpenFile: (String) -> Unit) {
+    val palette = LocalOraclePalette.current
+    var expanded by remember(events.size, events.lastOrNull()?.title) { mutableStateOf(false) }
+    val visibleEvents = events.filter { it.kind != "usage" }
+    val actionCount = visibleEvents.count { it.kind.endsWith("start") || it.kind == "file_created" }
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                .background(Color(0x147B8FE8)).clickable { expanded = !expanded }
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(Modifier.width(3.dp).height(18.dp).background(Color(0xFF788CE5), RoundedCornerShape(2.dp)))
+            Spacer(Modifier.width(9.dp))
+            Text("WORK LOG", color = Color(0xFF7E91EA), fontFamily = OracleMono,
+                fontSize = 9.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.85.sp)
+            Spacer(Modifier.width(8.dp))
+            Text(actionCount.toString() + " actions · " + visibleEvents.size + " events",
+                color = palette.textTertiary, fontFamily = OracleSans, fontSize = 10.sp)
+            Spacer(Modifier.weight(1f))
+            Text(if (expanded) "HIDE  −" else "VIEW  +", color = Color(0xFF7E91EA),
+                fontFamily = OracleMono, fontSize = 9.sp)
+        }
+        AnimatedVisibility(
+            visible = expanded,
+            enter = fadeIn(tween(170)) + expandVertically(tween(260)),
+            exit = fadeOut(tween(100)) + shrinkVertically(tween(180))
+        ) {
+            Column(
+                Modifier.fillMaxWidth().padding(start = 5.dp, top = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                visibleEvents.forEach { event -> AgentEventRow(event, onOpenFile) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgentEventRow(event: AgenticEvent, onOpenFile: (String) -> Unit) {
+    val palette = LocalOraclePalette.current
+    val isFile = event.kind == "file_created"
+    val isCode = event.code.isNotBlank()
+    val isImage = event.kind == "generated_image"
+    var expanded by remember(event.title, event.kind, event.code) { mutableStateOf(false) }
+    val accent = when {
+        isFile -> Color(0xFF42A68A)
+        event.kind.contains("python") || event.kind.contains("hosted") -> Color(0xFFBF8B52)
+        event.kind.contains("search") || event.kind.contains("url") -> Color(0xFF5C9ACB)
+        else -> Color(0xFF7B8FE8)
+    }
+    Row(Modifier.fillMaxWidth().heightIn(min = 30.dp), verticalAlignment = Alignment.Top) {
+        Box(Modifier.padding(top = 3.dp).width(2.dp).heightIn(min = 28.dp).background(accent.copy(alpha = 0.75f), RoundedCornerShape(2.dp)))
+        Spacer(Modifier.width(9.dp))
+        Column(
+            Modifier.weight(1f).clip(RoundedCornerShape(9.dp))
+                .background(palette.surfaceRaised.copy(alpha = 0.72f))
+                .clickable(enabled = isCode || isFile || event.detail.isNotBlank()) { expanded = !expanded }
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(event.title, color = accent, fontFamily = OracleMono, fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold, letterSpacing = 0.25.sp, modifier = Modifier.weight(1f))
+                if (isCode || event.detail.isNotBlank()) Text(if (expanded) "−" else "+",
+                    color = palette.textTertiary, fontSize = 12.sp)
+            }
+            if (isFile) {
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                        .background(Color(0x1242A68A)).clickable { onOpenFile(event.payload) }
+                        .padding(9.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("▤", color = Color(0xFF42A68A), fontSize = 16.sp)
+                    Spacer(Modifier.width(8.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(event.detail, color = palette.text, fontSize = 11.sp, maxLines = 2)
+                        Text("OPEN IN ORACLE EDITOR", color = Color(0xFF42A68A), fontFamily = OracleMono, fontSize = 8.sp)
+                    }
+                    Text("↗", color = Color(0xFF42A68A), fontSize = 16.sp)
+                }
+            } else if (event.detail.isNotBlank() && !isImage) {
+                Text(event.detail.take(if (expanded) 16000 else 180), color = palette.textSecondary,
+                    fontFamily = if (event.kind.contains("python")) OracleMono else OracleSans,
+                    fontSize = 10.sp, lineHeight = 15.sp)
+            }
+            if (isCode && expanded) {
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFF171D29)).padding(9.dp)) {
+                    Text(event.code.take(16000), color = Color(0xFFE0E7F2),
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp, lineHeight = 15.sp)
+                }
+            }
+            if (isImage && event.payload.isNotBlank()) {
+                val bitmap = remember(event.payload) { BitmapFactory.decodeFile(event.payload) }
+                bitmap?.let {
+                    Image(it.asImageBitmap(), contentDescription = "Generated by ORACLE",
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp).clip(RoundedCornerShape(10.dp)))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LiveAgentActivity(events: List<AgenticEvent>) {
+    val last = events.lastOrNull { it.kind != "usage" }
+    Row(
+        Modifier.fillMaxWidth().padding(start = 32.dp, end = 12.dp)
+            .clip(RoundedCornerShape(11.dp)).background(Color(0x147B8FE8))
+            .padding(horizontal = 11.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OracleSpinner(Modifier.size(15.dp), Color(0xFF788CE5))
+        Spacer(Modifier.width(9.dp))
+        Text(last?.title ?: "ORACLE is planning the next step",
+            Modifier.weight(1f), color = Color(0xFF788CE5), fontFamily = OracleMono,
+            fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        last?.detail?.takeIf { it.isNotBlank() }?.let {
+            Text(it.take(34), color = LocalOraclePalette.current.textTertiary, fontFamily = OracleSans, fontSize = 9.sp, maxLines = 1)
         }
     }
 }
