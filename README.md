@@ -39,6 +39,25 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Offline keyword retrieval, document reader, and Gemini library Q&A.
 - Library Q&A displays the exact retrieved excerpts and requires confirmation before sending them to Gemini.
 
+### Agentic Operator
+- Gemini Interactions loop: model → tool call → execution → function result → model, bounded to 12 tool rounds.
+- Built-in Gemini capabilities: URL Context and hosted Python. Gemini Google Search grounding is not enabled.
+- Independent live web research via Tavily and a separately encrypted API key stored through Android Keystore.
+- Composer quick switches independently enable web search, phone files, local Python, hosted Python, URL Context, image generation and all custom tools.
+- The main agent exposes a DRAW tool that calls Gemini 3.1 Flash Image as a separate service. Generated PNGs are saved in the app workspace and displayed inline. The direct image model can also be selected in the Model Atlas; direct image mode omits tool payloads because the model does not support function calling.
+- Phone files are accessed through a user-selected Storage Access Framework folder. Paths are scoped, traversal is rejected, and text read/write operations have size limits.
+- Reading file contents sent to Gemini, modifying files, running local Python and generating images require permission. Users can approve once or for the active chat thread.
+- Bundled CPython 3.13 via Chaquopy exposes standard Python built-ins, supported standard-library modules, network and an app-private working directory. It runs under Android's app UID; it is not an unrestricted OS-level Termux shell.
+- Python-created or modified workspace files are surfaced as in-chat artifacts and text/code files can be opened and edited in the in-app editor.
+
+### Rich Agent Interface
+- Assistant responses render headings, bold/italic text, lists, tables, quotes, fenced code with copy, Markdown links, images and simple process-map diagrams.
+- A compact colored Plan & Work Log rail sits above the assistant answer; expand it to inspect actual tool calls, code and results. Private model thought steps are not exposed.
+- Token usage is a small circular control with a detailed ledger on tap.
+- Generated images/audio/video/documents and saved files are surfaced inline where supported.
+- Model / Tools opens practical quick controls; Explore Models opens a full-screen model atlas with API metadata, descriptions, context limits, tags and artwork.
+- The composer and model controls use translucent glass surfaces and animated content transitions.
+
 ### Workflow Studio
 - Create, edit, reorder, save, and delete workflows with up to 20 ordered steps.
 - Three explicit local actions: create a note, append to a note by exact title, and search the on-device document index.
