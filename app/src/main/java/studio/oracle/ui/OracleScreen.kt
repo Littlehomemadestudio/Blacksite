@@ -79,7 +79,8 @@ import studio.oracle.data.AgenticEvent
 import studio.oracle.data.AgenticResult
 import studio.oracle.data.AgenticSettings
 import studio.oracle.data.GeminiAgenticRuntime
-import studio.oracle.data.GeminiFileUploader\nimport studio.oracle.data.GeminiImageGenerator
+import studio.oracle.data.GeminiFileUploader
+import studio.oracle.data.GeminiImageGenerator
 import studio.oracle.data.LocalPythonRuntime
 import studio.oracle.data.PhoneWorkspaceTools
 import studio.oracle.data.AgentRepository
@@ -114,7 +115,8 @@ fun OracleScreen(
     val keyStore = remember { SecureKeyStore(context) }
     val api = remember { GeminiApi() }
     val agenticRuntime = remember { GeminiAgenticRuntime() }
-    val fileUploader = remember { GeminiFileUploader() }\n    val imageGenerator = remember { GeminiImageGenerator() }
+    val fileUploader = remember { GeminiFileUploader() }
+    val imageGenerator = remember { GeminiImageGenerator() }
     val pythonRuntime = remember(context) { LocalPythonRuntime(context) }
     val repository = remember(context, workspaceId) {
         AgentRepository(OracleDatabase.get(context).agentDao(), workspaceId)
