@@ -760,6 +760,9 @@ private fun ModelControlPanel(
             listOf(0.7, 0.85, 0.95, 1.0).forEach { value ->
                 ModelChoice("P" + value.toString(), settings.topP == value, { onSettingsChange(settings.copy(topP = value)) })
             }
+            listOf(20, 40, 64).forEach { value ->
+                ModelChoice("K" + value, settings.topK == value, { onSettingsChange(settings.copy(topK = value)) })
+            }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("THINKING SUMMARY", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp)
