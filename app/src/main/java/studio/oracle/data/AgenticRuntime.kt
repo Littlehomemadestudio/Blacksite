@@ -139,6 +139,21 @@ class GeminiAgenticRuntime(
                         .put("max_output_tokens", cfg.maxOutputTokens)
                         .put("tool_choice", cfg.toolChoice)
                 )
+            if (model.contains("flash-image", ignoreCase = true)) {
+                body.put(
+                    "response_format",
+                    JSONArray()
+                        .put(JSONObject().put("type", "text"))
+                        .put(
+                            JSONObject()
+                                .put("type", "image")
+                                .put("mime_type", "image/png")
+                                .put("aspect_ratio", "16:9")
+                                .put("image_size", "1K")
+                                .put("delivery", "inline")
+                        )
+                )
+            }
             interactionId?.let { body.put("previous_interaction_id", it) }
 
             val request = Request.Builder()
@@ -258,8 +273,10 @@ class GeminiAgenticRuntime(
                                 }
                                 "image" -> {
                                     val data = part.optString("data")
-                                    if (data.isNotBlank()) onEvent(
-                                        AgenticEvent("generated_image", "Generated image", part.optString("mime_type", "image/png"), payload = data)
+                                    val uri = part.optString("uri")
+                                    val payload = data.ifBlank { uri }
+                                    if (payload.isNotBlank()) onEvent(
+                                        AgenticEvent("generated_image", "Generated image", part.optString("mime_type", "image/png"), payload = payload)
                                     )
                                 }
                                 "audio" -> {
