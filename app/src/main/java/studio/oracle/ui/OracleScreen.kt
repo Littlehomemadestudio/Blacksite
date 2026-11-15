@@ -110,7 +110,7 @@ fun OracleScreen(
     var messages by remember { mutableStateOf(emptyList<AgentMessageEntity>()) }
     var prompt by remember { mutableStateOf("") }
     var availableModels by remember {
-        mutableStateOf(listOf(GeminiModel(ModelPreferences.DEFAULT_MODEL, "Gemini 2.5 Flash")))
+        mutableStateOf(listOf(GeminiModel(ModelPreferences.DEFAULT_MODEL, "Gemini 3.5 Flash")))
     }
     var syncingModels by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -718,6 +718,14 @@ private fun ModelControlPanel(
                 ModelChoice(label = candidate.displayName, selected = candidate.name == selectedModel, onClick = { onSelect(candidate) })
             }
         }
+        val activeModel = models.firstOrNull { it.name == selectedModel }
+        val inputLimit = activeModel?.inputTokenLimit
+        val outputLimit = activeModel?.outputTokenLimit
+        Text(
+            "CONTEXT  " + (inputLimit?.let { "%,d".format(it) + " tokens" } ?: "limit unavailable") +
+                "   ·   OUTPUT  " + (outputLimit?.let { "%,d".format(it) } ?: "model default"),
+            color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp
+        )
         Spacer(Modifier.height(12.dp))
         Text("REASONING", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.8.sp)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -744,6 +752,25 @@ private fun ModelControlPanel(
             }
             OracleTextAction(if (folderGranted) "CHANGE" else "GRANT FOLDER", onChooseFolder, accent = true)
         }
+        Spacer(Modifier.height(9.dp))
+        Text("SAMPLING", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.8.sp)
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            listOf(0.2, 0.5, 0.8, 1.0).forEach { value ->
+                ModelChoice(value.toString(), settings.temperature == value, { onSettingsChange(settings.copy(temperature = value)) })
+            }
+            listOf(0.7, 0.85, 0.95, 1.0).forEach { value ->
+                ModelChoice("P" + value.toString(), settings.topP == value, { onSettingsChange(settings.copy(topP = value)) })
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("THINKING SUMMARY", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp)
+            Spacer(Modifier.weight(1f))
+            ModelChoice(if (settings.thinkingSummaries == "auto") "ON" else "OFF",
+                settings.thinkingSummaries == "auto",
+                { onSettingsChange(settings.copy(thinkingSummaries = if (settings.thinkingSummaries == "auto") "none" else "auto")) })
+        }
+        Text("Context caching is model-managed; cached tokens appear in the context ledger.",
+            color = palette.textTertiary, fontFamily = OracleSans, fontSize = 10.sp)
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("OUTPUT LIMIT", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp)
