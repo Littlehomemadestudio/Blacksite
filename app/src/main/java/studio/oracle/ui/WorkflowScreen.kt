@@ -47,12 +47,12 @@ import java.util.UUID
 fun WorkflowScreen(workspaceId: String) {
     val context = LocalContext.current
     val database = remember(context) { OracleDatabase.get(context) }
-    val repository = remember(database) { WorkflowRepository(database.workflowDao()) }
+    val repository = remember(database, workspaceId) { WorkflowRepository(database.workflowDao(), workspaceId) }
     val documentRepository = remember(context, database) {
         DocumentRepository(context, database.documentDao(), workspaceId)
     }
-    val runner = remember(database, documentRepository) {
-        LocalWorkflowRunner(database.workflowDao(), documentRepository)
+    val runner = remember(database, documentRepository, workspaceId) {
+        LocalWorkflowRunner(database.workflowDao(), documentRepository, workspaceId)
     }
     val scope = rememberCoroutineScope()
     val workflows by repository.workflows.collectAsState(initial = emptyList())
@@ -76,6 +76,18 @@ fun WorkflowScreen(workspaceId: String) {
 
     val selectedWorkflow = workflows.firstOrNull { it.id == selectedWorkflowId }
 
+    LaunchedEffect(workspaceId) {
+        selectedWorkflowId = null
+        loadedWorkflowId = null
+        draftTitle = ""
+        draftDescription = ""
+        steps = emptyList()
+        tab = "WORKFLOWS"
+        viewingRunId = null
+        viewingLogs = emptyList()
+        status = "WORKSPACE CHANGED · LOCAL DATA FILTERED"
+    }
+
     LaunchedEffect(selectedWorkflowId, workflows) {
         val id = selectedWorkflowId
         if (id == null) {
@@ -94,7 +106,7 @@ fun WorkflowScreen(workspaceId: String) {
 
     LaunchedEffect(viewingRunId) {
         val id = viewingRunId
-        viewingLogs = if (id == null) emptyList() else database.workflowDao().logsForRun(id)
+        viewingLogs = if (id == null) emptyList() else database.workflowDao().logsForRun(id, workspaceId)
     }
 
     BackHandler(enabled = selectedWorkflowId != null && tab == "WORKFLOWS") {
