@@ -589,7 +589,7 @@ private fun ThinkPill(onClick: () -> Unit, expanded: Boolean) {
         OracleGlyphIcon(OracleGlyph.Spark, Modifier.size(13.dp), palette.textSecondary, 1.35f)
         Spacer(Modifier.width(7.dp))
         androidx.compose.material3.Text(
-            "Think",
+            "Model / Tools",
             color = palette.textSecondary,
             fontFamily = OracleMono,
             fontSize = 10.sp,
