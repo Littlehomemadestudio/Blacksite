@@ -25,7 +25,12 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Stateful Gemini Agent using the Interactions API, with model-directed Google Search, URL context, hosted Python execution, and custom Android tool calls. Tool requests are executed by the app and returned to Gemini in bounded multi-step loops.
 - Model controls in the composer: thinking level and summaries, tool-choice mode, output-token limit, model-reported input/output limits, Google Search, URL context, hosted code execution, and local tools.
 - A live context ledger reports input, output, thinking, cached, and tool-use token counts when the API returns usage metadata.
-- Agent activity cards show web-search activity, Python source and execution output, local tool requests, results, and approval prompts.
+- The assistant response supports rich Markdown blocks: headings, inline emphasis, numbered/bulleted lists, tables, quotations, code blocks, clickable links, embedded remote images, and simple rendered process diagrams.
+- A compact colored plan/work rail sits above the assistant answer. Expanding it reveals the user-facing execution summary and actual tool/code/result log; private model reasoning traces are not exposed.
+- Context/token usage is a small circular control with a detailed breakdown on tap, not a large metadata card.
+- Tool outputs and generated artifacts are rendered inline: Python source/output, generated image/audio/video/document results, and editable file cards.
+- The model/tool composer uses a translucent glass-style surface and expands a quick-controls panel. Explore Models opens a full-screen model atlas with model metadata, limits, descriptions and artwork.
+- The assistant can request inline text+image output from Gemini Flash Image models selected from the live model list; other models return their supported output modalities.
 - Persistent agent threads and messages in Room; thread titles are generated locally from the first user prompt.
 - Cancellable OkHttp requests. Failed/cancelled prompts remain available for retry without duplicating the saved user turn.
 - Bounded conversation context (last 12 messages) with a send-point disclosure in the composer.
@@ -56,6 +61,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Reading cloud-bound phone file contents, creating/appending files, and running local Python require an approval. The user can allow an action once or grant tool access for the active chat session. The folder grant can be changed through the composer controls.
 - A bundled CPython 3.13 runtime is included through Chaquopy. Local Python execution is displayed in the conversation and can be approved once for the active chat session. Normal Python built-ins, the supported standard library, network access and the app-private Python workspace are available. Android still limits the interpreter to the app UID; this is not an OS-level Termux shell, and some platform-dependent Python modules and binary wheels are unavailable.
 - Hosted Gemini code execution and local on-device Python are separate tools: the first runs in Google's hosted environment; the second runs on the device.
+- The response UI displays an expandable user-facing plan summary and executed action log, not private hidden chain-of-thought.
 - The Interactions API uses model-managed implicit context caching. The UI reports cached-token usage when returned by Google; explicit cache-object management is not available through this API.
 - Model capability and context limits vary by model. Unsupported model/API combinations return a visible error instead of silently falling back to a tool-less chat.
 
