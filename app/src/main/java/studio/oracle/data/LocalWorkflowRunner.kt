@@ -37,7 +37,7 @@ class LocalWorkflowRunner(
 
         val ordered = steps.sortedBy { it.position }
         val runId = UUID.randomUUID().toString()
-        var runCreated = false
+        var runCreated = true
         var completed = 0
         try {
             dao.insertRun(
