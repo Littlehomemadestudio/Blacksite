@@ -743,7 +743,6 @@ private fun ModelControlPanel(
             }
         }
         Spacer(Modifier.height(9.dp))
-        Spacer(Modifier.height(9.dp))
         Text("MODEL CAPABILITIES", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 0.8.sp)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             ModelChoice("SEARCH", settings.googleSearch, { onSettingsChange(settings.copy(googleSearch = !settings.googleSearch)) })
