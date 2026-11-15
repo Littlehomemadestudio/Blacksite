@@ -1402,14 +1402,32 @@ private fun ModelControlPanel(
                 Text("↗", color = Color(0xFF6579CF), fontSize = 16.sp)
             }
         }
-        Text("QUICK CONTROLS", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 8.sp, letterSpacing = 0.9.sp)
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            ModelChoice("WEB SEARCH", settings.localTools && settings.webSearch, { onSettingsChange(settings.copy(webSearch = !settings.webSearch)) })
-            ModelChoice("PHONE FILES", settings.localTools && settings.phoneFiles, { onSettingsChange(settings.copy(phoneFiles = !settings.phoneFiles)) })
-            ModelChoice("LOCAL PY", settings.localTools && settings.localPython, { onSettingsChange(settings.copy(localPython = !settings.localPython)) })
-            ModelChoice("HOSTED PY", settings.hostedPython, { onSettingsChange(settings.copy(hostedPython = !settings.hostedPython)) })
-            ModelChoice("URL CONTEXT", settings.urlContext, { onSettingsChange(settings.copy(urlContext = !settings.urlContext)) })
-            ModelChoice("ALL TOOLS", settings.localTools, { onSettingsChange(settings.copy(localTools = !settings.localTools)) })
+        if (selectedModel.contains("flash-image", ignoreCase = true)) {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(11.dp))
+                    .background(Color(0x1642A68A)).padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("✦", color = Color(0xFF369A7B), fontSize = 17.sp)
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("IMAGE GENERATION MODEL", color = Color(0xFF369A7B),
+                        fontFamily = OracleMono, fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Dedicated image output. For web, files and Python, use the main agent model and its DRAW tool.",
+                        color = palette.textSecondary, fontFamily = OracleSans, fontSize = 10.sp, lineHeight = 14.sp)
+                }
+            }
+        } else {
+            Text("QUICK CONTROLS", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 8.sp, letterSpacing = 0.9.sp)
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ModelChoice("WEB SEARCH", settings.localTools && settings.webSearch, { onSettingsChange(settings.copy(webSearch = !settings.webSearch)) })
+                ModelChoice("PHONE FILES", settings.localTools && settings.phoneFiles, { onSettingsChange(settings.copy(phoneFiles = !settings.phoneFiles)) })
+                ModelChoice("LOCAL PY", settings.localTools && settings.localPython, { onSettingsChange(settings.copy(localPython = !settings.localPython)) })
+                ModelChoice("HOSTED PY", settings.hostedPython, { onSettingsChange(settings.copy(hostedPython = !settings.hostedPython)) })
+                ModelChoice("URL CONTEXT", settings.urlContext, { onSettingsChange(settings.copy(urlContext = !settings.urlContext)) })
+                ModelChoice("DRAW", settings.localTools && settings.imageGeneration, { onSettingsChange(settings.copy(imageGeneration = !settings.imageGeneration)) })
+                ModelChoice("ALL TOOLS", settings.localTools, { onSettingsChange(settings.copy(localTools = !settings.localTools)) })
+            }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("REASONING", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 8.sp, letterSpacing = 0.8.sp)
@@ -1493,7 +1511,7 @@ private fun ModelChoice(
 
 private fun modelArt(model: String): String = when {
     model.contains("flash-image", ignoreCase = true) ->
-        "https://storage.googleapis.com/generativeai-downloads/images/gemini_3_1_flash_image.png"
+        "https://assets.runware.ai/og/google-nano-banana-2.png"
     model.contains("3.8", ignoreCase = true) ->
         "https://iweaver-sv-1402138190.cos.na-siliconvalley.myqcloud.com/docx/2026/09/03/8806aaac-cfb7-464a-a254-3ea0d9231c5c/gemini-3-8-flash.webp"
     model.contains("4-", ignoreCase = true) || model.contains("gemini-4", ignoreCase = true) ->
@@ -1503,7 +1521,7 @@ private fun modelArt(model: String): String = when {
 }
 
 private fun modelDescription(model: GeminiModel): String = model.description?.takeIf { it.isNotBlank() } ?: when {
-    model.name.contains("flash-image", true) -> "A dedicated image-generation model for creating and editing high-quality visual assets. Returns text and inline generated images."
+    model.name.contains("flash-image", true) -> "A dedicated image-generation model for creating and editing high-quality visual assets. It returns text and images but does not support function calling; ORACLE's main agent can call it through DRAW."
     model.name.contains("3.8-flash", true) -> "A versatile agent model for coding, long-running tasks, advanced reasoning and multimodal understanding."
     model.name.contains("flash-lite", true) -> "A lighter, throughput-oriented model for fast everyday work and high-volume tasks."
     model.name.contains("pro", true) -> "A higher-capability reasoning model for demanding analysis and complex knowledge work."
