@@ -176,7 +176,7 @@ class GeminiApi(
         val customToolsRequested = settings.localPython || settings.phoneFiles
         val canCombineCustomAndBuiltIn = modelSupportsToolCombination
         val includeCustomTools = customToolsRequested &&
-            (!settings.googleSearch && !settings.cloudCodeExecution || canCombineCustomAndBuiltIn)
+            (!settings.googleSearch && !settings.urlContext && !settings.cloudCodeExecution || canCombineCustomAndBuiltIn)
 
         val tools = JSONArray()
         if (settings.googleSearch) tools.put(JSONObject().put("googleSearch", JSONObject()))
