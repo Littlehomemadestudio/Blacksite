@@ -11,7 +11,7 @@ import java.io.InputStreamReader
 import java.nio.charset.StandardCharsets
 
 /** SAF-scoped tools: all paths are relative to a folder explicitly granted by the user. */
-class PhoneWorkspaceTools(private val context:Context,private val grantedTree:Uri?,private val confirm:suspend(String)->Boolean,private val python:suspend(String)->String):AgenticToolExecutor{
+class PhoneWorkspaceTools(private val context:Context,private val grantedTree:Uri?,private val confirm: suspend (String) -> Boolean,private val python: suspend (String) -> String):AgenticToolExecutor{
  override fun declarations()=JSONArray().apply{
   put(fn("list_phone_files","List entries in the user-granted folder.",schema("path" to prop("Relative folder path; empty means root.")),arrayOf("path")))
   put(fn("read_phone_file","Read a UTF-8 text file inside the granted folder.",schema("path" to prop("Relative file path.")),arrayOf("path")))
