@@ -159,6 +159,7 @@ fun OracleScreen(
         busy = false
         activeSessionId = null
         messages = emptyList()
+        agentEvents = emptyList()
         prompt = ""
         error = null
         failedPrompt = null
@@ -203,6 +204,7 @@ fun OracleScreen(
     fun createNewThread(closeDrawer: Boolean = false) {
         scope.launch {
             activeSessionId = repository.createSession(model)
+            agentEvents = emptyList()
             prompt = ""
             clearTransientState()
             modelPanelOpen = false
@@ -213,6 +215,7 @@ fun OracleScreen(
 
     fun selectThread(sessionId: String) {
         activeSessionId = sessionId
+        agentEvents = emptyList()
         clearTransientState()
         drawerOpen = false
         keyboard?.hide()
@@ -277,7 +280,6 @@ fun OracleScreen(
         }
 
         prompt = ""
-        agentEvents = emptyList()
         error = null
         keyboard?.hide()
         busy = true
