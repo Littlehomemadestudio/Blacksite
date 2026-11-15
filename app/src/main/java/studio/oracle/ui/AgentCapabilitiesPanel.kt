@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -266,7 +267,7 @@ private fun CapabilityToggle(
             Text(title, color = palette.text, fontFamily = OracleSans, fontSize = 11.sp, fontWeight = FontWeight.Medium)
             Text(subtitle, color = palette.textTertiary, fontFamily = OracleSans, fontSize = 9.sp, lineHeight = 13.sp)
         }
-        CapabilityChip(if (enabled) "ON" else "OFF", enabled) { onChange(!enabled) }
+        CapabilityChip(if (enabled) "ON" else "OFF", enabled, onClick = { onChange(!enabled) })
     }
 }
 
