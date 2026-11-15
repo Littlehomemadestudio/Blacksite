@@ -741,7 +741,7 @@ private fun OracleAssistantContent(text: String, modifier: Modifier = Modifier) 
 }
 
 private fun splitAssistantMessage(raw: String): List<AssistantMessageSegment> {
-    val pattern = Regex("""\`\`\`([A-Za-z0-9_+.-]*)\n([\s\S]*?)\`\`\`""")
+    val pattern = Regex("""\\x60{3}([A-Za-z0-9_+.-]*)\n([\s\S]*?)\\x60{3}""")
     val result = mutableListOf<AssistantMessageSegment>()
     var cursor = 0
     pattern.findAll(raw).forEach { match ->
@@ -767,17 +767,21 @@ private fun splitAssistantMessage(raw: String): List<AssistantMessageSegment> {
 }
 
 @Composable
-private fun OracleThinkingIndicator() {
+private fun OracleThinkingIndicator(activity: String? = null) {
     val palette = LocalOraclePalette.current
+    val pulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "oracle-thinking")
     Row(
         modifier = Modifier.padding(start = 33.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         repeat(3) { index ->
-            val interaction = remember { MutableInteractionSource() }
-            val scale by androidx.compose.animation.core.animateFloatAsState(
-                targetValue = 1f,
-                animationSpec = androidx.compose.animation.core.spring(stiffness = 420f),
+            val scale by pulse.animateFloat(
+                initialValue = 0.62f,
+                targetValue = 1.08f,
+                animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                    animation = tween(durationMillis = 560, delayMillis = index * 115),
+                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                ),
                 label = "thinking-dot-$index"
             )
             Box(
@@ -786,12 +790,18 @@ private fun OracleThinkingIndicator() {
                     .size(5.dp)
                     .graphicsLayer { scaleX = scale; scaleY = scale }
                     .clip(CircleShape)
-                    .background(palette.textTertiary.copy(alpha = 0.6f))
+                    .background(palette.accent.copy(alpha = 0.8f))
             )
         }
+        Text(
+            activity ?: "ORACLE IS THINKING",
+            color = palette.textTertiary,
+            fontFamily = OracleMono,
+            fontSize = 8.sp,
+            letterSpacing = 0.55.sp
+        )
     }
 }
-
 @Composable
 private fun OracleErrorNotice(
     message: String,
