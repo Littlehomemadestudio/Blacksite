@@ -35,6 +35,7 @@ import studio.oracle.data.WorkspacePolicy
 import studio.oracle.data.WorkspaceRepository
 import studio.oracle.data.local.OracleDatabase
 import studio.oracle.ui.HandcraftedLogo
+import studio.oracle.ui.OracleWhaleMark
 import studio.oracle.ui.LibraryScreen
 import studio.oracle.ui.AudioMemoryScreen
 import studio.oracle.ui.OracleGlyph
@@ -83,29 +84,26 @@ private fun OracleRoot() {
 
 @Composable
 private fun OracleStartupSplash() {
-    val palette = LocalOraclePalette.current
-    val motion = rememberInfiniteTransition(label = "startup-motion")
-    val rotation by motion.animateFloat(
-        initialValue = 0f, targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(4200), repeatMode = RepeatMode.Restart),
-        label = "logo-rotation"
-    )
-    val pulse by motion.animateFloat(
-        initialValue = 0.94f, targetValue = 1.04f,
-        animationSpec = infiniteRepeatable(tween(1500), repeatMode = RepeatMode.Reverse),
-        label = "logo-pulse"
-    )
-    Box(Modifier.fillMaxSize().background(palette.canvas), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            Box(Modifier.size(112.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.fillMaxSize().border(1.dp, palette.accent.copy(alpha = 0.20f), CircleShape))
-                Box(Modifier.fillMaxSize().padding(9.dp).rotate(rotation).border(1.dp, palette.accent.copy(alpha = 0.42f), CircleShape))
-                HandcraftedLogo(Modifier.size(54.dp).scale(pulse), palette.accent)
-            }
-            Text("ORACLE", color = palette.text, fontFamily = OracleSans, fontSize = 22.sp, letterSpacing = 4.5.sp)
-            Text("INTELLIGENCE WORKSPACE", color = palette.accent, fontFamily = studio.oracle.ui.theme.OracleMono, fontSize = 9.sp, letterSpacing = 1.7.sp)
-            Spacer(Modifier.height(15.dp))
-            Text("INITIALIZING WORKSPACE", color = palette.textSecondary, fontFamily = studio.oracle.ui.theme.OracleMono, fontSize = 8.sp, letterSpacing = 1.sp)
+    Box(
+        Modifier.fillMaxSize().background(Color.White),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(15.dp)
+        ) {
+            OracleWhaleMark(
+                Modifier.size(width = 39.dp, height = 31.dp),
+                Color(0xFF4F78E8)
+            )
+            Text(
+                "Hi. What can I do for you?",
+                color = Color(0xFF171717),
+                fontFamily = OracleSans,
+                fontSize = 18.sp,
+                lineHeight = 25.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+            )
         }
     }
 }
