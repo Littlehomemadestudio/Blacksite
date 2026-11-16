@@ -219,6 +219,9 @@ interface AgentDao {
     @Insert
     suspend fun insertMessage(message: AgentMessageEntity): Long
 
+    @Query("UPDATE agent_messages SET agentTrace = :agentTrace WHERE id = :messageId")
+    suspend fun updateMessageTrace(messageId: Long, agentTrace: String): Int
+
     @Query("UPDATE agent_sessions SET title = :title, model = :model, updatedAt = :updatedAt WHERE id = :id")
     suspend fun updateSession(id: String, title: String, model: String, updatedAt: Long)
 
