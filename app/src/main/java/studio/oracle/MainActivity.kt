@@ -51,13 +51,13 @@ import studio.oracle.ui.theme.OracleTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.navigationBarColor = android.graphics.Color.WHITE
+        window.navigationBarColor = android.graphics.Color.rgb(16, 18, 20)
         androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
-            isAppearanceLightStatusBars = true
-            isAppearanceLightNavigationBars = true
+            isAppearanceLightStatusBars = false
+            isAppearanceLightNavigationBars = false
         }
         setContent {
-            OracleTheme {
+            OracleTheme(darkTheme = true) {
                 OracleRoot()
             }
         }
@@ -91,24 +91,28 @@ private fun OracleRoot() {
 @Composable
 private fun OracleStartupSplash() {
     Box(
-        Modifier.fillMaxSize().background(Color.White),
+        Modifier.fillMaxSize().background(Color(0xFF101214)),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(15.dp)
+            verticalArrangement = Arrangement.spacedBy(9.dp)
         ) {
-            OracleWhaleMark(
-                Modifier.size(width = 39.dp, height = 31.dp),
-                Color(0xFF4F78E8)
-            )
             Text(
-                "Hi. What can I do for you?",
-                color = Color(0xFF171717),
+                "ORACLE",
+                color = Color(0xFFE9E9E6),
                 fontFamily = OracleSans,
-                fontSize = 18.sp,
-                lineHeight = 25.sp,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                fontSize = 19.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                letterSpacing = 3.2.sp
+            )
+            Box(Modifier.width(24.dp).height(1.dp).background(Color(0xFFB7C5B5)))
+            Text(
+                "PERSONAL INTELLIGENCE",
+                color = Color(0xFF747D83),
+                fontFamily = OracleSans,
+                fontSize = 8.sp,
+                letterSpacing = 1.65.sp
             )
         }
     }
@@ -220,7 +224,7 @@ private fun OracleSection(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(58.dp)
+                .height(50.dp)
                 .padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -230,7 +234,7 @@ private fun OracleSection(
                 onClick = onBack
             )
             Spacer(Modifier.width(10.dp))
-            HandcraftedLogo(Modifier.size(25.dp), palette.accent)
+            Text("ORACLE", color = palette.text, fontFamily = OracleSans, fontSize = 13.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, letterSpacing = 1.4.sp)
             Spacer(Modifier.width(9.dp))
             Text(
                 title,
