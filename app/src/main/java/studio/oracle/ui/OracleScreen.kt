@@ -339,7 +339,7 @@ fun OracleScreen(
         failedPrompt = null
         failedPromptPersisted = false
         try {
-            activeSessionId = repository.ensureSession(model)
+            activeSessionId = repository.createSession(model)
         } finally {
             suppressCancelledPromptRestore = false
         }
@@ -835,19 +835,24 @@ fun OracleScreen(
                 enter = fadeIn() + androidx.compose.animation.expandVertically(),
                 exit = fadeOut() + androidx.compose.animation.shrinkVertically()
             ) {
-                ModelControlPanel(
-                    models = menuModels,
-                    selectedModel = model,
-                    refreshing = syncingModels,
-                    onSelect = ::chooseModel,
-                    onRefresh = ::refreshModels,
-                    settings = agenticSettings,
-                    onSettingsChange = { agenticSettings = it },
-                    folderGranted = grantedTreeUri != null,
-                    onChooseFolder = { folderPicker.launch(null) },
-                    onOpenModelBrowser = { modelBrowserOpen = true },
-                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 8.dp)
-                )
+                Box(
+                    Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 2.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    ModelControlPanel(
+                        models = menuModels,
+                        selectedModel = model,
+                        refreshing = syncingModels,
+                        onSelect = ::chooseModel,
+                        onRefresh = ::refreshModels,
+                        settings = agenticSettings,
+                        onSettingsChange = { agenticSettings = it },
+                        folderGranted = grantedTreeUri != null,
+                        onChooseFolder = { folderPicker.launch(null) },
+                        onOpenModelBrowser = { modelBrowserOpen = true },
+                        modifier = Modifier.widthIn(max = 350.dp).padding(bottom = 8.dp)
+                    )
+                }
             }
 
             DeepSeekInputPill(
