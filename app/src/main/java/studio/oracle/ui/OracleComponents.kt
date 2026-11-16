@@ -86,7 +86,7 @@ fun OracleSpinner(
 
 enum class OracleGlyph {
     Menu, NewChat, Library, Settings, Back, Close, ArrowUp, ChevronDown,
-    Search, Spark, Chat, Refresh, More, Key, Eye, EyeOff, Check, Shield, Trash
+    Search, Spark, Chat, Refresh, More, Key, Eye, EyeOff, Check, Shield, Trash, Audio
 }
 
 @Composable
@@ -318,6 +318,12 @@ fun OracleGlyphIcon(
                 line(7.5f, 20f, 16.5f, 20f)
                 line(10f, 10f, 10.5f, 17f, sw * 0.72f)
                 line(14f, 10f, 13.5f, 17f, sw * 0.72f)
+            }
+            OracleGlyph.Audio -> {
+                line(12f, 3f, 12f, 14f, sw * 1.25f)
+                arc(7f, 8f, 17f, 18f, 0f, 180f, sw * 1.1f)
+                line(12f, 18f, 12f, 21f)
+                line(8f, 21f, 16f, 21f)
             }
         }
     }
