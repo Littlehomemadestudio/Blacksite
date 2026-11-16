@@ -52,7 +52,7 @@ fun WorkflowScreen(workspaceId: String) {
         DocumentRepository(context, database.documentDao(), workspaceId)
     }
     val runner = remember(database, documentRepository, workspaceId) {
-        LocalWorkflowRunner(database.workflowDao(), documentRepository, workspaceId)
+        LocalWorkflowRunner(database.workflowDao(), database.audioMemoryDao(), documentRepository, workspaceId)
     }
     val scope = rememberCoroutineScope()
     val workflows by repository.workflows.collectAsState(initial = emptyList())
@@ -245,7 +245,7 @@ fun WorkflowScreen(workspaceId: String) {
             else -> {
                 if (selectedWorkflowId == null) {
                     if (workflows.isEmpty()) {
-                        FlowEmptyState("Build your first workflow", "Combine local note actions and document searches. Nothing runs until you review and confirm it.")
+                        FlowEmptyState("Build your first workflow", "Combine local notes, document searches and audio-memory retrieval. Nothing runs until you review and confirm it.")
                     } else {
                         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(workflows, key = { it.id }) { workflow ->
@@ -575,10 +575,10 @@ private fun WorkflowStepCard(
             FlowField(
                 value = step.title,
                 onValueChange = { onChange(step.copy(title = it.take(WorkflowRules.MAX_TITLE_CHARS))) },
-                placeholder = if (step.actionType == WorkflowAction.SEARCH_LIBRARY.key) "Search query" else "Note title",
+                placeholder = if (step.actionType in setOf(WorkflowAction.SEARCH_LIBRARY.key, WorkflowAction.SEARCH_AUDIO.key)) "Search query" else "Note title",
                 singleLine = true
             )
-            if (step.actionType != WorkflowAction.SEARCH_LIBRARY.key) {
+            if (step.actionType in setOf(WorkflowAction.CREATE_NOTE.key, WorkflowAction.APPEND_NOTE.key)) {
                 FlowField(
                     value = step.input,
                     onValueChange = { onChange(step.copy(input = it.take(WorkflowRules.MAX_INPUT_CHARS))) },
@@ -587,7 +587,14 @@ private fun WorkflowStepCard(
                     minLines = 3
                 )
             } else {
-                Text("Searches the existing on-device document index. Results are recorded in the run log.", color = LocalOraclePalette.current.textSecondary, fontSize = 9.sp)
+                Text(
+                    if (step.actionType == WorkflowAction.SEARCH_AUDIO.key)
+                        "Searches local recording titles, transcripts, summaries, tasks and decisions. Audio stays on this device."
+                    else
+                        "Searches the existing on-device document index. Results are recorded in the run log.",
+                    color = LocalOraclePalette.current.textSecondary,
+                    fontSize = 9.sp
+                )
             }
         }
     }
