@@ -877,6 +877,10 @@ fun OracleScreen(
                 onOpenWorkflows = {
                     drawerOpen = false
                     onOpenWorkflows()
+                },
+                onOpenAudio = {
+                    drawerOpen = false
+                    onOpenAudio()
                 }
             )
         }
@@ -1914,7 +1918,8 @@ private fun OracleThreadDrawer(
     onSelectThread: (String) -> Unit,
     onOpenLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenWorkflows: () -> Unit
+    onOpenWorkflows: () -> Unit,
+    onOpenAudio: () -> Unit
 ) {
     val palette = LocalOraclePalette.current
     val scope = rememberCoroutineScope()
