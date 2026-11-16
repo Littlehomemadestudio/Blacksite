@@ -6,6 +6,9 @@ import android.media.MediaPlayer
 import android.os.SystemClock
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,7 +38,10 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import studio.oracle.data.AudioMemoryRepository
@@ -89,6 +95,10 @@ fun AudioMemoryScreen(workspaceId: String) {
     var playbackLoading by remember { mutableStateOf(false) }
     val recordingNow by rememberUpdatedState(isRecording)
     val playerNow by rememberUpdatedState(player)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val finishRecordingNow by rememberUpdatedState<() -> Unit> {
+        { scope.launch { finishRecording() } }
+    }
 
     val selectedRecord = records.firstOrNull { it.id == selectedRecordId }
 
@@ -96,19 +106,32 @@ fun AudioMemoryScreen(workspaceId: String) {
         if (isRecording) return
         error = null
         status = "INITIALIZING MICROPHONE"
+        var candidateFile: java.io.File? = null
         try {
             val file = withContext(Dispatchers.IO) {
-                repository.newRecordingFile().also(recorder::start)
+                repository.newRecordingFile().also { candidate ->
+                    candidateFile = candidate
+                    recorder.start(candidate)
+                }
             }
             activeRecordingFile = file
             elapsedMs = 0L
             recordingStartedAt = SystemClock.elapsedRealtime()
             isRecording = true
             status = "RECORDING LOCALLY · NO NETWORK"
+        } catch (cancelled: CancellationException) {
+            withContext(NonCancellable + Dispatchers.IO) {
+                recorder.cancel()
+                candidateFile?.delete()
+            }
+            throw cancelled
         } catch (failure: Exception) {
             error = failure.message ?: "Could not start microphone capture."
             status = "MICROPHONE UNAVAILABLE"
-            withContext(Dispatchers.IO) { recorder.cancel() }
+            withContext(NonCancellable + Dispatchers.IO) {
+                recorder.cancel()
+                candidateFile?.delete()
+            }
         }
     }
 
@@ -120,15 +143,27 @@ fun AudioMemoryScreen(workspaceId: String) {
         status = "FINALIZING WAV RECORDING"
         var completedFile: java.io.File? = null
         try {
-            completedFile = withContext(Dispatchers.IO) { recorder.stop() }
+            currentCoroutineContext().ensureActive()
+            completedFile = withContext(NonCancellable + Dispatchers.IO) { recorder.stop() }
             val title = "Recording " + SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()).format(Date())
-            val record = repository.saveRecording(title, completedFile, duration)
+            val record = withContext(NonCancellable) {
+                repository.saveRecording(title, completedFile, duration)
+            }
             selectedRecordId = record.id
             status = "SAVED LOCALLY · " + formatDuration(duration)
+        } catch (cancelled: CancellationException) {
+            withContext(NonCancellable + Dispatchers.IO) {
+                recorder.cancel()
+                completedFile?.delete()
+                file.delete()
+            }
+            throw cancelled
         } catch (failure: Exception) {
-            withContext(Dispatchers.IO) { recorder.cancel() }
-            completedFile?.delete()
-            file.delete()
+            withContext(NonCancellable + Dispatchers.IO) {
+                recorder.cancel()
+                completedFile?.delete()
+                file.delete()
+            }
             error = failure.message ?: "Could not save this recording."
             status = "RECORDING SAVE FAILED"
         } finally {
@@ -251,6 +286,15 @@ fun AudioMemoryScreen(workspaceId: String) {
     ) { granted ->
         if (granted) scope.launch { beginRecording() }
         else error = "Microphone permission was denied. ORACLE did not record audio."
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            // Android microphone capture is foreground-only; finalize instead of continuing silently in background.
+            if (event == Lifecycle.Event.ON_STOP && recordingNow) finishRecordingNow()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     DisposableEffect(recorder) {
