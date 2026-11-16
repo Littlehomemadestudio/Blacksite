@@ -45,7 +45,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Library Q&A displays the exact retrieved excerpts and requires confirmation before sending them to Gemini.
 
 ### Agentic Operator
-- Gemini Interactions loop: model → tool call → execution → function result → model, runs until the model completes or the user cancels; transient network failures retry with backoff.
+- Gemini Interactions loop: model → tool call → execution → function result → model, with a hard limit of 16 model rounds and 32 combined tool calls per run; transient network failures retry with backoff and cancellation stops in-flight OkHttp calls.
 - Built-in Gemini capabilities: URL Context and hosted Python. Gemini Google Search grounding is not enabled.
 - Independent live web research via Tavily and a separately encrypted API key stored through Android Keystore.
 - Composer quick switches independently enable web search, phone files, local Python, hosted Python, URL Context, image generation and all custom tools.
@@ -111,7 +111,7 @@ Room schema v7 retains existing agent, document, workflow, and workspace data. M
 - Startup splash and animated new-conversation idle scene.
 - Turn-taking voice conversation: speech recognition captures a turn, Gemini responds, Android TTS speaks the answer, and the microphone resumes until voice mode is disabled.
 - Generated files appear as extension-aware, tappable artifact cards that open the exact local file in the ORACLE editor.
-- The agent loop has no fixed tool-round ceiling. Transient connection, response-stream, and retryable HTTP failures use exponential backoff; the user can cancel a run at any time.
+- The agent loop is bounded to 16 model rounds and 32 combined hosted/local tool calls per run to control runaway loops and API cost. Tool-call batches are reserved atomically; when the budget is exhausted, ORACLE stops before executing additional local actions. Transient connection, response-stream, and retryable HTTP failures use exponential backoff; the user can cancel a run at any time.
 - The Gemini API key vault supports multiple encrypted named keys and switching the active key without re-entering credentials.
 
 - Voice listener state is lifecycle-safe and microphone permission is declared once in the Android manifest.
