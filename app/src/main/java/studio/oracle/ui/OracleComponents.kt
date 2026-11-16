@@ -619,7 +619,6 @@ fun DeepSeekInputPill(
                 )
             }
             Spacer(Modifier.width(8.dp))
-            Spacer(Modifier.width(8.dp))
             OracleSendButton(
                 enabled = true,
                 busy = busy,
