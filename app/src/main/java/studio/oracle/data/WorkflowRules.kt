@@ -5,7 +5,8 @@ import studio.oracle.data.local.WorkflowStepEntity
 enum class WorkflowAction(val key: String, val label: String, val help: String) {
     CREATE_NOTE("CREATE_NOTE", "Create local note", "Create a new note in ORACLE's private workspace."),
     APPEND_NOTE("APPEND_NOTE", "Append to local note", "Append text to an existing note by its exact title."),
-    SEARCH_LIBRARY("SEARCH_LIBRARY", "Search document library", "Search indexed PDF, TXT and Markdown passages on this device.");
+    SEARCH_LIBRARY("SEARCH_LIBRARY", "Search document library", "Search indexed PDF, TXT and Markdown passages on this device."),
+    SEARCH_AUDIO("SEARCH_AUDIO", "Search audio memory", "Search local recording titles, transcripts, summaries, tasks and decisions.");
 
     companion object {
         fun from(key: String): WorkflowAction? = entries.firstOrNull { it.key == key }
@@ -29,7 +30,7 @@ object WorkflowRules {
                 ?: return "Step ${index + 1} uses an unsupported action."
             if (step.title.isBlank()) {
                 return when (action) {
-                    WorkflowAction.SEARCH_LIBRARY -> "Step ${index + 1}: enter a search query."
+                    WorkflowAction.SEARCH_LIBRARY, WorkflowAction.SEARCH_AUDIO -> "Step ${index + 1}: enter a search query."
                     else -> "Step ${index + 1}: enter a note title."
                 }
             }
@@ -38,7 +39,7 @@ object WorkflowRules {
             when (action) {
                 WorkflowAction.CREATE_NOTE, WorkflowAction.APPEND_NOTE ->
                     if (step.input.isBlank()) return "Step ${index + 1}: enter the note text."
-                WorkflowAction.SEARCH_LIBRARY -> Unit
+                WorkflowAction.SEARCH_LIBRARY, WorkflowAction.SEARCH_AUDIO -> Unit
             }
         }
         return null
