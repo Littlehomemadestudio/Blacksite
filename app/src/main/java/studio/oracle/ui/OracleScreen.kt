@@ -765,7 +765,8 @@ fun OracleScreen(
                         textToSpeech.stop()
                     }
                 },
-                showTitle = messages.isNotEmpty()
+                showTitle = messages.isNotEmpty(),
+                conversationTitle = sessions.firstOrNull { it.id == activeSessionId }?.title.orEmpty()
             )
 
             Box(
@@ -816,32 +817,6 @@ fun OracleScreen(
                 )
             }
 
-            DeepSeekInputPill(
-                value = prompt,
-                onValueChange = { prompt = it },
-                busy = busy,
-                onSend = { submitPrompt() },
-                onCancel = { requestJob?.cancel() },
-                onThinkClick = { modelPanelOpen = !modelPanelOpen; keyboard?.hide() },
-                thinkExpanded = modelPanelOpen,
-                attachments = selectedAttachments,
-                onAttachClick = { mediaPicker.launch(arrayOf("*/*")) },
-                onRemoveAttachment = { attachment -> selectedAttachments = selectedAttachments.filterNot { it.uri == attachment.uri } },
-                onVoiceClick = { microphonePermission.launch(android.Manifest.permission.RECORD_AUDIO) },
-                voiceReplyEnabled = voiceReplyEnabled,
-                onVoiceReplyToggle = {
-                    val enabling = !voiceReplyEnabled
-                    voiceReplyEnabled = enabling
-                    if (enabling) microphonePermission.launch(android.Manifest.permission.RECORD_AUDIO)
-                    else {
-                        speechRecognizer?.stopListening()
-                        textToSpeech.stop()
-                    }
-                },
-                modifier = Modifier
-                    .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 10.dp)
-            )
-
             AnimatedVisibility(
                 visible = modelPanelOpen,
                 enter = fadeIn() + androidx.compose.animation.expandVertically(),
@@ -858,9 +833,42 @@ fun OracleScreen(
                     folderGranted = grantedTreeUri != null,
                     onChooseFolder = { folderPicker.launch(null) },
                     onOpenModelBrowser = { modelBrowserOpen = true },
-                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp)
+                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 8.dp)
                 )
             }
+
+            DeepSeekInputPill(
+                value = prompt,
+                onValueChange = { prompt = it },
+                busy = busy,
+                onSend = { submitPrompt() },
+                onCancel = { requestJob?.cancel() },
+                onThinkClick = { modelPanelOpen = !modelPanelOpen; keyboard?.hide() },
+                thinkExpanded = modelPanelOpen,
+                attachments = selectedAttachments,
+                onAttachClick = { mediaPicker.launch(arrayOf("*/*")) },
+                onRemoveAttachment = { attachment -> selectedAttachments = selectedAttachments.filterNot { it.uri == attachment.uri } },
+                onVoiceClick = { microphonePermission.launch(android.Manifest.permission.RECORD_AUDIO) },
+                voiceReplyEnabled = voiceReplyEnabled,
+                searchEnabled = agenticSettings.localTools && agenticSettings.webSearch,
+                onSearchClick = {
+                    agenticSettings = agenticSettings.copy(
+                        localTools = true,
+                        webSearch = !agenticSettings.webSearch
+                    )
+                },
+                onVoiceReplyToggle = {
+                    val enabling = !voiceReplyEnabled
+                    voiceReplyEnabled = enabling
+                    if (enabling) microphonePermission.launch(android.Manifest.permission.RECORD_AUDIO)
+                    else {
+                        speechRecognizer?.stopListening()
+                        textToSpeech.stop()
+                    }
+                },
+                modifier = Modifier
+                    .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 10.dp)
+            )
 
             Spacer(Modifier.height(WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().coerceAtLeast(4.dp)))
         }
@@ -974,7 +982,7 @@ private fun CustomTopBar(
         if (showTitle) {
             Spacer(Modifier.width(9.dp))
             Text(
-                "Conversation",
+                conversationTitle.ifBlank { "New chat" },
                 color = palette.text,
                 fontFamily = OracleSans,
                 fontWeight = FontWeight.SemiBold,
