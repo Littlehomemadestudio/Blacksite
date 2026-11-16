@@ -48,7 +48,7 @@ class GeminiImageGenerator(
             .put(
                 JSONObject()
                     .put("type", "image")
-                    .put("mime_type", "image/png")
+                    .put("mime_type", "image/jpeg")
                     .put("aspect_ratio", aspectRatio)
                     .put("image_size", imageSize)
                     .put("delivery", "inline")

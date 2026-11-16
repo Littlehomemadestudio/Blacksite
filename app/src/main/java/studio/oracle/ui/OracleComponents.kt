@@ -603,14 +603,6 @@ fun DeepSeekInputPill(
             Spacer(Modifier.width(8.dp))
             ThinkPill(onClick = onThinkClick, expanded = thinkExpanded)
             Spacer(Modifier.width(6.dp))
-            Box(
-                Modifier.size(36.dp).clip(RoundedCornerShape(11.dp))
-                    .background(palette.surfaceRaised).border(1.dp, palette.outlineSoft, RoundedCornerShape(11.dp))
-                    .clickable(onClick = onVoiceClick),
-                contentAlignment = Alignment.Center
-            ) {
-                androidx.compose.material3.Text("♩", color = palette.accent, fontSize = 19.sp)
-            }
             Spacer(Modifier.width(5.dp))
             Box(
                 Modifier.size(36.dp).clip(RoundedCornerShape(11.dp))
@@ -638,9 +630,14 @@ fun DeepSeekInputPill(
             }
             Spacer(Modifier.width(8.dp))
             OracleSendButton(
-                enabled = busy || value.isNotBlank() || attachments.isNotEmpty(),
+                enabled = busy || value.isNotBlank() || attachments.isNotEmpty() || value.isBlank(),
                 busy = busy,
-                onClick = if (busy) onCancel else onSend
+                listeningAction = value.isBlank() && attachments.isEmpty() && !busy,
+                onClick = when {
+                    busy -> onCancel
+                    value.isBlank() && attachments.isEmpty() -> onVoiceClick
+                    else -> onSend
+                }
             )
         }
     }
@@ -694,6 +691,7 @@ private fun ThinkPill(onClick: () -> Unit, expanded: Boolean) {
 private fun OracleSendButton(
     enabled: Boolean,
     busy: Boolean,
+    listeningAction: Boolean = false,
     onClick: () -> Unit
 ) {
     val palette = LocalOraclePalette.current
@@ -723,7 +721,11 @@ private fun OracleSendButton(
         contentAlignment = Alignment.Center
     ) {
         androidx.compose.animation.AnimatedContent(
-            targetState = busy,
+            targetState = when {
+                busy -> "cancel"
+                listeningAction -> "voice"
+                else -> "send"
+            },
             transitionSpec = {
                 (androidx.compose.animation.fadeIn(tween(130)) +
                     androidx.compose.animation.scaleIn(initialScale = 0.72f, animationSpec = tween(170))) togetherWith
@@ -731,13 +733,23 @@ private fun OracleSendButton(
                         androidx.compose.animation.scaleOut(targetScale = 0.72f, animationSpec = tween(130)))
             },
             label = "send-icon"
-        ) { sending ->
-            OracleGlyphIcon(
-                if (sending) OracleGlyph.Close else OracleGlyph.ArrowUp,
-                Modifier.size(19.dp),
-                tint = if (enabled) palette.onAccent else palette.textTertiary,
-                strokeWidth = 1.8f
-            )
+        ) { action ->
+            when (action) {
+                "cancel" -> OracleGlyphIcon(
+                    OracleGlyph.Close, Modifier.size(19.dp),
+                    tint = if (enabled) palette.onAccent else palette.textTertiary,
+                    strokeWidth = 1.8f
+                )
+                "voice" -> androidx.compose.material3.Text(
+                    "🎙", fontSize = 18.sp,
+                    color = if (enabled) palette.onAccent else palette.textTertiary
+                )
+                else -> OracleGlyphIcon(
+                    OracleGlyph.ArrowUp, Modifier.size(19.dp),
+                    tint = if (enabled) palette.onAccent else palette.textTertiary,
+                    strokeWidth = 1.8f
+                )
+            }
         }
     }
 }
