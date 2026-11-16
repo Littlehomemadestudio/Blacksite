@@ -465,213 +465,312 @@ fun DeepSeekInputPill(
     onAttachClick: () -> Unit = {},
     onRemoveAttachment: (AgentAttachmentRef) -> Unit = {},
     onVoiceClick: () -> Unit = {},
+    onVoiceRelease: () -> Unit = {},
+    onVoiceCancel: () -> Unit = {},
+    onCameraClick: () -> Unit = onAttachClick,
+    onPhotoClick: () -> Unit = onAttachClick,
+    onDocumentClick: () -> Unit = onAttachClick,
     voiceReplyEnabled: Boolean = false,
     onVoiceReplyToggle: () -> Unit = {},
     searchEnabled: Boolean = false,
     onSearchClick: () -> Unit = {}
 ) {
     val palette = LocalOraclePalette.current
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val focused by interaction.collectIsFocusedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.985f else 1f,
-        animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f),
-        label = "composer-press"
-    )
-    val borderColor by animateColorAsState(
-        targetValue = if (focused) palette.accent.copy(alpha = 0.72f) else palette.outline,
-        animationSpec = tween(220),
-        label = "composer-border"
-    )
-    val elevation by androidx.compose.animation.core.animateDpAsState(
-        targetValue = if (focused) 5.dp else 1.dp,
-        animationSpec = spring(stiffness = 360f, dampingRatio = 0.86f),
-        label = "composer-elevation"
-    )
+    var attachmentTrayOpen by remember { androidx.compose.runtime.mutableStateOf(false) }
+    var voiceHoldActive by remember { androidx.compose.runtime.mutableStateOf(false) }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
             .animateContentSize(spring(stiffness = 420f, dampingRatio = 0.88f))
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                translationY = if (pressed) 1.dp.toPx() else 0f
-            }
-             .shadow(elevation + 3.dp, RoundedCornerShape(28.dp), clip = false)
-            .clip(RoundedCornerShape(28.dp))
-            .background(Color.White)
-            .border(1.dp, Color(0xFFECECEC), RoundedCornerShape(28.dp))
-            .padding(start = 14.dp, end = 12.dp, top = 9.dp, bottom = 8.dp)
     ) {
-        if (attachments.isNotEmpty()) {
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(7.dp)
-            ) {
-                attachments.forEach { attachment ->
-                    Row(
-                        Modifier.clip(RoundedCornerShape(11.dp))
-                            .background(palette.surfaceRaised)
-                            .border(1.dp, palette.outlineSoft, RoundedCornerShape(11.dp))
-                            .padding(start = 9.dp, end = 5.dp, top = 6.dp, bottom = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        androidx.compose.material3.Text(
-                            when {
-                                attachment.mimeType.startsWith("image/") -> "▧"
-                                attachment.mimeType.startsWith("video/") -> "▶"
-                                attachment.mimeType.startsWith("audio/") -> "♫"
-                                else -> "▤"
-                            },
-                            color = palette.accent, fontSize = 13.sp
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        androidx.compose.material3.Text(
-                            attachment.name.take(19),
-                            color = palette.textSecondary, fontFamily = OracleSans,
-                            fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(Modifier.width(5.dp))
-                        androidx.compose.material3.Text(
-                            "×",
-                            modifier = Modifier.clickable { onRemoveAttachment(attachment) }.padding(horizontal = 3.dp),
-                            color = palette.textTertiary, fontSize = 16.sp
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(9.dp))
-        }
-
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 34.dp, max = 132.dp),
-            textStyle = androidx.compose.material3.MaterialTheme.typography.bodyLarge.copy(
-                color = palette.text,
-                fontFamily = OracleSans,
-                fontSize = 15.sp,
-                lineHeight = 22.sp
-            ),
-            cursorBrush = SolidColor(palette.accent),
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Sentences,
-                imeAction = ImeAction.Send
-            ),
-            keyboardActions = KeyboardActions(
-                onSend = { if (busy) onCancel() else onSend() }
-            ),
-            interactionSource = interaction,
-            maxLines = 6,
-            decorationBox = { innerTextField ->
-                Box(
-                    Modifier.fillMaxWidth().defaultMinSize(minHeight = 34.dp),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    if (value.isEmpty()) {
-                        androidx.compose.material3.Text(
-                            "Type a message or hold to speak",
-                            color = palette.textTertiary,
-                            fontFamily = OracleSans,
-                            fontSize = 15.sp
-                        )
-                    }
-                    innerTextField()
-                }
-            }
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Row(
-            Modifier.fillMaxWidth().height(36.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .shadow(18.dp, RoundedCornerShape(25.dp), clip = false)
+                .clip(RoundedCornerShape(25.dp))
+                .background(Color.White)
+                .border(1.dp, Color(0xFFEAEAEA), RoundedCornerShape(25.dp))
+                .padding(start = 14.dp, end = 12.dp, top = 10.dp, bottom = 9.dp)
         ) {
-            ThinkPill(onClick = onThinkClick, expanded = thinkExpanded)
-            Spacer(Modifier.width(7.dp))
-            SearchPill(enabled = searchEnabled, onClick = onSearchClick)
-            Spacer(Modifier.weight(1f))
-            Box(
-                Modifier.size(36.dp).clip(CircleShape)
-                    .background(Color.White)
-                    .border(1.dp, Color(0xFFE6E6E6), CircleShape)
-                    .clickable(onClick = onAttachClick),
-                contentAlignment = Alignment.Center
-            ) {
-                androidx.compose.material3.Text("＋", color = Color(0xFF171717), fontSize = 23.sp, lineHeight = 24.sp)
+            if (attachments.isNotEmpty()) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    attachments.forEach { attachment ->
+                        Row(
+                            Modifier.clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFFF4F4F4))
+                                .border(1.dp, Color(0xFFEAEAEA), RoundedCornerShape(12.dp))
+                                .padding(start = 9.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                when {
+                                    attachment.mimeType.startsWith("image/") -> "▧"
+                                    attachment.mimeType.startsWith("video/") -> "▶"
+                                    attachment.mimeType.startsWith("audio/") -> "♫"
+                                    else -> "▤"
+                                },
+                                color = Color(0xFF6B87D9), fontSize = 13.sp
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                attachment.name.take(19),
+                                color = Color(0xFF555555), fontFamily = OracleSans,
+                                fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(Modifier.width(5.dp))
+                            Text(
+                                "×",
+                                modifier = Modifier.clickable { onRemoveAttachment(attachment) }
+                                    .padding(horizontal = 3.dp),
+                                color = Color(0xFF888888), fontSize = 17.sp
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
             }
-            androidx.compose.animation.AnimatedVisibility(
-                visible = busy,
-                enter = androidx.compose.animation.fadeIn(tween(150)) +
-                    androidx.compose.animation.expandHorizontally(tween(180)),
-                exit = androidx.compose.animation.fadeOut(tween(100)) +
-                    androidx.compose.animation.shrinkHorizontally(tween(150))
-            ) {
-                androidx.compose.material3.Text(
-                    "WORKING",
-                    color = palette.textTertiary,
-                    fontFamily = OracleMono,
-                    fontSize = 9.sp
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            OracleSendButton(
-                enabled = true,
-                busy = busy,
-                listeningAction = value.isBlank() && attachments.isEmpty() && !busy,
-                onClick = when {
-                    busy -> onCancel
-                    value.isBlank() && attachments.isEmpty() -> onVoiceClick
-                    else -> onSend
+
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 34.dp, max = 132.dp),
+                textStyle = TextStyle(
+                    color = Color(0xFF171717),
+                    fontFamily = OracleSans,
+                    fontSize = 16.sp,
+                    lineHeight = 23.sp
+                ),
+                cursorBrush = SolidColor(Color(0xFF5279D8)),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences,
+                    imeAction = ImeAction.Send
+                ),
+                keyboardActions = KeyboardActions(
+                    onSend = { if (busy) onCancel() else onSend() }
+                ),
+                maxLines = 6,
+                decorationBox = { innerTextField ->
+                    Box(
+                        Modifier.fillMaxWidth().defaultMinSize(minHeight = 34.dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        if (value.isEmpty()) {
+                            Text(
+                                "Type a message or hold to speak",
+                                color = Color(0xFFB3B3B3),
+                                fontFamily = OracleSans,
+                                fontSize = 16.sp
+                            )
+                        }
+                        innerTextField()
+                    }
                 }
             )
+
+            Spacer(Modifier.height(9.dp))
+
+            Row(
+                Modifier.fillMaxWidth().height(37.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ThinkPill(onClick = onThinkClick, expanded = thinkExpanded)
+                Spacer(Modifier.width(7.dp))
+                SearchPill(enabled = searchEnabled, onClick = onSearchClick)
+                Spacer(Modifier.weight(1f))
+
+                if (attachmentTrayOpen) {
+                    RoundComposerAction(
+                        symbol = "×",
+                        description = "Close attachments",
+                        onClick = { attachmentTrayOpen = false }
+                    )
+                } else {
+                    RoundComposerAction(
+                        symbol = "+",
+                        description = "Add attachment",
+                        onClick = {
+                            attachmentTrayOpen = true
+                            onAttachClick()
+                        }
+                    )
+                }
+                Spacer(Modifier.width(7.dp))
+                OracleSendButton(
+                    busy = busy,
+                    listeningAction = value.isBlank() && attachments.isEmpty() && !busy,
+                    onTap = {
+                        when {
+                            busy -> onCancel()
+                            value.isBlank() && attachments.isEmpty() -> onVoiceClick()
+                            else -> onSend()
+                        }
+                    },
+                    onVoiceHoldStart = {
+                        voiceHoldActive = true
+                        onVoiceClick()
+                    },
+                    onVoiceHoldEnd = {
+                        voiceHoldActive = false
+                        onVoiceRelease()
+                    },
+                    onVoiceHoldCancel = {
+                        voiceHoldActive = false
+                        onVoiceCancel()
+                    }
+                )
+            }
+        }
+
+        androidx.compose.animation.AnimatedVisibility(
+            visible = attachmentTrayOpen,
+            enter = androidx.compose.animation.fadeIn(tween(160)) +
+                androidx.compose.animation.expandVertically(tween(220)),
+            exit = androidx.compose.animation.fadeOut(tween(110)) +
+                androidx.compose.animation.shrinkVertically(tween(160))
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 5.dp, end = 5.dp, top = 13.dp, bottom = 5.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                AttachmentChoice("Camera", "▣", onCameraClick, Modifier.weight(1f))
+                AttachmentChoice("Photo", "▧", onPhotoClick, Modifier.weight(1f))
+                AttachmentChoice("Document", "⌁", onDocumentClick, Modifier.weight(1f))
+            }
+        }
+
+        androidx.compose.animation.AnimatedVisibility(
+            visible = voiceHoldActive,
+            enter = androidx.compose.animation.fadeIn(tween(140)),
+            exit = androidx.compose.animation.fadeOut(tween(180))
+        ) {
+            Column(
+                Modifier.fillMaxWidth()
+                    .height(220.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.Transparent,
+                                Color(0xBFD5E5FF),
+                                Color(0xFF78AFFF)
+                            )
+                        )
+                    )
+                    .padding(top = 34.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(22.dp)
+            ) {
+                Text(
+                    "Release to send, slide up to cancel",
+                    color = Color.White,
+                    fontFamily = OracleSans,
+                    fontSize = 13.sp
+                )
+                Row(
+                    Modifier.fillMaxWidth().height(28.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val levels = listOf(7, 12, 18, 10, 22, 15, 26, 12, 19, 9, 25, 14, 20, 8, 16, 24, 11, 18, 7)
+                    levels.forEachIndexed { index, height ->
+                        Box(
+                            Modifier.padding(horizontal = 2.dp)
+                                .width(2.dp)
+                                .height((height * if (index % 3 == 0) 1.12f else 1f).dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(Color.White.copy(alpha = 0.88f))
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
+private fun AttachmentChoice(
+    label: String,
+    symbol: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.height(86.dp)
+            .clip(RoundedCornerShape(17.dp))
+            .background(Color(0xFFF4F4F4))
+            .clickable(onClick = onClick)
+            .padding(vertical = 11.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Text(symbol, color = Color(0xFF171717), fontSize = 26.sp, lineHeight = 29.sp)
+        Text(label, color = Color(0xFF171717), fontFamily = OracleSans,
+            fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun RoundComposerAction(
+    symbol: String,
+    description: String,
+    onClick: () -> Unit
+) {
+    Box(
+        Modifier.size(37.dp)
+            .semantics { contentDescription = description }
+            .clip(CircleShape)
+            .border(1.dp, Color(0xFFE2E2E2), CircleShape)
+            .background(Color.White)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            symbol,
+            color = Color(0xFF171717),
+            fontFamily = OracleSans,
+            fontSize = if (symbol == "+") 25.sp else 23.sp,
+            lineHeight = 25.sp
+        )
+    }
+}
+
+@Composable
 private fun ThinkPill(onClick: () -> Unit, expanded: Boolean) {
-    val palette = LocalOraclePalette.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.96f else 1f, spring(stiffness = 550f), label = "think-pill")
-    val chevronRotation by animateFloatAsState(
+    val scale by animateFloatAsState(
+        if (pressed) 0.97f else 1f,
+        spring(stiffness = 560f, dampingRatio = 0.82f),
+        label = "think-pill"
+    )
+    val rotation by animateFloatAsState(
         if (expanded) 180f else 0f,
-        animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f),
+        spring(stiffness = 420f, dampingRatio = 0.82f),
         label = "think-chevron"
     )
     Row(
-        modifier = Modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                translationY = if (pressed) 1.dp.toPx() else 0f
-            }
+        modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(22.dp))
-            .background(if (pressed || expanded) Color(0xFFF1F1F1) else Color.White)
+            .background(if (expanded || pressed) Color(0xFFF3F3F3) else Color.White)
             .border(1.dp, Color(0xFFE9E9E9), RoundedCornerShape(22.dp))
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(start = 11.dp, end = 10.dp, top = 7.dp, bottom = 7.dp),
+            .padding(horizontal = 11.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        OracleGlyphIcon(OracleGlyph.Spark, Modifier.size(13.dp), palette.textSecondary, 1.35f)
-        Spacer(Modifier.width(7.dp))
-        androidx.compose.material3.Text(
-            "Think",
-            color = palette.textSecondary,
-            fontFamily = OracleSans,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(Modifier.width(4.dp))
+        OracleGlyphIcon(OracleGlyph.Spark, Modifier.size(14.dp), Color(0xFF181818), 1.5f)
+        Spacer(Modifier.width(6.dp))
+        Text("Think", color = Color(0xFF171717), fontFamily = OracleSans,
+            fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.width(3.dp))
         OracleGlyphIcon(
             OracleGlyph.ChevronDown,
-            Modifier.size(11.dp).graphicsLayer { rotationZ = chevronRotation },
-            palette.textTertiary,
+            Modifier.size(10.dp).graphicsLayer { rotationZ = rotation },
+            Color(0xFF777777),
             1.4f
         )
     }
@@ -680,89 +779,67 @@ private fun ThinkPill(onClick: () -> Unit, expanded: Boolean) {
 @Composable
 private fun SearchPill(enabled: Boolean, onClick: () -> Unit) {
     Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(22.dp))
-            .background(if (enabled) Color(0xFFEAF1FF) else Color.White)
-            .border(1.dp, if (enabled) Color(0xFFD8E4FF) else Color(0xFFE9E9E9), RoundedCornerShape(22.dp))
+        modifier = Modifier.clip(RoundedCornerShape(22.dp))
+            .background(if (enabled) Color(0xFFEAF1FF) else Color(0xFFF5F7FA))
+            .border(1.dp, if (enabled) Color(0xFFD7E3FF) else Color(0xFFE8EBF0), RoundedCornerShape(22.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 7.dp),
+            .padding(horizontal = 11.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        androidx.compose.material3.Text("◎", color = Color(0xFF4F78D8), fontSize = 14.sp)
+        Text("◎", color = Color(0xFF4F78D8), fontSize = 15.sp)
         Spacer(Modifier.width(5.dp))
-        androidx.compose.material3.Text(
-            "Search",
-            color = Color(0xFF4F78D8),
-            fontFamily = OracleSans,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold
-        )
+        Text("Search", color = Color(0xFF4F78D8), fontFamily = OracleSans,
+            fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
 @Composable
 private fun OracleSendButton(
-    enabled: Boolean,
     busy: Boolean,
-    listeningAction: Boolean = false,
-    onClick: () -> Unit
+    listeningAction: Boolean,
+    onTap: () -> Unit,
+    onVoiceHoldStart: () -> Unit,
+    onVoiceHoldEnd: () -> Unit,
+    onVoiceHoldCancel: () -> Unit
 ) {
-    val palette = LocalOraclePalette.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.96f else 1f,
-        animationSpec = spring(stiffness = 560f, dampingRatio = 0.78f),
-        label = "send-press"
+        if (pressed) 0.95f else 1f,
+        spring(stiffness = 560f, dampingRatio = 0.8f),
+        label = "composer-action-press"
     )
+    var held by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     Box(
-        modifier = Modifier
-            .size(42.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                translationY = if (pressed) 1.dp.toPx() else 0f
-            }
+        modifier = Modifier.size(39.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(CircleShape)
-            .background(if (enabled) palette.accent else palette.surfaceRaised)
-            .clickable(
-                enabled = enabled,
-                interactionSource = interaction,
-                indication = null,
-                onClick = onClick
-            ),
+            .background(Color.White)
+            .border(1.dp, Color(0xFFE4E4E4), CircleShape)
+            .pointerInput(busy, listeningAction) {
+                androidx.compose.foundation.gestures.detectTapGestures(
+                    onPress = {
+                        held = false
+                        val released = tryAwaitRelease()
+                        if (held) {
+                            if (released) onVoiceHoldEnd() else onVoiceHoldCancel()
+                        }
+                    },
+                    onLongPress = {
+                        if (listeningAction) {
+                            held = true
+                            onVoiceHoldStart()
+                        }
+                    },
+                    onTap = { onTap() }
+                )
+            },
         contentAlignment = Alignment.Center
     ) {
-        androidx.compose.animation.AnimatedContent(
-            targetState = when {
-                busy -> "cancel"
-                listeningAction -> "voice"
-                else -> "send"
-            },
-            transitionSpec = {
-                (androidx.compose.animation.fadeIn(tween(130)) +
-                    androidx.compose.animation.scaleIn(initialScale = 0.72f, animationSpec = tween(170))) togetherWith
-                    (androidx.compose.animation.fadeOut(tween(90)) +
-                        androidx.compose.animation.scaleOut(targetScale = 0.72f, animationSpec = tween(130)))
-            },
-            label = "send-icon"
-        ) { action ->
-            when (action) {
-                "cancel" -> OracleGlyphIcon(
-                    OracleGlyph.Close, Modifier.size(19.dp),
-                    tint = if (enabled) palette.onAccent else palette.textTertiary,
-                    strokeWidth = 1.8f
-                )
-                "voice" -> androidx.compose.material3.Text(
-                    "🎙", fontSize = 18.sp,
-                    color = if (enabled) palette.onAccent else palette.textTertiary
-                )
-                else -> OracleGlyphIcon(
-                    OracleGlyph.ArrowUp, Modifier.size(19.dp),
-                    tint = if (enabled) palette.onAccent else palette.textTertiary,
-                    strokeWidth = 1.8f
-                )
-            }
+        when {
+            busy -> Text("×", color = Color(0xFF171717), fontSize = 23.sp)
+            listeningAction -> OracleGlyphIcon(OracleGlyph.Audio, Modifier.size(20.dp), Color(0xFF171717), 1.7f)
+            else -> OracleGlyphIcon(OracleGlyph.ArrowUp, Modifier.size(19.dp), Color(0xFF171717), 1.9f)
         }
     }
 }
