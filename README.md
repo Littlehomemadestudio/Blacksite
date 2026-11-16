@@ -70,6 +70,15 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - A failed step stops the run. Deleting a workflow removes its steps and run history but preserves notes created by previous runs.
 - Workflow execution is local-only: no Gemini request, network calls, shell access, arbitrary scripts, app launching, scheduled triggers, or background execution.
 
+### Audio Memory Studio
+- Records microphone audio locally with Android AudioRecord as 16 kHz mono PCM, then wraps it in a standard WAV file for Gemini-compatible audio input.
+- Recording requires the Android microphone permission, has a 10-minute per-recording limit, and is never uploaded automatically.
+- Audio files, titles, transcripts, summaries, extracted tasks, and decisions are stored in the active workspace and indexed for offline search.
+- Recordings can be played back locally. Transcription requires a separate per-recording confirmation that explains the Google Gemini upload.
+- The selected Gemini model receives only the approved recording through the Gemini Files API. ORACLE requests a verbatim transcript in the spoken language, a concise summary, explicit tasks, and decisions; it then attempts to delete the temporary remote file.
+- The UI reports when remote cleanup cannot be confirmed. Local recordings remain available; audio and the Room database are app-private but not encrypted at rest.
+- This is file-based, user-initiated transcription—not live transcription, background capture, or Gemini Live streaming.
+
 ### Verification
 - Unit tests cover conversation context, session naming, workspace-name normalization (including Persian text), document chunk boundaries, PDF citations, stable text sections, keyword ranking, workflow plan validation, and Room workspace-isolation queries/mutations under Robolectric.
 
@@ -77,7 +86,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Office document extraction, image OCR, scanned-PDF OCR, document summaries, flashcards, quizzes, semantic embeddings, and knowledge graph.
 - Scheduled, event-based, and background workflow triggers. Workflow runs are manual only.
 - Additional workflow actions such as export, file operations, notifications, and external integrations.
-- Persistent full-duplex Gemini Live audio streaming, interruption handling, and a searchable voice transcript archive. Current voice mode is push-to-talk with Android speech recognition and optional spoken replies.
+- Persistent full-duplex Gemini Live audio streaming and interruption handling. Audio Memory provides saved recordings and file-based Gemini transcription, not live streaming.
 - Arbitrary OS-level shell/Termux access, app launching, UI automation, scheduled triggers, and background agents are not implemented. The Agent can use the scoped tools described above, subject to user-selected capabilities and per-session/action approval.
 
 ## Privacy and data handling
@@ -85,8 +94,8 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - The key is sent over HTTPS only to Google's Gemini API when a user invokes validation, model discovery, or generation.
 - Agent threads, workflows, notes, run history, and document data are stored in the app-private Room database; they are not uploaded automatically.
 - Workflow actions run locally. A document-search step queries the on-device index; it does not send excerpts to Gemini.
-- The Room database is app-private but is **not encrypted at the database layer**. Imported originals are also app-private files, not encrypted files. Do not store highly sensitive content until encrypted local-data storage is implemented.
-- Library Q&A is opt-in: only the question and up to six retrieved excerpts are sent to the selected Gemini model after explicit confirmation.
+- The Room database, imported originals, and Audio Memory WAV files are app-private but are **not encrypted at the database/file layer**. Do not store highly sensitive content until encrypted local-data storage is implemented.
+- Library Q&A is opt-in: only the question and up to six retrieved excerpts are sent to the selected Gemini model after explicit confirmation. Audio transcription is also opt-in per recording; only that selected WAV is uploaded, and ORACLE attempts remote file deletion after analysis.
 
 ## Document library scope and limits
 - Supported imports: PDF with selectable text, UTF-8 plain text, and Markdown. Maximum file size is 20 MB; PDFs are limited to 400 pages; extracted text is capped at 1.5 million characters per file.
@@ -95,7 +104,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - User-facing thread deletion, workspace deletion, and full workspace export are not available yet. Uninstalling the app removes its app-private data.
 
 ## Database compatibility
-Room schema v5 retains the existing agent, document, and workflow data while adding workspace ownership to workflows and local notes. The 4→5 migration assigns existing workflows and notes to the Personal workspace, replaces global note-title uniqueness with per-workspace uniqueness, and adds workspace-aware indexes. Earlier 3→4 compatibility remains idempotent across the two v3 layouts.
+Room schema v7 retains existing agent, document, workflow, and workspace data. Migration 6→7 adds workspace-scoped Audio Memory records and search indexes without modifying existing rows. Earlier 3→4 compatibility remains idempotent across the two v3 layouts.
 
 
 ### Release polish
