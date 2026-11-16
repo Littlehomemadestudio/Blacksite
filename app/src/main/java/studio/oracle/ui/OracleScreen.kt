@@ -2008,9 +2008,10 @@ private fun OracleThreadDrawer(
             exit = slideOutHorizontally(targetOffsetX = { -it }) + fadeOut()
         ) {
             Column(
-                modifier = Modifier.fillMaxHeight().fillMaxWidth(0.79f).widthIn(max = 360.dp)
+                modifier = Modifier.fillMaxHeight().fillMaxWidth(0.77f).widthIn(max = 360.dp)
                     .clip(RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp))
                     .background(Color.White)
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
                     .padding(start = 16.dp, end = 15.dp, top = 16.dp, bottom = 11.dp)
             ) {
                 Row(Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(24.dp))
@@ -2070,15 +2071,7 @@ private fun OracleThreadDrawer(
                             color = Color(0xFF969696), fontFamily = OracleSans, fontSize = 13.sp) }
                     }
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                    DrawerAction(OracleGlyph.Library, "Library", onOpenLibrary)
-                    DrawerAction(OracleGlyph.Spark, "Workflow Studio", onOpenWorkflows)
-                    DrawerAction(OracleGlyph.Audio, "Audio Memory", onOpenAudio)
-                    DrawerAction(OracleGlyph.Settings, "Settings", onOpenSettings)
-                }
                 Spacer(Modifier.height(7.dp))
-                Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFECECEC)))
-                Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
                     .clickable { workspaceListExpanded = !workspaceListExpanded }
                     .padding(horizontal = 3.dp, vertical = 5.dp),
@@ -2106,6 +2099,11 @@ private fun OracleThreadDrawer(
                     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp))
                         .background(Color(0xFFF5F5F5)).padding(9.dp),
                         verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        DrawerAction(OracleGlyph.Library, "Library", onOpenLibrary)
+                        DrawerAction(OracleGlyph.Spark, "Workflow Studio", onOpenWorkflows)
+                        DrawerAction(OracleGlyph.Audio, "Audio Memory", onOpenAudio)
+                        DrawerAction(OracleGlyph.Settings, "Settings", onOpenSettings)
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE7E7E7)))
                         workspaces.forEach { workspace ->
                             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
                                 .background(if (workspace.id == activeWorkspaceId) Color(0xFFE8EFFF) else Color.Transparent)
