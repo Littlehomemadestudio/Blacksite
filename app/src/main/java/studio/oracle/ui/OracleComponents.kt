@@ -27,6 +27,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -448,6 +451,43 @@ fun OracleSolidAction(
             fontSize = 10.sp,
             letterSpacing = 0.3.sp
         )
+    }
+}
+
+@Composable
+fun OracleWhaleMark(
+    modifier: Modifier = Modifier,
+    color: Color = Color(0xFF4F78E8)
+) {
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        val body = androidx.compose.ui.graphics.Path().apply {
+            moveTo(w * 0.10f, h * 0.42f)
+            cubicTo(w * 0.17f, h * 0.16f, w * 0.43f, h * 0.08f, w * 0.66f, h * 0.22f)
+            cubicTo(w * 0.73f, h * 0.15f, w * 0.70f, h * 0.04f, w * 0.81f, h * 0.08f)
+            cubicTo(w * 0.88f, h * 0.13f, w * 0.88f, h * 0.22f, w * 0.79f, h * 0.29f)
+            cubicTo(w * 0.91f, h * 0.30f, w * 0.98f, h * 0.25f, w * 0.98f, h * 0.18f)
+            cubicTo(w * 1.00f, h * 0.33f, w * 0.92f, h * 0.43f, w * 0.80f, h * 0.42f)
+            cubicTo(w * 0.80f, h * 0.64f, w * 0.68f, h * 0.83f, w * 0.47f, h * 0.86f)
+            cubicTo(w * 0.28f, h * 0.88f, w * 0.12f, h * 0.76f, w * 0.08f, h * 0.59f)
+            cubicTo(w * 0.06f, h * 0.52f, w * 0.07f, h * 0.46f, w * 0.10f, h * 0.42f)
+            close()
+        }
+        drawPath(body, color)
+        val fin = androidx.compose.ui.graphics.Path().apply {
+            moveTo(w * 0.44f, h * 0.73f)
+            cubicTo(w * 0.34f, h * 0.61f, w * 0.27f, h * 0.52f, w * 0.19f, h * 0.47f)
+            cubicTo(w * 0.20f, h * 0.63f, w * 0.28f, h * 0.77f, w * 0.39f, h * 0.81f)
+            close()
+        }
+        drawPath(fin, Color.White.copy(alpha = 0.94f))
+        drawCircle(Color.White, radius = w * 0.018f, center = androidx.compose.ui.geometry.Offset(w * 0.69f, h * 0.34f))
+        val tailLine = androidx.compose.ui.graphics.Path().apply {
+            moveTo(w * 0.78f, h * 0.28f)
+            cubicTo(w * 0.82f, h * 0.22f, w * 0.83f, h * 0.16f, w * 0.80f, h * 0.12f)
+        }
+        drawPath(tailLine, color.copy(alpha = 0.9f), style = Stroke(width = w * 0.018f, cap = StrokeCap.Round))
     }
 }
 
