@@ -268,7 +268,8 @@ fun AudioMemoryScreen(workspaceId: String) {
             text = {
                 Text(
                     "ORACLE will upload only “" + record.title + "” to Google's Gemini Files API using your selected model. " +
-                        "Gemini will create a transcript, summary, tasks, and decisions. ORACLE then attempts to delete the remote file. " +
+                        "Gemini 3.5 Transcribe creates the verbatim transcript; your selected model then extracts a summary, tasks, and decisions. " +
+                        "ORACLE attempts immediate remote deletion. Google automatically deletes Files API uploads after 48 hours if cleanup fails. " +
                         "Your original WAV remains in this workspace. This upload is not automatic."
                 )
             },
