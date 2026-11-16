@@ -243,7 +243,8 @@ fun OracleScreen(
         val deferred = CompletableDeferred<String>()
         val scopeLabel = permissionGroup.replace('_', ' ').replaceFirstChar { it.uppercase() }
         withContext(Dispatchers.Main.immediate) {
-            pendingApproval = action + "\n\nScope: " + scopeLabel + " · this conversation only."
+            pendingApproval = action + "\n\nScope: " + scopeLabel + " · this conversation only." +
+                "\nAllow for session authorizes this capability group for the rest of this conversation. It does not grant other capabilities."
             approvalDeferred = deferred
         }
         return try {
