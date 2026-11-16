@@ -1,5 +1,8 @@
 package studio.oracle.data
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
@@ -9,9 +12,10 @@ import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
+import androidx.core.content.ContextCompat
 
 /** Captures mono 16 kHz PCM and writes a standards-compliant WAV file. */
-class WavAudioRecorder {
+class WavAudioRecorder(private val context: Context) {
     private var audioRecord: AudioRecord? = null
     private var writerThread: Thread? = null
     @Volatile private var recording = false
@@ -21,23 +25,34 @@ class WavAudioRecorder {
 
     fun start(outputFile: File) {
         check(!recording && audioRecord == null) { "A recording is already active." }
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            throw SecurityException("Microphone permission is required before recording.")
+        }
         val parent = outputFile.parentFile ?: throw IOException("Recording path has no parent directory.")
         if (!parent.exists() && !parent.mkdirs()) throw IOException("Could not create the audio directory.")
 
-        val minBuffer = AudioRecord.getMinBufferSize(
-            SAMPLE_RATE,
-            AudioFormat.CHANNEL_IN_MONO,
-            AudioFormat.ENCODING_PCM_16BIT
-        )
+        val minBuffer = try {
+            AudioRecord.getMinBufferSize(
+                SAMPLE_RATE,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT
+            )
+        } catch (denied: SecurityException) {
+            throw IOException("Microphone permission is no longer available.", denied)
+        }
         if (minBuffer <= 0) throw IOException("This device does not expose a compatible microphone input.")
 
-        val capture = AudioRecord(
-            MediaRecorder.AudioSource.MIC,
-            SAMPLE_RATE,
-            AudioFormat.CHANNEL_IN_MONO,
-            AudioFormat.ENCODING_PCM_16BIT,
-            minBuffer * 2
-        )
+        val capture = try {
+            AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                SAMPLE_RATE,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                minBuffer * 2
+            )
+        } catch (denied: SecurityException) {
+            throw IOException("Android denied access to the microphone.", denied)
+        }
         if (capture.state != AudioRecord.STATE_INITIALIZED) {
             capture.release()
             throw IOException("The microphone could not be initialized.")
