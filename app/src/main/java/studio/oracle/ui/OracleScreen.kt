@@ -930,6 +930,20 @@ fun OracleScreen(
                         webSearch = !agenticSettings.webSearch
                     )
                 },
+                codeEnabled = agenticSettings.localTools && agenticSettings.localPython,
+                filesEnabled = agenticSettings.localTools && agenticSettings.phoneFiles,
+                onCodeClick = {
+                    agenticSettings = agenticSettings.copy(
+                        localTools = true,
+                        localPython = !agenticSettings.localPython
+                    )
+                },
+                onFilesClick = {
+                    agenticSettings = agenticSettings.copy(
+                        localTools = true,
+                        phoneFiles = !agenticSettings.phoneFiles
+                    )
+                },
                 onVoiceReplyToggle = {
                     val enabling = !voiceReplyEnabled
                     voiceReplyEnabled = enabling
@@ -1662,7 +1676,7 @@ private fun ModelControlPanel(
     }
     Column(
         modifier = modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(14.dp))
             .background(
                 androidx.compose.ui.graphics.Brush.linearGradient(
                     if (palette.isDark) {
@@ -1672,7 +1686,7 @@ private fun ModelControlPanel(
                     }
                 )
             )
-            .border(1.dp, Color(0x66FFFFFF), RoundedCornerShape(22.dp))
+            .border(1.dp, Color(0xBFFFFFFF), RoundedCornerShape(14.dp))
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -1784,7 +1798,7 @@ private fun ModelChoice(
     val pressed by interaction.collectIsPressedAsState()
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(
                 when {
                     selected -> palette.accentSoft
@@ -1795,7 +1809,7 @@ private fun ModelChoice(
             .border(
                 1.dp,
                 if (selected) palette.accent.copy(alpha = 0.45f) else palette.outlineSoft,
-                RoundedCornerShape(12.dp)
+                RoundedCornerShape(8.dp)
             )
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 9.dp),
