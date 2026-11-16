@@ -114,6 +114,7 @@ fun OracleScreen(
     onOpenLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenWorkflows: () -> Unit,
+    onOpenAudio: () -> Unit,
     workspaceId: String,
     workspaces: List<WorkspaceEntity>,
     onWorkspaceChange: (String) -> Unit,
@@ -2218,6 +2219,7 @@ private fun OracleThreadDrawer(
                 Spacer(Modifier.height(8.dp))
                 DrawerAction(OracleGlyph.Library, "Library", onOpenLibrary)
                 DrawerAction(OracleGlyph.Spark, "Workflow Studio", onOpenWorkflows)
+                DrawerAction(OracleGlyph.Audio, "Audio Memory", onOpenAudio)
                 DrawerAction(OracleGlyph.Settings, "Settings", onOpenSettings)
             }
         }
