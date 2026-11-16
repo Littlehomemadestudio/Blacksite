@@ -1,6 +1,8 @@
 package studio.oracle.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AgenticSettingsTest {
@@ -32,5 +34,38 @@ class AgenticSettingsTest {
         assertEquals("none", settings.thinkingSummaries)
         assertEquals(16384, settings.maxOutputTokens)
         assertEquals("none", settings.toolChoice)
+    }
+
+    @Test
+    fun agentRunStopsAfterSixteenModelRounds() {
+        val budget = AgenticExecutionBudget()
+
+        repeat(AgenticExecutionBudget.MAX_ROUNDS) {
+            assertTrue(budget.beginRound())
+        }
+
+        assertFalse(budget.beginRound())
+        assertEquals(AgenticExecutionBudget.MAX_ROUNDS, budget.roundsUsed)
+    }
+
+    @Test
+    fun toolCallBatchIsReservedAtomicallyWithinBudget() {
+        val budget = AgenticExecutionBudget(maxRounds = 2, maxToolCalls = 3)
+
+        assertTrue(budget.reserveToolCalls(2))
+        assertFalse(budget.reserveToolCalls(2))
+        assertEquals(2, budget.toolCallsUsed)
+        assertTrue(budget.reserveToolCalls(1))
+        assertFalse(budget.reserveToolCalls(1))
+        assertEquals(3, budget.toolCallsUsed)
+    }
+
+    @Test
+    fun rejectsNegativeToolReservationsWithoutChangingBudget() {
+        val budget = AgenticExecutionBudget(maxRounds = 2, maxToolCalls = 4)
+
+        assertFalse(budget.reserveToolCalls(-1))
+        assertEquals(0, budget.toolCallsUsed)
+        assertTrue(budget.reserveToolCalls(0))
     }
 }
