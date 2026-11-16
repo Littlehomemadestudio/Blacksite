@@ -89,6 +89,7 @@ import studio.oracle.data.AgentConversationPolicy
 import studio.oracle.data.AgenticEvent
 import studio.oracle.data.AgenticResult
 import studio.oracle.data.AgenticSettings
+import studio.oracle.data.AgenticPermissionPolicy
 import studio.oracle.data.GeminiAgenticRuntime
 import studio.oracle.data.GeminiFileUploader
 import studio.oracle.data.GeminiImageGenerator
@@ -232,17 +233,19 @@ fun OracleScreen(
         }.onFailure { error = "Android could not persist access to that folder. Choose it again." }
     }
     suspend fun authorizeTool(action: String, permissionGroup: String, authorizationSessionId: String): Boolean {
-        if (authorizationSessionId in approvedToolSessions) return true
+        val grantKey = AgenticPermissionPolicy.sessionGrantKey(authorizationSessionId, permissionGroup)
+        if (grantKey in approvedToolSessions) return true
         val deferred = CompletableDeferred<String>()
+        val scopeLabel = permissionGroup.replace('_', ' ').replaceFirstChar { it.uppercase() }
         withContext(Dispatchers.Main.immediate) {
-            pendingApproval = action
+            pendingApproval = action + "\n\nScope: " + scopeLabel + " · this conversation only."
             approvalDeferred = deferred
         }
         return try {
             when (deferred.await()) {
                 "session" -> {
                     withContext(Dispatchers.Main.immediate) {
-                        approvedToolSessions = approvedToolSessions + authorizationSessionId
+                        approvedToolSessions = approvedToolSessions + grantKey
                     }
                     true
                 }
