@@ -32,6 +32,16 @@ class GeminiAudioTranscriberTest {
     }
 
     @Test
+    fun usesDedicatedTranscriptionTextWhenAnalysisContainsOnlyInsights() {
+        val result = transcriber.parseAnalysis(
+            """{"summary":"Planning call","tasks":["Send the agenda"],"decisions":["Meet Monday"]}""",
+            "Original spoken words."
+        )
+        assertEquals("Original spoken words.", result.transcript)
+        assertEquals("Planning call", result.summary)
+    }
+
+    @Test
     fun rejectsAnEmptyTranscript() {
         val result = runCatching {
             transcriber.parseAnalysis("""{"transcript":" ","summary":"empty","tasks":[],"decisions":[]}""")
