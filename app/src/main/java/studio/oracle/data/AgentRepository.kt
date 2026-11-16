@@ -45,11 +45,11 @@ class AgentRepository(
         model: String,
         agentTrace: String = "",
         attachments: String = ""
-    ) {
+    ): Long {
         require(role == "user" || role == "assistant") { "Unsupported message role." }
         require(content.isNotBlank()) { "Message content cannot be blank." }
         val now = System.currentTimeMillis()
-        dao.insertMessage(
+        val messageId = dao.insertMessage(
             AgentMessageEntity(
                 sessionId = sessionId,
                 role = role,
@@ -59,14 +59,18 @@ class AgentRepository(
                 attachments = attachments
             )
         )
-        val session = dao.findSession(sessionId) ?: return
+        val session = dao.findSession(sessionId) ?: return messageId
         val title = if (role == "user" && session.title == AgentConversationPolicy.DEFAULT_TITLE) {
             AgentConversationPolicy.titleFor(content)
         } else {
             session.title
         }
         dao.updateSession(sessionId, title, model, now)
+        return messageId
     }
+
+    suspend fun updateMessageTrace(messageId: Long, trace: String): Boolean =
+        dao.updateMessageTrace(messageId, trace) == 1
 
     suspend fun updateModel(sessionId: String, model: String) {
         dao.updateModel(sessionId, model, System.currentTimeMillis())
