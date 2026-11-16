@@ -50,6 +50,11 @@ import studio.oracle.ui.theme.OracleTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.navigationBarColor = android.graphics.Color.WHITE
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = true
+            isAppearanceLightNavigationBars = true
+        }
         setContent {
             OracleTheme {
                 OracleRoot()
