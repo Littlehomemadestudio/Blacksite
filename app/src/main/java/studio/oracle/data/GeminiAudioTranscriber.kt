@@ -31,8 +31,8 @@ data class GeminiAudioAnalysisResult(
 )
 
 /**
- * Uploads one user-approved WAV to Google's Gemini Files API, analyzes it, and
- * attempts remote deletion even when the request is cancelled or fails.
+ * Uses Gemini 3.5 Transcribe for speech recognition, then the user's selected
+ * Gemini model for summary, task, and decision extraction.
  */
 class GeminiAudioTranscriber(
     private val uploader: GeminiFileUploader = GeminiFileUploader(),
@@ -42,86 +42,122 @@ class GeminiAudioTranscriber(
         .callTimeout(180, TimeUnit.SECONDS)
         .build()
 ) {
-    suspend fun analyze(apiKey: String, model: String, file: File): GeminiAudioAnalysisResult {
+    suspend fun analyze(apiKey: String, analysisModel: String, file: File): GeminiAudioAnalysisResult {
         require(apiKey.isNotBlank()) { "Connect a Gemini API key in Settings first." }
-        require(model.matches(Regex("[A-Za-z0-9._-]+"))) { "The selected Gemini model identifier is invalid." }
+        require(analysisModel.matches(Regex("[A-Za-z0-9._-]+"))) { "The selected Gemini model identifier is invalid." }
         require(file.isFile && file.length() in 45L..AudioMemoryRepository.MAX_FILE_BYTES) {
             "This recording is missing, empty, or exceeds the 30 MB upload limit."
         }
 
         val bytes = withContext(Dispatchers.IO) { file.readBytes() }
         val uploaded = uploader.upload(apiKey, file.nameWithoutExtension, "audio/wav", bytes)
-        var remoteDeleted = false
-        val analysis = try {
-            val prompt = """
-                Transcribe the attached audio and return only one valid JSON object with exactly these keys:
-                "transcript", "summary", "tasks", "decisions".
-                Preserve the spoken language; do not translate. Make the transcript as verbatim as practical.
-                Use [inaudible] for genuinely unintelligible speech. Do not invent speaker identities, tasks, or decisions.
-                "summary" must be concise. "tasks" and "decisions" must be arrays of short strings.
-                If there are no tasks or decisions, return empty arrays.
-            """.trimIndent()
-            val body = JSONObject()
-                .put(
-                    "contents",
-                    JSONArray().put(
-                        JSONObject()
-                            .put("role", "user")
-                            .put(
-                                "parts",
-                                JSONArray()
-                                    .put(JSONObject().put("text", prompt))
-                                    .put(
-                                        JSONObject().put(
-                                            "file_data",
-                                            JSONObject()
-                                                .put("mime_type", uploaded.mimeType.ifBlank { "audio/wav" })
-                                                .put("file_uri", uploaded.uri)
-                                        )
-                                    )
-                            )
-                    )
-                )
-                .put(
-                    "generationConfig",
-                    JSONObject()
-                        .put("temperature", 0.1)
-                        .put("maxOutputTokens", 8192)
-                        .put("responseMimeType", "application/json")
-                )
-            val request = Request.Builder()
-                .url("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent")
-                .header("x-goog-api-key", apiKey)
-                .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
-                .build()
-
-            http.newCall(request).await().use { response ->
-                val raw = response.body?.string().orEmpty()
-                if (!response.isSuccessful) throw IOException(apiError(response.code, raw))
-                val root = JSONObject(raw)
-                val candidates = root.optJSONArray("candidates") ?: JSONArray()
-                val parts = candidates.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts")
-                    ?: JSONArray()
-                val responseText = buildString {
-                    for (index in 0 until parts.length()) {
-                        val part = parts.optJSONObject(index)?.optString("text").orEmpty()
-                        if (part.isNotBlank()) {
-                            if (isNotEmpty()) append('\n')
-                            append(part)
-                        }
-                    }
-                }
-                parseAnalysis(responseText)
-            }
+        var remoteFileDeleted = false
+        val transcript = try {
+            transcribeUploadedFile(apiKey, uploaded.uri, uploaded.mimeType.ifBlank { "audio/wav" })
         } finally {
             withContext(NonCancellable) {
-                remoteDeleted = runCatching { uploader.delete(apiKey, uploaded.name) }.getOrDefault(false)
+                remoteFileDeleted = runCatching {
+                    uploader.delete(apiKey, uploaded.name)
+                }.getOrDefault(false)
             }
         }
-        GeminiAudioAnalysisResult(analysis, remoteDeleted)
+        val analysis = summarizeTranscript(apiKey, analysisModel, transcript)
+        return GeminiAudioAnalysisResult(analysis, remoteFileDeleted)
     }
 
-    internal fun parseAnalysis(responseText: String): AudioAnalysis {
+    private suspend fun transcribeUploadedFile(
+        apiKey: String,
+        fileUri: String,
+        mimeType: String
+    ): String {
+        val body = JSONObject()
+            .put(
+                "contents",
+                JSONArray().put(
+                    JSONObject().put(
+                        "parts",
+                        JSONArray().put(
+                            JSONObject().put(
+                                "fileData",
+                                JSONObject()
+                                    .put("fileUri", fileUri)
+                                    .put("mimeType", mimeType)
+                            )
+                        )
+                    )
+                )
+            )
+            .put(
+                "generationConfig",
+                JSONObject().put(
+                    "audioTranscriptionConfig",
+                    JSONObject()
+                        .put("languageCodes", JSONArray())
+                        .put("mode", "VERBATIM")
+                )
+            )
+        val request = Request.Builder()
+            .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-transcribe:generateContent")
+            .header("x-goog-api-key", apiKey)
+            .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+            .build()
+
+        return http.newCall(request).await().use { response ->
+            val raw = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw IOException(apiError(response.code, raw))
+            val text = extractCandidateText(raw)
+            if (text.isBlank()) throw IOException("Gemini Transcribe returned an empty transcript.")
+            text.trim()
+        }
+    }
+
+    private suspend fun summarizeTranscript(
+        apiKey: String,
+        model: String,
+        transcript: String
+    ): AudioAnalysis {
+        val prompt = """
+            Analyze the following transcript. Return only one valid JSON object with exactly these keys:
+            "summary", "tasks", "decisions".
+            Keep the summary concise. "tasks" must contain only explicit actionable commitments.
+            "decisions" must contain only decisions clearly made in the conversation.
+            Do not infer owners, dates, or commitments that are not stated. Use empty arrays when none exist.
+            Preserve the original transcript separately; do not rewrite or translate it.
+
+            TRANSCRIPT:
+            $transcript
+        """.trimIndent()
+        val body = JSONObject()
+            .put(
+                "contents",
+                JSONArray().put(
+                    JSONObject().put(
+                        "parts",
+                        JSONArray().put(JSONObject().put("text", prompt))
+                    )
+                )
+            )
+            .put(
+                "generationConfig",
+                JSONObject()
+                    .put("temperature", 0.1)
+                    .put("maxOutputTokens", 4096)
+                    .put("responseMimeType", "application/json")
+            )
+        val request = Request.Builder()
+            .url("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent")
+            .header("x-goog-api-key", apiKey)
+            .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+            .build()
+
+        return http.newCall(request).await().use { response ->
+            val raw = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw IOException(apiError(response.code, raw))
+            parseAnalysis(extractCandidateText(raw), transcript)
+        }
+    }
+
+    internal fun parseAnalysis(responseText: String, sourceTranscript: String = ""): AudioAnalysis {
         val start = responseText.indexOf('{')
         val end = responseText.lastIndexOf('}')
         if (start < 0 || end <= start) {
@@ -132,10 +168,10 @@ class GeminiAudioTranscriber(
         } catch (_: Exception) {
             throw IOException("Gemini returned invalid analysis data. Retry transcription.")
         }
-        val transcript = root.optString("transcript").trim()
-        if (transcript.isBlank() || transcript == "null") {
-            throw IOException("Gemini did not return a usable transcript.")
-        }
+        val returnedTranscript = root.optString("transcript").trim()
+        val transcript = returnedTranscript.takeIf { it.isNotBlank() && it != "null" }
+            ?: sourceTranscript.trim()
+        if (transcript.isBlank()) throw IOException("Gemini did not return a usable transcript.")
         return AudioAnalysis(
             transcript = transcript,
             summary = root.optString("summary").trim().takeIf { it != "null" }.orEmpty(),
@@ -155,9 +191,26 @@ class GeminiAudioTranscriber(
         }.distinct().take(40)
     }
 
+    private fun extractCandidateText(raw: String): String {
+        val root = JSONObject(raw)
+        val candidates = root.optJSONArray("candidates") ?: JSONArray()
+        val parts = candidates.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts")
+            ?: JSONArray()
+        return buildString {
+            for (index in 0 until parts.length()) {
+                val part = parts.optJSONObject(index)?.optString("text").orEmpty()
+                if (part.isNotBlank()) {
+                    if (isNotEmpty()) append('\n')
+                    append(part)
+                }
+            }
+        }
+    }
+
     private fun apiError(code: Int, raw: String): String = when (code) {
-        400 -> "Gemini could not process this audio or the selected model does not support audio input."
+        400 -> "Gemini could not process this audio or the selected model rejected the request."
         401, 403 -> "Gemini rejected the API key. Reconnect it in Settings."
+        404 -> "The Gemini transcription or analysis model is unavailable for this API key."
         429 -> "Gemini rate limit or quota reached. Check usage and retry."
         else -> {
             val detail = runCatching {
