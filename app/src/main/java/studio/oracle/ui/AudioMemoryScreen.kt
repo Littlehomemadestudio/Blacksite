@@ -56,6 +56,7 @@ import studio.oracle.ui.theme.OracleMono
 import studio.oracle.ui.theme.OracleSans
 import java.io.IOException
 import java.text.DateFormat
+import java.util.concurrent.atomic.AtomicBoolean
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -73,6 +74,7 @@ fun AudioMemoryScreen(workspaceId: String) {
     val model by modelPreferences.selectedModel.collectAsState(initial = ModelPreferences.DEFAULT_MODEL)
     val records by repository.records.collectAsState(initial = emptyList())
     val recorder = remember(context) { WavAudioRecorder(context.applicationContext) }
+    val finalizationStarted = remember { AtomicBoolean(false) }
     val transcriber = remember { GeminiAudioTranscriber() }
     val scope = rememberCoroutineScope()
 
@@ -101,7 +103,7 @@ fun AudioMemoryScreen(workspaceId: String) {
     val selectedRecord = records.firstOrNull { it.id == selectedRecordId }
 
     suspend fun beginRecording() {
-        if (isRecording || finishingRecording) return
+        if (isRecording || finishingRecording || finalizationStarted.get()) return
         error = null
         status = "INITIALIZING MICROPHONE"
         var candidateFile: java.io.File? = null
@@ -134,8 +136,12 @@ fun AudioMemoryScreen(workspaceId: String) {
     }
 
     suspend fun finishRecording() {
-        if (finishingRecording || (!isRecording && activeRecordingFile == null)) return
-        val file = activeRecordingFile ?: return
+        if (finishingRecording || !finalizationStarted.compareAndSet(false, true)) return
+        val file = activeRecordingFile
+        if (file == null) {
+            finalizationStarted.set(false)
+            return
+        }
         val duration = (SystemClock.elapsedRealtime() - recordingStartedAt)
             .coerceIn(1_000L, WavAudioRecorder.MAX_DURATION_MS)
         finishingRecording = true
@@ -175,6 +181,7 @@ fun AudioMemoryScreen(workspaceId: String) {
         } finally {
             activeRecordingFile = null
             finishingRecording = false
+            finalizationStarted.set(false)
         }
     }
 
@@ -310,7 +317,7 @@ fun AudioMemoryScreen(workspaceId: String) {
 
     DisposableEffect(recorder) {
         onDispose {
-            if (recordingNow) recorder.cancel()
+            if (!finalizationStarted.get()) recorder.cancel()
             runCatching { playerNow?.release() }
         }
     }
