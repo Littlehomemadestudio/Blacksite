@@ -6,6 +6,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import studio.oracle.data.local.LocalNoteEntity
+import studio.oracle.data.local.AudioMemoryDao
 import studio.oracle.data.local.WorkflowDao
 import studio.oracle.data.local.WorkflowEntity
 import studio.oracle.data.local.WorkflowRunEntity
@@ -22,6 +23,7 @@ data class WorkflowRunResult(
 /** Executes only the explicit local actions in WorkflowAction. */
 class LocalWorkflowRunner(
     private val dao: WorkflowDao,
+    private val audioMemories: AudioMemoryDao,
     private val documents: DocumentRepository,
     private val workspaceId: String
 ) {
@@ -87,6 +89,20 @@ class LocalWorkflowRunner(
                             } else {
                                 val sources = hits.joinToString("; ") { "${it.document.title} · ${it.chunk.sectionLabel}" }
                                 "Found ${hits.size} local passages for “${step.title.trim()}”: $sources"
+                            }
+                        }
+                        WorkflowAction.SEARCH_AUDIO -> {
+                            val hits = audioMemories.search(workspaceId, step.title.trim()).take(5)
+                            if (hits.isEmpty()) {
+                                "No matching local audio memories found for “${step.title.trim()}”. No audio or transcript was uploaded."
+                            } else {
+                                val matches = hits.joinToString("\n") { record ->
+                                    val excerpt = record.summary.ifBlank { record.transcript }
+                                        .replace(Regex("\\s+"), " ")
+                                        .take(220)
+                                    record.title + if (excerpt.isBlank()) "" else " — " + excerpt
+                                }
+                                "Found ${hits.size} local audio memories for “${step.title.trim()}” (workspace-isolated, offline):\n$matches"
                             }
                         }
                     }
