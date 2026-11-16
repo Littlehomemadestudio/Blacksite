@@ -66,29 +66,16 @@ fun OracleRichMessage(
             ) {
             when (block) {
                 is RichBlock.Heading -> {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val headingIcon = when {
-                            block.text.contains("objective", true) || block.text.contains("mission", true) -> "◎"
-                            block.text.contains("step", true) || block.text.contains("process", true) -> "⌘"
-                            block.text.contains("result", true) || block.text.contains("deliver", true) -> "✦"
-                            block.text.contains("architecture", true) || block.text.contains("design", true) -> "⬡"
-                            block.text.contains("summary", true) || block.text.contains("overview", true) -> "◈"
-                            else -> "◆"
-                        }
-                        Box(
-                            Modifier.size(if (block.level == 1) 25.dp else 20.dp)
-                                .background(Color(0x187B8FE8), RoundedCornerShape(7.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(headingIcon, color = Color(0xFF7B8FE8), fontSize = if (block.level == 1) 15.sp else 12.sp,
-                                fontWeight = FontWeight.SemiBold)
-                        }
-                        RichInlineText(block.text, fontSize = when (block.level) { 1 -> 21; 2 -> 18; else -> 15 },
-                            weight = FontWeight.SemiBold, color = LocalOraclePalette.current.text, onOpenUrl = onOpenUrl)
-                    }
+                    RichInlineText(
+                        block.text,
+                        fontSize = when (block.level) { 1 -> 20; 2 -> 18; else -> 16 },
+                        weight = FontWeight.SemiBold,
+                        color = LocalOraclePalette.current.text,
+                        onOpenUrl = onOpenUrl
+                    )
                 }
                 is RichBlock.Paragraph -> RichInlineText(
-                    block.text, fontSize = 15, color = LocalOraclePalette.current.text, onOpenUrl = onOpenUrl
+                    block.text, fontSize = 16, color = LocalOraclePalette.current.text, onOpenUrl = onOpenUrl
                 )
                 is RichBlock.Bullet -> Row(
                     Modifier.fillMaxWidth(),
@@ -99,7 +86,7 @@ fun OracleRichMessage(
                         modifier = Modifier.widthIn(min = 17.dp).padding(top = 1.dp),
                         color = Color(0xFF7589E3), fontFamily = OracleMono, fontSize = 13.sp, fontWeight = FontWeight.Bold
                     )
-                    RichInlineText(block.text, modifier = Modifier.weight(1f), fontSize = 14,
+                    RichInlineText(block.text, modifier = Modifier.weight(1f), fontSize = 15,
                         color = LocalOraclePalette.current.text, onOpenUrl = onOpenUrl)
                 }
                 is RichBlock.Code -> if (block.language.equals("mermaid", true) || block.language.equals("diagram", true)) {
@@ -134,7 +121,7 @@ fun OracleRichMessage(
 private fun RichInlineText(
     text: String,
     modifier: Modifier = Modifier,
-    fontSize: Int = 14,
+    fontSize: Int = 16,
     weight: FontWeight = FontWeight.Normal,
     color: Color,
     onOpenUrl: ((String) -> Unit)?
