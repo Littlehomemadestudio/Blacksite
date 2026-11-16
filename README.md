@@ -51,7 +51,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Composer quick switches independently enable web search, phone files, local Python, hosted Python, URL Context, image generation and all custom tools.
 - The main agent exposes a DRAW tool that calls Gemini 3.1 Flash Image as a separate service. Generated PNGs are saved in the app workspace and displayed inline. The direct image model can also be selected in the Model Atlas; direct image mode omits tool payloads because the model does not support function calling.
 - Phone files are accessed through a user-selected Storage Access Framework folder. Paths are scoped, traversal is rejected, and text read/write operations have size limits.
-- Reading file contents sent to Gemini, modifying files, running local Python and generating images require permission. Users can approve once or for the active chat thread.
+- Reading file contents sent to Gemini, modifying files, running local Python, web searches sent to Tavily, and generating images require explicit permission. Session approvals are capability-scoped: Python approval does not authorize phone-file access, file reads do not authorize file writes, and web-search approval does not authorize other tools.
 - Bundled CPython 3.13 via Chaquopy exposes standard Python built-ins, supported standard-library modules, network and an app-private working directory. It runs under Android's app UID; it is not an unrestricted OS-level Termux shell.
 - Python-created or modified workspace files are surfaced as in-chat artifacts and text/code files can be opened and edited in the in-app editor.
 
@@ -91,7 +91,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 
 ## Privacy and data handling
 - The API key is stored locally as AES-GCM ciphertext; its non-exportable encryption key is managed by Android Keystore.
-- The key is sent over HTTPS only to Google's Gemini API when a user invokes validation, model discovery, or generation.
+- The Gemini key is sent over HTTPS only to Google's Gemini API when a user invokes validation, model discovery, or generation. The separate Tavily key is sent only to Tavily when the user approves a web-search query.
 - Agent threads, workflows, notes, run history, and document data are stored in the app-private Room database; they are not uploaded automatically.
 - Workflow actions run locally. A document-search step queries the on-device index; it does not send excerpts to Gemini.
 - The Room database, imported originals, and Audio Memory WAV files are app-private but are **not encrypted at the database/file layer**. Do not store highly sensitive content until encrypted local-data storage is implemented.
@@ -111,7 +111,7 @@ Room schema v7 retains existing agent, document, workflow, and workspace data. M
 - Startup splash and animated new-conversation idle scene.
 - Turn-taking voice conversation: speech recognition captures a turn, Gemini responds, Android TTS speaks the answer, and the microphone resumes until voice mode is disabled.
 - Generated files appear as extension-aware, tappable artifact cards that open the exact local file in the ORACLE editor.
-- The agent loop is bounded to 16 model rounds and 32 combined hosted/local tool calls per run to control runaway loops and API cost. Tool-call batches are reserved atomically; when the budget is exhausted, ORACLE stops before executing additional local actions. Transient connection, response-stream, and retryable HTTP failures use exponential backoff; the user can cancel a run at any time.
+- The agent loop is bounded to 16 model rounds and 32 combined hosted/local tool calls per run to control runaway loops and API cost. Tool-call batches are reserved atomically; when the budget is exhausted, ORACLE stops before executing additional local actions. Transient connection, response-stream, and retryable HTTP failures use exponential backoff; the user can cancel a run at any time. Session approvals are scoped to individual capability groups.
 - The Gemini API key vault supports multiple encrypted named keys and switching the active key without re-entering credentials.
 
 - Voice listener state is lifecycle-safe and microphone permission is declared once in the Android manifest.
