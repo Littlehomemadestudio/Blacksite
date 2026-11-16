@@ -603,7 +603,6 @@ fun DeepSeekInputPill(
             Spacer(Modifier.width(8.dp))
             ThinkPill(onClick = onThinkClick, expanded = thinkExpanded)
             Spacer(Modifier.width(6.dp))
-            Spacer(Modifier.width(5.dp))
             Box(
                 Modifier.size(36.dp).clip(RoundedCornerShape(11.dp))
                     .background(if (voiceReplyEnabled) palette.accentSoft else palette.surfaceRaised)
@@ -630,7 +629,7 @@ fun DeepSeekInputPill(
             }
             Spacer(Modifier.width(8.dp))
             OracleSendButton(
-                enabled = busy || value.isNotBlank() || attachments.isNotEmpty() || value.isBlank(),
+                enabled = true,
                 busy = busy,
                 listeningAction = value.isBlank() && attachments.isEmpty() && !busy,
                 onClick = when {
