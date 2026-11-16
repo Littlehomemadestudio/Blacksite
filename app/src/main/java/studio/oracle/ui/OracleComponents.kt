@@ -558,7 +558,7 @@ fun DeepSeekInputPill(
                 .fillMaxWidth()
                 .shadow(20.dp, RoundedCornerShape(16.dp), clip = false)
                 .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xEFFFFFFF))
+                .background(Color(0xDFFFFFFF))
                 .border(1.dp, Color(0xFFFFFFFF), RoundedCornerShape(16.dp))
                 .padding(start = 15.dp, end = 13.dp, top = 12.dp, bottom = 10.dp)
         ) {
@@ -653,10 +653,10 @@ fun DeepSeekInputPill(
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    ToolControl("Agent", thinkExpanded, onThinkClick, true)
-                    ToolControl("Code", codeEnabled, onCodeClick, false)
-                    ToolControl("Web", searchEnabled, onSearchClick, false)
-                    ToolControl("Files", filesEnabled, onFilesClick, false)
+                    ToolControl("Agent", true, onThinkClick, OracleGlyph.Spark)
+                    ToolControl("Code", codeEnabled, onCodeClick, OracleGlyph.NewChat)
+                    ToolControl("Web", searchEnabled, onSearchClick, OracleGlyph.Search)
+                    ToolControl("Files", filesEnabled, onFilesClick, OracleGlyph.Library)
                 }
                 Spacer(Modifier.width(7.dp))
 
@@ -729,7 +729,7 @@ private fun ToolControl(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
-    primary: Boolean
+    glyph: OracleGlyph
 ) {
     val palette = LocalOraclePalette.current
     val shape = RoundedCornerShape(8.dp)
@@ -741,15 +741,13 @@ private fun ToolControl(
             .padding(horizontal = 8.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (primary) {
-            OracleGlyphIcon(OracleGlyph.Spark, Modifier.size(13.dp),
-                if (selected) palette.accent else palette.textSecondary, 1.6f)
-            Spacer(Modifier.width(5.dp))
-        }
+        OracleGlyphIcon(glyph, Modifier.size(13.dp),
+            if (selected) palette.accent else palette.textSecondary, 1.55f)
+        Spacer(Modifier.width(5.dp))
         Text(label, color = if (selected) palette.accent else palette.textSecondary,
             fontFamily = OracleSans, fontSize = 11.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium)
-        if (selected && !primary) {
+        if (selected && label != "Agent") {
             Spacer(Modifier.width(4.dp))
             Box(Modifier.size(4.dp).clip(CircleShape).background(palette.accent))
         }
