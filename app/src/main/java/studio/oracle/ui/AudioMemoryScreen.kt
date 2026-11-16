@@ -77,6 +77,7 @@ fun AudioMemoryScreen(workspaceId: String) {
     val scope = rememberCoroutineScope()
 
     var isRecording by remember { mutableStateOf(false) }
+    var finishingRecording by remember { mutableStateOf(false) }
     var elapsedMs by remember { mutableLongStateOf(0L) }
     var recordingStartedAt by remember { mutableLongStateOf(0L) }
     var activeRecordingFile by remember { mutableStateOf<java.io.File?>(null) }
@@ -96,9 +97,6 @@ fun AudioMemoryScreen(workspaceId: String) {
     val recordingNow by rememberUpdatedState(isRecording)
     val playerNow by rememberUpdatedState(player)
     val lifecycleOwner = LocalLifecycleOwner.current
-    val finishRecordingNow by rememberUpdatedState<() -> Unit> {
-        { scope.launch { finishRecording() } }
-    }
 
     val selectedRecord = records.firstOrNull { it.id == selectedRecordId }
 
@@ -136,39 +134,52 @@ fun AudioMemoryScreen(workspaceId: String) {
     }
 
     suspend fun finishRecording() {
-        if (!isRecording && activeRecordingFile == null) return
+        if (finishingRecording || (!isRecording && activeRecordingFile == null)) return
         val file = activeRecordingFile ?: return
-        val duration = elapsedMs.coerceAtLeast(1_000L)
+        val duration = (SystemClock.elapsedRealtime() - recordingStartedAt)
+            .coerceIn(1_000L, WavAudioRecorder.MAX_DURATION_MS)
+        finishingRecording = true
         isRecording = false
         status = "FINALIZING WAV RECORDING"
         var completedFile: java.io.File? = null
+        var recordSaved = false
         try {
             currentCoroutineContext().ensureActive()
-            completedFile = withContext(NonCancellable + Dispatchers.IO) { recorder.stop() }
+            val stoppedFile = withContext(NonCancellable + Dispatchers.IO) { recorder.stop() }
+            completedFile = stoppedFile
             val title = "Recording " + SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()).format(Date())
             val record = withContext(NonCancellable) {
-                repository.saveRecording(title, completedFile, duration)
+                repository.saveRecording(title, stoppedFile, duration).also { recordSaved = true }
             }
             selectedRecordId = record.id
             status = "SAVED LOCALLY · " + formatDuration(duration)
         } catch (cancelled: CancellationException) {
-            withContext(NonCancellable + Dispatchers.IO) {
-                recorder.cancel()
-                completedFile?.delete()
-                file.delete()
+            if (!recordSaved) {
+                withContext(NonCancellable + Dispatchers.IO) {
+                    recorder.cancel()
+                    completedFile?.delete()
+                    file.delete()
+                }
             }
             throw cancelled
         } catch (failure: Exception) {
-            withContext(NonCancellable + Dispatchers.IO) {
-                recorder.cancel()
-                completedFile?.delete()
-                file.delete()
+            if (!recordSaved) {
+                withContext(NonCancellable + Dispatchers.IO) {
+                    recorder.cancel()
+                    completedFile?.delete()
+                    file.delete()
+                }
             }
             error = failure.message ?: "Could not save this recording."
             status = "RECORDING SAVE FAILED"
         } finally {
             activeRecordingFile = null
+            finishingRecording = false
         }
+    }
+
+    val finishRecordingNow by rememberUpdatedState<() -> Unit> {
+        { scope.launch { finishRecording() } }
     }
 
     fun runTranscription(record: AudioMemoryEntity) {
