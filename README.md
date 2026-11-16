@@ -66,7 +66,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 ### Workflow Studio
 - Create, edit, reorder, save, and delete workflows with up to 20 ordered steps.
 - Four explicit local actions: create a note, append to a note by exact title, search the on-device document index, and search the active workspace's audio titles/transcripts/summaries/tasks/decisions. Audio search never uploads recordings or transcripts.
-- Runs require a manual confirmation. Each run records a persistent status and per-step execution log; agent approval/denial decisions are included in the chat's execution trace.
+- Runs require a manual confirmation. Successful runs keep their execution trace on the assistant response; failed and cancelled runs attach permission decisions and completed tool events to the originating user turn, so retries retain the audit history.
 - A failed step stops the run. Deleting a workflow removes its steps and run history but preserves notes created by previous runs.
 - Workflow execution is local-only: no Gemini request, network calls, shell access, arbitrary scripts, app launching, scheduled triggers, or background execution.
 
