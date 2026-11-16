@@ -66,7 +66,7 @@ fun AudioMemoryScreen(workspaceId: String) {
     val modelPreferences = remember(context) { ModelPreferences(context) }
     val model by modelPreferences.selectedModel.collectAsState(initial = ModelPreferences.DEFAULT_MODEL)
     val records by repository.records.collectAsState(initial = emptyList())
-    val recorder = remember { WavAudioRecorder() }
+    val recorder = remember(context) { WavAudioRecorder(context.applicationContext) }
     val transcriber = remember { GeminiAudioTranscriber() }
     val scope = rememberCoroutineScope()
 
