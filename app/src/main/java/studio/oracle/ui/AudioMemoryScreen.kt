@@ -368,7 +368,7 @@ fun AudioMemoryScreen(workspaceId: String) {
                             color = palette.textSecondary,
                             fontFamily = OracleMono,
                             fontSize = 8.sp,
-                            letterSpacing = 1f
+                            letterSpacing = 1.sp
                         )
                         if (transcribingId == selectedRecord.id) {
                             AudioActionButton("CANCEL", onClick = { transcriptionJob?.cancel() })
