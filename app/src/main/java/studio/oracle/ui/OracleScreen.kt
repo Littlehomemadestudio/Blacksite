@@ -74,6 +74,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.platform.LocalContext
@@ -173,6 +174,7 @@ fun OracleScreen(
     var suppressCancelledPromptRestore by remember { mutableStateOf(false) }
     var drawerOpen by remember { mutableStateOf(false) }
     var modelPanelOpen by remember { mutableStateOf(false) }
+    var voiceHoldActive by remember { mutableStateOf(false) }
     var modelBrowserOpen by remember { mutableStateOf(false) }
     var agenticSettings by remember { mutableStateOf(AgenticSettings()) }
     var agentEvents by remember { mutableStateOf(emptyList<AgenticEvent>()) }
@@ -869,6 +871,7 @@ fun OracleScreen(
                 onVoiceClick = { microphonePermission.launch(android.Manifest.permission.RECORD_AUDIO) },
                 onVoiceRelease = { speechRecognizer?.stopListening() },
                 onVoiceCancel = { speechRecognizer?.cancel() },
+                onVoiceHoldChanged = { voiceHoldActive = it },
                 onCameraClick = { cameraPicker.launch(null) },
                 onPhotoClick = { mediaPicker.launch(arrayOf("image/*")) },
                 onDocumentClick = { mediaPicker.launch(arrayOf("*/*")) },
@@ -894,6 +897,45 @@ fun OracleScreen(
             )
 
             Spacer(Modifier.height(WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().coerceAtLeast(4.dp)))
+        }
+
+        if (voiceHoldActive) {
+            Box(
+                Modifier.fillMaxWidth()
+                    .height(270.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0.0f to Color.Transparent,
+                                0.38f to Color.Transparent,
+                                0.62f to Color(0xBFD5E5FF),
+                                1.0f to Color(0xFF78AFFF)
+                            )
+                        )
+                    )
+            ) {
+                Text(
+                    "Release to send, slide up to cancel",
+                    Modifier.align(Alignment.Center).padding(top = 24.dp),
+                    color = Color.White, fontFamily = OracleSans, fontSize = 13.sp
+                )
+                Row(
+                    Modifier.align(Alignment.BottomCenter).padding(bottom = 63.dp).height(28.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    listOf(7, 12, 18, 10, 22, 15, 26, 12, 19, 9, 25, 14, 20, 8, 16, 24, 11, 18, 7)
+                        .forEachIndexed { index, height ->
+                            Box(
+                                Modifier.padding(horizontal = 2.dp).width(2.dp)
+                                    .height((height * if (index % 3 == 0) 1.12f else 1f).dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(Color.White.copy(alpha = 0.88f))
+                            )
+                        }
+                }
+            }
         }
 
         if (drawerOpen) {
