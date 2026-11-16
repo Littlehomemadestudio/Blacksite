@@ -46,7 +46,7 @@ class PhoneWorkspaceTools(
 
     override fun declarations(): JSONArray = JSONArray().apply {
         if (webSearchEnabled) {
-            put(function("web_search", "Search the live web using Tavily for current facts, documentation and research. Return concise findings with original source URLs.", schema("query" to property("The exact search query to run.")), arrayOf("query")))
+            put(function("web_search", "Search the live web using Tavily for current facts, documentation and research. ORACLE asks before sending the exact query to Tavily. Return concise findings with original source URLs.", schema("query" to property("The exact search query to run.")), arrayOf("query")))
         }
         if (phoneFilesEnabled) {
             put(function("list_phone_files", "List files and folders beneath the folder the user explicitly granted to ORACLE.", schema("path" to property("Relative folder path. Empty means the granted root.")), arrayOf("path")))
@@ -83,7 +83,7 @@ class PhoneWorkspaceTools(
                 val file = resolve(root, path.joinToString("/")) ?: return@withContext "File not found under the granted directory."
                 if (!file.isFile) return@withContext "The requested path is not a file."
                 if (file.length() > MAX_PHONE_READ_BYTES) return@withContext "The file is larger than ORACLE's 10 MB text-read limit."
-                if (!authorize("Read '" + path.joinToString("/") + "' and send its contents to Gemini for this task?", "phone_files")) return@withContext "The user declined file access."
+                if (!authorize("Read '" + path.joinToString("/") + "' and send its contents to Gemini for this task?", "phone_files_read")) return@withContext "The user declined file access."
                 context.contentResolver.openInputStream(file.uri)?.use {
                     BufferedReader(InputStreamReader(it, StandardCharsets.UTF_8)).readText()
                 } ?: "Android could not open the selected file."
@@ -93,7 +93,7 @@ class PhoneWorkspaceTools(
                 if (path.isEmpty()) return@withContext "A filename is required."
                 val content = arguments.optString("content")
                 if (content.toByteArray(StandardCharsets.UTF_8).size > MAX_PHONE_WRITE_BYTES) return@withContext "File exceeds the 10 MB text-write limit."
-                if (!authorize("Create '" + path.joinToString("/") + "' in the folder granted to ORACLE?", "phone_files")) return@withContext "The user declined file creation."
+                if (!authorize("Create '" + path.joinToString("/") + "' in the folder granted to ORACLE?", "phone_files_write")) return@withContext "The user declined file creation."
                 val root = rootOrNull() ?: return@withContext "Phone folder access is not enabled."
                 val parent = ensureParent(root, path.dropLast(1)) ?: return@withContext "Could not create the requested parent folder."
                 if (parent.findFile(path.last()) != null) return@withContext "A file with that name already exists. Choose a different name."
@@ -110,7 +110,7 @@ class PhoneWorkspaceTools(
                 if (path.isEmpty()) return@withContext "A filename is required."
                 val content = arguments.optString("content")
                 if (content.toByteArray(StandardCharsets.UTF_8).size > MAX_PHONE_WRITE_BYTES) return@withContext "Appended text exceeds the 10 MB limit."
-                if (!authorize("Append " + content.length + " characters to '" + path.joinToString("/") + "'?", "phone_files")) return@withContext "The user declined this file modification."
+                if (!authorize("Append " + content.length + " characters to '" + path.joinToString("/") + "'?", "phone_files_write")) return@withContext "The user declined this file modification."
                 val root = rootOrNull() ?: return@withContext "Phone folder access is not enabled."
                 val file = resolve(root, path.joinToString("/")) ?: return@withContext "File not found under the granted directory."
                 if (!file.isFile) return@withContext "The requested path is not a file."
@@ -153,6 +153,11 @@ class PhoneWorkspaceTools(
     private suspend fun search(query: String): String {
         if (query.isBlank()) return "Search query is empty."
         val key = tavilyKey?.takeIf { it.isNotBlank() } ?: return "Web search is not configured. Ask the user to add a Tavily API key in ORACLE Settings."
+        if (!authorize(
+                "Send this exact query to Tavily Search?\n\n" + query,
+                "web_search"
+            )
+        ) return "The user declined to send this query to Tavily."
         val body = JSONObject().put("query", query).put("search_depth", "advanced").put("max_results", 8).put("include_answer", true).put("include_raw_content", false)
         val request = Request.Builder()
             .url("https://api.tavily.com/search")
