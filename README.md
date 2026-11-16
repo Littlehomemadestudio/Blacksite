@@ -65,7 +65,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 
 ### Workflow Studio
 - Create, edit, reorder, save, and delete workflows with up to 20 ordered steps.
-- Three explicit local actions: create a note, append to a note by exact title, and search the on-device document index.
+- Four explicit local actions: create a note, append to a note by exact title, search the on-device document index, and search the active workspace's audio titles/transcripts/summaries/tasks/decisions. Audio search never uploads recordings or transcripts.
 - Runs require a manual confirmation. Each run records a persistent status and per-step execution log.
 - A failed step stops the run. Deleting a workflow removes its steps and run history but preserves notes created by previous runs.
 - Workflow execution is local-only: no Gemini request, network calls, shell access, arbitrary scripts, app launching, scheduled triggers, or background execution.
@@ -80,7 +80,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - This is file-based, user-initiated transcription—not live transcription, background capture, or Gemini Live streaming.
 
 ### Verification
-- Unit tests cover conversation context, session naming, workspace-name normalization (including Persian text), document chunk boundaries, PDF citations, stable text sections, keyword ranking, workflow plan validation, and Room workspace-isolation queries/mutations under Robolectric.
+- Unit tests cover conversation context, session naming, workspace-name normalization (including Persian text), document chunk boundaries, PDF citations, stable text sections, keyword ranking, workflow plan validation, audio-memory workflow execution and workspace isolation, and Room workspace-isolation queries/mutations under Robolectric.
 
 ## In progress / not yet available
 - Office document extraction, image OCR, scanned-PDF OCR, document summaries, flashcards, quizzes, semantic embeddings, and knowledge graph.
