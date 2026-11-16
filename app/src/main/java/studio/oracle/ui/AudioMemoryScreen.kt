@@ -101,7 +101,7 @@ fun AudioMemoryScreen(workspaceId: String) {
     val selectedRecord = records.firstOrNull { it.id == selectedRecordId }
 
     suspend fun beginRecording() {
-        if (isRecording) return
+        if (isRecording || finishingRecording) return
         error = null
         status = "INITIALIZING MICROPHONE"
         var candidateFile: java.io.File? = null
@@ -497,6 +497,7 @@ fun AudioMemoryScreen(workspaceId: String) {
 
             AudioCapturePanel(
                 isRecording = isRecording,
+                isFinishing = finishingRecording,
                 elapsedMs = elapsedMs,
                 onStart = {
                     if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
@@ -582,6 +583,7 @@ fun AudioMemoryScreen(workspaceId: String) {
 @Composable
 private fun AudioCapturePanel(
     isRecording: Boolean,
+    isFinishing: Boolean,
     elapsedMs: Long,
     onStart: () -> Unit,
     onStop: () -> Unit
@@ -602,15 +604,22 @@ private fun AudioCapturePanel(
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    if (isRecording) "MICROPHONE ACTIVE" else "LOCAL CAPTURE READY",
+                    when {
+                        isRecording -> "MICROPHONE ACTIVE"
+                        isFinishing -> "SAVING RECORDING"
+                        else -> "LOCAL CAPTURE READY"
+                    },
                     color = if (isRecording) palette.error else palette.text,
                     fontFamily = OracleMono,
                     fontSize = 9.sp,
                     letterSpacing = 1.1.sp
                 )
                 Text(
-                    if (isRecording) "Audio is being written to this device only."
-                    else "16 kHz mono WAV · maximum 10 minutes per recording",
+                    when {
+                        isRecording -> "Audio is being written to this device only."
+                        isFinishing -> "Finalizing WAV and saving to this workspace."
+                        else -> "16 kHz mono WAV · maximum 10 minutes per recording"
+                    },
                     color = palette.textSecondary,
                     fontSize = 10.sp
                 )
@@ -625,9 +634,14 @@ private fun AudioCapturePanel(
             )
         }
         AudioActionButton(
-            if (isRecording) "STOP & SAVE RECORDING" else "START RECORDING",
+            when {
+                isFinishing -> "SAVING…"
+                isRecording -> "STOP & SAVE RECORDING"
+                else -> "START RECORDING"
+            },
             onClick = if (isRecording) onStop else onStart,
-            primary = !isRecording,
+            primary = !isRecording && !isFinishing,
+            enabled = !isFinishing,
             modifier = Modifier.fillMaxWidth()
         )
         Text(
