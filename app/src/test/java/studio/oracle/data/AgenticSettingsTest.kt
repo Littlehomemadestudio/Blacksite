@@ -2,6 +2,7 @@ package studio.oracle.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -67,5 +68,15 @@ class AgenticSettingsTest {
         assertFalse(budget.reserveToolCalls(-1))
         assertEquals(0, budget.toolCallsUsed)
         assertTrue(budget.reserveToolCalls(0))
+    }
+
+    @Test
+    fun sessionApprovalDoesNotCrossCapabilityGroupsOrConversations() {
+        val pythonGrant = AgenticPermissionPolicy.sessionGrantKey("chat-1", "python")
+
+        assertNotEquals(pythonGrant, AgenticPermissionPolicy.sessionGrantKey("chat-1", "phone_files_read"))
+        assertNotEquals(pythonGrant, AgenticPermissionPolicy.sessionGrantKey("chat-1", "phone_files_write"))
+        assertNotEquals(pythonGrant, AgenticPermissionPolicy.sessionGrantKey("chat-1", "web_search"))
+        assertNotEquals(pythonGrant, AgenticPermissionPolicy.sessionGrantKey("chat-2", "python"))
     }
 }
