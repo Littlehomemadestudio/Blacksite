@@ -3,12 +3,17 @@ package studio.oracle.data
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -165,7 +170,7 @@ class PhoneWorkspaceTools(
             .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
         return try {
-            http.newCall(request).execute().use { response ->
+            http.newCall(request).awaitResponse().use { response ->
                 val raw = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
                     val message = runCatching { JSONObject(raw).optString("detail") }.getOrNull().orEmpty()
@@ -187,6 +192,8 @@ class PhoneWorkspaceTools(
                     }
                 }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (error: Exception) {
             "Tavily search could not complete: " + (error.message ?: "network error")
         }
@@ -245,4 +252,18 @@ class PhoneWorkspaceTools(
         private const val MAX_PHONE_WRITE_BYTES = 10 * 1024 * 1024
         private const val MAX_PYTHON_SOURCE_CHARS = 256 * 1024
     }
+}
+
+/** Cancels the underlying OkHttp call when the agent run is cancelled. */
+private suspend fun Call.awaitResponse(): Response = suspendCancellableCoroutine { continuation ->
+    enqueue(object : Callback {
+        override fun onFailure(call: Call, error: java.io.IOException) {
+            continuation.resumeWith(Result.failure(error))
+        }
+
+        override fun onResponse(call: Call, response: Response) {
+            continuation.resume(response) { _, resource, _ -> resource.close() }
+        }
+    })
+    continuation.invokeOnCancellation { cancel() }
 }
