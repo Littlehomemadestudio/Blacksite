@@ -811,7 +811,7 @@ fun OracleScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Brush.verticalGradient(listOf(Color(0xFFF9FBFD), palette.canvas, Color(0xFFF1F5F9)))
+                .background(Brush.verticalGradient(listOf(Color(0xFFF9FBFD), palette.canvas, Color(0xFFF1F5F9))))
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
                 .imePadding()
         ) {
