@@ -38,6 +38,14 @@ class AgenticSettingsTest {
     }
 
     @Test
+    fun hostedExecutionAndUrlContextRequireExplicitOptIn() {
+        val defaults = AgenticSettings()
+
+        assertFalse(defaults.hostedPython)
+        assertFalse(defaults.urlContext)
+    }
+
+    @Test
     fun agentRunStopsAfterSixteenModelRounds() {
         val budget = AgenticExecutionBudget()
 
