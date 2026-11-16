@@ -75,6 +75,26 @@ class GeminiFileUploader(
         return file
     }
 
+    /** Deletes a temporary Gemini Files API upload after its approved analysis is complete. */
+    suspend fun delete(apiKey: String, fileName: String): Boolean {
+        val id = fileName.removePrefix("files/")
+        if (apiKey.isBlank() || !id.matches(Regex("[A-Za-z0-9_-]+"))) return false
+        val request = Request.Builder()
+            .url("https://generativelanguage.googleapis.com/v1beta/files/" + id)
+            .header("x-goog-api-key", apiKey)
+            .delete()
+            .build()
+        return try {
+            http.newCall(request).await().use { response ->
+                response.isSuccessful || response.code == 404
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private suspend fun awaitVideoProcessing(apiKey: String, file: GeminiUploadedFile) {
         repeat(40) {
             delay(1500)
