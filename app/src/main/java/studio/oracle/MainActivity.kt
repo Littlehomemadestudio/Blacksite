@@ -96,19 +96,23 @@ private fun OracleStartupSplash() {
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(15.dp)
+            verticalArrangement = Arrangement.spacedBy(9.dp)
         ) {
-            OracleWhaleMark(
-                Modifier.size(width = 39.dp, height = 31.dp),
-                Color(0xFFB7C5B5)
-            )
             Text(
-                "Hi. What can I do for you?",
+                "ORACLE",
                 color = Color(0xFFE9E9E6),
                 fontFamily = OracleSans,
-                fontSize = 16.sp,
-                lineHeight = 25.sp,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                fontSize = 19.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                letterSpacing = 3.2.sp
+            )
+            Box(Modifier.width(24.dp).height(1.dp).background(Color(0xFFB7C5B5)))
+            Text(
+                "PERSONAL INTELLIGENCE",
+                color = Color(0xFF747D83),
+                fontFamily = OracleSans,
+                fontSize = 8.sp,
+                letterSpacing = 1.65.sp
             )
         }
     }
