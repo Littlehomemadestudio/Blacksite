@@ -962,7 +962,8 @@ private fun CustomTopBar(
     onNewThread: () -> Unit,
     voiceReplyEnabled: Boolean,
     onVoiceToggle: () -> Unit,
-    showTitle: Boolean
+    showTitle: Boolean,
+    conversationTitle: String
 ) {
     val palette = LocalOraclePalette.current
     Row(
@@ -992,18 +993,17 @@ private fun CustomTopBar(
             )
         }
         Spacer(Modifier.weight(1f))
-        androidx.compose.material3.Text(
-            if (voiceReplyEnabled) "◖))" else "◖×",
-            modifier = Modifier
-                .size(42.dp)
-                .clip(CircleShape)
-                .clickable(onClick = onVoiceToggle)
-                .wrapContentHeight(Alignment.CenterVertically),
-            color = palette.text,
-            fontFamily = OracleSans,
-            fontSize = 18.sp,
-            textAlign = TextAlign.Center
-        )
+        Box(
+            Modifier.size(42.dp).clip(CircleShape).clickable(onClick = onVoiceToggle),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                if (voiceReplyEnabled) "◖))" else "◖×",
+                color = palette.text,
+                fontFamily = OracleSans,
+                fontSize = 18.sp
+            )
+        }
         Spacer(Modifier.width(7.dp))
         OracleIconButton(
             glyph = OracleGlyph.NewChat,
