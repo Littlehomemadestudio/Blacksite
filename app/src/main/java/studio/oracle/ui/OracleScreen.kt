@@ -806,12 +806,12 @@ fun OracleScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(palette.canvas)
+            .background(Brush.verticalGradient(listOf(Color(0xFFF9FBFD), palette.canvas, Color(0xFFF1F5F9))))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(palette.canvas)
+                .background(Brush.verticalGradient(listOf(Color(0xFFF9FBFD), palette.canvas, Color(0xFFF1F5F9)))
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
                 .imePadding()
         ) {
@@ -840,9 +840,9 @@ fun OracleScreen(
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 18.dp),
-                        verticalArrangement = Arrangement.spacedBy(22.dp),
-                        contentPadding = PaddingValues(top = 18.dp, bottom = 22.dp)
+                            .padding(horizontal = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(25.dp),
+                        contentPadding = PaddingValues(top = 22.dp, bottom = 26.dp)
                     ) {
                         items(messages, key = { it.id }) { message ->
                             OracleMessageRow(
@@ -1077,31 +1077,47 @@ private fun CustomTopBar(
     showTitle: Boolean,
     conversationTitle: String
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 11.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        OracleIconButton(OracleGlyph.Menu, "Open conversations", onMenu,
-            tint = Color(0xFF171717), size = 40.dp)
-        if (showTitle) {
-            Spacer(Modifier.width(10.dp))
-            Text(conversationTitle.ifBlank { "New chat" }, color = Color(0xFF171717),
-                fontFamily = OracleSans, fontWeight = FontWeight.SemiBold, fontSize = 15.sp,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        Spacer(Modifier.weight(1f))
-        Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onVoiceToggle),
-            contentAlignment = Alignment.Center) {
-            OracleGlyphIcon(
+    val palette = LocalOraclePalette.current
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 17.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OracleIconButton(
+                OracleGlyph.Menu, "Open conversations", onMenu,
+                tint = palette.textSecondary, size = 38.dp,
+                modifier = Modifier.clip(RoundedCornerShape(10.dp))
+                    .background(Color.White.copy(alpha = 0.62f))
+                    .border(1.dp, palette.outlineSoft, RoundedCornerShape(10.dp))
+            )
+            Spacer(Modifier.width(12.dp))
+            HandcraftedLogo(Modifier.size(25.dp), palette.accent)
+            Spacer(Modifier.width(9.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text("ORACLE", color = palette.text, fontFamily = OracleSans,
+                    fontWeight = FontWeight.Bold, fontSize = 13.sp, letterSpacing = 1.35.sp)
+                Text(
+                    if (showTitle) conversationTitle.ifBlank { "PERSONAL WORKSPACE" }.uppercase().take(28)
+                    else "PERSONAL WORKSPACE",
+                    color = palette.textTertiary, fontFamily = OracleMono,
+                    fontSize = 8.sp, letterSpacing = 0.55.sp, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            OracleIconButton(
                 if (voiceReplyEnabled) OracleGlyph.Speaker else OracleGlyph.SpeakerOff,
-                Modifier.size(26.dp), Color(0xFF171717), 1.7f
+                "Toggle voice replies", onVoiceToggle, tint = palette.textSecondary, size = 37.dp,
+                modifier = Modifier.clip(RoundedCornerShape(10.dp))
+            )
+            Spacer(Modifier.width(3.dp))
+            OracleIconButton(
+                OracleGlyph.AddCircle, "New conversation", onNewThread,
+                tint = palette.text, size = 37.dp,
+                modifier = Modifier.clip(RoundedCornerShape(10.dp))
             )
         }
-        Spacer(Modifier.width(6.dp))
-        Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onNewThread),
-            contentAlignment = Alignment.Center) {
-            OracleGlyphIcon(OracleGlyph.AddCircle, Modifier.size(28.dp), Color(0xFF171717), 1.7f)
-        }
+        Box(Modifier.fillMaxWidth().padding(horizontal = 17.dp).height(1.dp)
+            .background(Brush.horizontalGradient(listOf(Color.Transparent, palette.outlineSoft, Color.Transparent))))
     }
 }
 
@@ -1127,8 +1143,10 @@ private fun OracleMessageRow(
             ) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     Column(
-                        Modifier.widthIn(max = 340.dp).clip(RoundedCornerShape(22.dp))
-                            .background(Color(0xFFEDF2FC)).padding(horizontal = 14.dp, vertical = 10.dp),
+                        Modifier.widthIn(max = 340.dp).clip(RoundedCornerShape(14.dp))
+                            .background(Color(0xEAF0F6FC))
+                            .border(1.dp, Color(0xFFDCE7F1), RoundedCornerShape(14.dp))
+                            .padding(horizontal = 15.dp, vertical = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         if (message.content.isNotBlank()) Text(message.content,
@@ -2333,19 +2351,30 @@ private fun OracleEmptyState(onPrompt: (String) -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        OracleWhaleMark(
-            modifier = Modifier.size(width = 38.dp, height = 30.dp),
-            color = Color(0xFF4F78E8)
-        )
-        Spacer(Modifier.height(17.dp))
+        Box(
+            Modifier.size(62.dp).clip(RoundedCornerShape(18.dp))
+                .background(Color.White.copy(alpha = 0.72f))
+                .border(1.dp, Color(0xFFDCE6F0), RoundedCornerShape(18.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            HandcraftedLogo(Modifier.size(31.dp), palette.accent)
+        }
+        Spacer(Modifier.height(23.dp))
+        Text("A CLEARER WAY TO WORK", color = palette.textTertiary,
+            fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 1.5.sp)
+        Spacer(Modifier.height(8.dp))
         Text(
             greeting,
-            color = Color(0xFF171717),
+            color = palette.text,
             fontFamily = OracleSans,
             fontWeight = FontWeight.SemiBold,
-            fontSize = 18.sp,
-            lineHeight = 25.sp,
+            fontSize = 21.sp,
+            lineHeight = 29.sp,
             textAlign = TextAlign.Center
         )
+        Spacer(Modifier.height(7.dp))
+        Text("Research, create, reason and get things done.",
+            color = palette.textSecondary, fontFamily = OracleSans,
+            fontSize = 12.sp, lineHeight = 18.sp, textAlign = TextAlign.Center)
     }
 }
