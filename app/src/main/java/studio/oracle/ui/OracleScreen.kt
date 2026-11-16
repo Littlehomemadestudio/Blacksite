@@ -1175,6 +1175,7 @@ private fun OracleMessageRow(
                         AgentExecutionTrace(events, onOpenFile)
                     }
                 }
+                }
             }
         } else {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
