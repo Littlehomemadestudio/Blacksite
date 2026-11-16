@@ -532,6 +532,7 @@ fun DeepSeekInputPill(
     onVoiceClick: () -> Unit = {},
     onVoiceRelease: () -> Unit = {},
     onVoiceCancel: () -> Unit = {},
+    onVoiceHoldChanged: (Boolean) -> Unit = {},
     onCameraClick: () -> Unit = onAttachClick,
     onPhotoClick: () -> Unit = onAttachClick,
     onDocumentClick: () -> Unit = onAttachClick,
@@ -542,7 +543,6 @@ fun DeepSeekInputPill(
 ) {
     val palette = LocalOraclePalette.current
     var attachmentTrayOpen by remember { androidx.compose.runtime.mutableStateOf(false) }
-    var voiceHoldActive by remember { androidx.compose.runtime.mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -677,15 +677,15 @@ fun DeepSeekInputPill(
                         }
                     },
                     onVoiceHoldStart = {
-                        voiceHoldActive = true
+                        onVoiceHoldChanged(true)
                         onVoiceClick()
                     },
                     onVoiceHoldEnd = {
-                        voiceHoldActive = false
+                        onVoiceHoldChanged(false)
                         onVoiceRelease()
                     },
                     onVoiceHoldCancel = {
-                        voiceHoldActive = false
+                        onVoiceHoldChanged(false)
                         onVoiceCancel()
                     }
                 )
@@ -709,51 +709,7 @@ fun DeepSeekInputPill(
             }
         }
 
-        androidx.compose.animation.AnimatedVisibility(
-            visible = voiceHoldActive,
-            enter = androidx.compose.animation.fadeIn(tween(140)),
-            exit = androidx.compose.animation.fadeOut(tween(180))
-        ) {
-            Column(
-                Modifier.fillMaxWidth()
-                    .height(220.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color.Transparent,
-                                Color(0xBFD5E5FF),
-                                Color(0xFF78AFFF)
-                            )
-                        )
-                    )
-                    .padding(top = 34.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(22.dp)
-            ) {
-                Text(
-                    "Release to send, slide up to cancel",
-                    color = Color.White,
-                    fontFamily = OracleSans,
-                    fontSize = 13.sp
-                )
-                Row(
-                    Modifier.fillMaxWidth().height(28.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val levels = listOf(7, 12, 18, 10, 22, 15, 26, 12, 19, 9, 25, 14, 20, 8, 16, 24, 11, 18, 7)
-                    levels.forEachIndexed { index, height ->
-                        Box(
-                            Modifier.padding(horizontal = 2.dp)
-                                .width(2.dp)
-                                .height((height * if (index % 3 == 0) 1.12f else 1f).dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(Color.White.copy(alpha = 0.88f))
-                        )
-                    }
-                }
-            }
-        }
+
     }
 }
 
