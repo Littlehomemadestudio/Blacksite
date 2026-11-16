@@ -380,7 +380,7 @@ fun AudioMemoryScreen(workspaceId: String) {
                         }
                     }
                     Text(
-                        "Per-record approval · selected model: " + model,
+                        "ASR: gemini-3.5-transcribe · analysis: " + model,
                         color = palette.textTertiary,
                         fontFamily = OracleMono,
                         fontSize = 8.sp
