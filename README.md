@@ -72,7 +72,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 
 ### Audio Memory Studio
 - Records microphone audio locally with Android AudioRecord as 16 kHz mono PCM, then wraps it in a standard WAV file for Gemini-compatible audio input.
-- Recording requires the Android microphone permission, has a 10-minute per-recording limit, and is never uploaded automatically.
+- Recording requires the Android microphone permission, has a 10-minute per-recording limit, is automatically finalized when the app enters the background, and is never uploaded automatically. ORACLE does not run a background microphone service.
 - Audio files, titles, transcripts, summaries, extracted tasks, and decisions are stored in the active workspace and indexed for offline search.
 - Recordings can be played back locally. Transcription requires a separate per-recording confirmation that explains the Google Gemini upload.
 - The approved WAV is uploaded through the Gemini Files API and transcribed with Google's dedicated Gemini 3.5 Transcribe model in VERBATIM mode with automatic language detection. ORACLE then sends the resulting transcript—not the audio again—to the selected Gemini model for a concise summary, explicit tasks, and decisions. It attempts to delete the temporary remote audio file immediately after transcription; Google documents automatic Files API deletion after 48 hours if manual cleanup does not occur.
