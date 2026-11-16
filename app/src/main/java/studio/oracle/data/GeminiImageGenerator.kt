@@ -94,7 +94,7 @@ class GeminiImageGenerator(
                                 if (data.isNotBlank()) {
                                     generated = GeminiGeneratedImage(
                                         bytes = android.util.Base64.decode(data, android.util.Base64.DEFAULT),
-                                        mimeType = block.optString("mime_type").ifBlank { "image/png" },
+                                        mimeType = block.optString("mime_type").ifBlank { "image/jpeg" },
                                         description = description
                                     )
                                 }
