@@ -1436,7 +1436,7 @@ private fun AgentExecutionTrace(events: List<AgenticEvent>, onOpenFile: (String)
                 .padding(vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(Modifier.width(2.dp).height(20.dp).background(Color(0xFFE08A45), RoundedCornerShape(2.dp)))
+            Box(Modifier.width(2.dp).height(20.dp).background(palette.accent, RoundedCornerShape(2.dp)))
             Spacer(Modifier.width(9.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("REASONING SUMMARY  ·  ACTIVITY", color = Color(0xFFE08A45), fontFamily = OracleMono,
@@ -1449,7 +1449,7 @@ private fun AgentExecutionTrace(events: List<AgenticEvent>, onOpenFile: (String)
                 )
             }
             Spacer(Modifier.width(8.dp))
-            Text(if (expanded) "−" else "⌄", color = Color(0xFF7E8FE0), fontSize = 15.sp)
+            Text(if (expanded) "−" else "⌄", color = palette.textTertiary, fontSize = 15.sp)
         }
         AnimatedVisibility(
             visible = expanded,
@@ -1473,16 +1473,16 @@ private fun AgentEventRow(index: Int, event: AgenticEvent, onOpenFile: (String) 
     val isCode = event.code.isNotBlank()
     var expanded by remember(event.title, event.kind, event.code) { mutableStateOf(false) }
     val accent = when {
-        isFile -> Color(0xFF42A68A)
+        isFile -> palette.success
         event.kind.contains("network") -> Color(0xFFE08A45)
-        event.kind.contains("python") || event.kind.contains("hosted") -> Color(0xFFBF8B52)
-        event.kind.contains("search") || event.kind.contains("url") -> Color(0xFF5C9ACB)
-        else -> Color(0xFF7B8FE8)
+        event.kind.contains("python") || event.kind.contains("hosted") -> palette.textSecondary
+        event.kind.contains("search") || event.kind.contains("url") -> palette.textSecondary
+        else -> palette.textSecondary
     }
     Row(Modifier.fillMaxWidth().heightIn(min = 30.dp), verticalAlignment = Alignment.Top) {
         Column(Modifier.width(25.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Box(
-                Modifier.size(22.dp).clip(RoundedCornerShape(7.dp))
+                Modifier.size(20.dp).clip(RoundedCornerShape(7.dp))
                     .background(accent.copy(alpha = 0.13f))
                     .border(1.dp, accent.copy(alpha = 0.28f), RoundedCornerShape(7.dp)),
                 contentAlignment = Alignment.Center
@@ -1494,7 +1494,7 @@ private fun AgentEventRow(index: Int, event: AgenticEvent, onOpenFile: (String) 
         }
         Spacer(Modifier.width(8.dp))
         Column(
-            Modifier.weight(1f).clip(RoundedCornerShape(9.dp))
+            Modifier.weight(1f).clip(RoundedCornerShape(7.dp))
                 .background(palette.surfaceRaised.copy(alpha = 0.72f))
                 .clickable(enabled = isCode || isFile || event.detail.isNotBlank()) { expanded = !expanded }
                 .padding(horizontal = 10.dp, vertical = 8.dp),
@@ -1527,7 +1527,7 @@ private fun AgentEventRow(index: Int, event: AgenticEvent, onOpenFile: (String) 
                     fontSize = 10.sp, lineHeight = 15.sp)
             }
             if (isCode && expanded) {
-                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFF171D29)).padding(9.dp)) {
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(palette.surfaceSunken).padding(9.dp)) {
                     OracleSyntaxCode(event.code.take(16000))
                 }
             }
@@ -1540,11 +1540,11 @@ private fun LiveAgentActivity(events: List<AgenticEvent>) {
     val last = events.lastOrNull { it.kind != "usage" }
     Row(
         Modifier.fillMaxWidth().padding(start = 32.dp, end = 12.dp)
-            .clip(RoundedCornerShape(11.dp)).background(Color(0x147B8FE8))
+            .clip(RoundedCornerShape(8.dp)).background(Color(0x147B8FE8))
             .padding(horizontal = 11.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        OracleSpinner(Modifier.size(15.dp), Color(0xFF788CE5))
+        OracleSpinner(Modifier.size(15.dp), palette.accent)
         Spacer(Modifier.width(9.dp))
         Text(last?.title ?: "ORACLE is planning the next step",
             Modifier.weight(1f), color = Color(0xFF788CE5), fontFamily = OracleMono,
@@ -1661,17 +1661,17 @@ private fun ModelControlPanel(
     }
     Column(
         modifier = modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(13.dp))
             .background(
                 androidx.compose.ui.graphics.Brush.linearGradient(
                     if (palette.isDark) {
-                        listOf(Color(0xED303A49), Color(0xD91E2631), Color(0xF0262E3A))
+                        listOf(palette.surfaceRaised.copy(alpha = 0.98f), palette.surface.copy(alpha = 0.96f))
                     } else {
                         listOf(Color(0xF5FFFFFF), Color(0xDCECF1FA), Color(0xF4FFFFFF))
                     }
                 )
             )
-            .border(1.dp, Color(0x66FFFFFF), RoundedCornerShape(22.dp))
+            .border(1.dp, palette.outline, RoundedCornerShape(13.dp))
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -2103,7 +2103,7 @@ private fun OracleThreadDrawer(
                             value = searchQuery, onValueChange = { searchQuery = it }, singleLine = true,
                             textStyle = TextStyle(color = palette.text,
                                 fontFamily = OracleSans, fontSize = 14.sp),
-                            cursorBrush = SolidColor(Color(0xFF557BDD)), modifier = Modifier.fillMaxWidth()
+                            cursorBrush = SolidColor(palette.accent), modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
@@ -2270,7 +2270,8 @@ private fun DrawerDateLabel(label: String) {
 }
 
 @Composable
-private fun DrawerSessionRow(title: String, selected: Boolean, onClick: () -> Unit) {
+private fun DrawerSessionRow(title: String, selected: Boolean, onClick: () -> Unit ) {
+    val palette = LocalOraclePalette.current
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp))
             .background(if (selected) palette.accentSoft else Color.Transparent)
