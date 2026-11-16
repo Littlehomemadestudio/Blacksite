@@ -755,7 +755,17 @@ fun OracleScreen(
         ) {
             CustomTopBar(
                 onMenu = { drawerOpen = true },
-                onNewThread = { createNewThread() }
+                onNewThread = { createNewThread() },
+                voiceReplyEnabled = voiceReplyEnabled,
+                onVoiceToggle = {
+                    voiceReplyEnabled = !voiceReplyEnabled
+                    if (voiceReplyEnabled) microphonePermission.launch(android.Manifest.permission.RECORD_AUDIO)
+                    else {
+                        speechRecognizer?.stopListening()
+                        textToSpeech.stop()
+                    }
+                },
+                showTitle = messages.isNotEmpty()
             )
 
             Box(
@@ -941,7 +951,10 @@ fun OracleScreen(
 @Composable
 private fun CustomTopBar(
     onMenu: () -> Unit,
-    onNewThread: () -> Unit
+    onNewThread: () -> Unit,
+    voiceReplyEnabled: Boolean,
+    onVoiceToggle: () -> Unit,
+    showTitle: Boolean
 ) {
     val palette = LocalOraclePalette.current
     Row(
@@ -955,28 +968,41 @@ private fun CustomTopBar(
             glyph = OracleGlyph.Menu,
             description = "Open conversations",
             onClick = onMenu,
-            tint = palette.text
+            tint = palette.text,
+            size = 42.dp
         )
-        Spacer(Modifier.width(7.dp))
-        HandcraftedLogo(
-            modifier = Modifier.size(27.dp),
-            color = palette.text
-        )
-        Spacer(Modifier.width(9.dp))
-        Text(
-            text = "ORACLE",
+        if (showTitle) {
+            Spacer(Modifier.width(9.dp))
+            Text(
+                "Conversation",
+                color = palette.text,
+                fontFamily = OracleSans,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        androidx.compose.material3.Text(
+            if (voiceReplyEnabled) "◖))" else "◖×",
+            modifier = Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .clickable(onClick = onVoiceToggle)
+                .wrapContentHeight(Alignment.CenterVertically),
             color = palette.text,
             fontFamily = OracleSans,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 14.sp,
-            letterSpacing = 1.5.sp
+            fontSize = 18.sp,
+            textAlign = TextAlign.Center
         )
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.width(7.dp))
         OracleIconButton(
             glyph = OracleGlyph.NewChat,
             description = "New conversation",
             onClick = onNewThread,
-            tint = palette.textSecondary
+            tint = palette.text,
+            size = 42.dp
         )
     }
 }
@@ -2282,80 +2308,35 @@ private fun DrawerAction(
 @Composable
 private fun OracleEmptyState(onPrompt: (String) -> Unit) {
     val palette = LocalOraclePalette.current
-    val motion = rememberInfiniteTransition(label = "empty-state-orbit")
-    val orbit by motion.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            androidx.compose.animation.core.tween(18000, easing = androidx.compose.animation.core.LinearEasing)
-        ),
-        label = "orbit"
-    )
-    val breathe by motion.animateFloat(
-        initialValue = 0.94f,
-        targetValue = 1.04f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            androidx.compose.animation.core.tween(2600),
-            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
-        ),
-        label = "breathe"
-    )
+    val greeting = remember {
+        listOf(
+            "Hi. What can I do for you?",
+            "Hello. What are we working on today?",
+            "What would you like to explore?",
+            "Ready when you are.",
+            "How can I help?"
+        ).random()
+    }
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Box(Modifier.size(172.dp), contentAlignment = Alignment.Center) {
-            Box(Modifier.size(154.dp).rotate(orbit).border(1.dp, palette.accent.copy(alpha = 0.24f), CircleShape))
-            Box(Modifier.size(116.dp).rotate(-orbit * 0.7f).border(1.dp, palette.outlineSoft, RoundedCornerShape(36.dp)))
-            Box(Modifier.size(86.dp).scale(breathe).clip(CircleShape).background(palette.accent.copy(alpha = 0.10f)), contentAlignment = Alignment.Center) {
-                HandcraftedLogo(Modifier.size(49.dp), palette.accent)
-            }
-            Box(Modifier.offset(x = 57.dp, y = (-53).dp).size(9.dp).clip(CircleShape).background(palette.accent))
-            Box(Modifier.offset(x = (-65).dp, y = 37.dp).size(6.dp).clip(CircleShape).background(palette.accent.copy(alpha = 0.65f)))
-        }
-        Spacer(Modifier.height(22.dp))
+        HandcraftedLogo(
+            modifier = Modifier.size(42.dp),
+            color = Color(0xFF4F78E8)
+        )
+        Spacer(Modifier.height(17.dp))
         Text(
-            "A clear field. A capable mind.",
-            color = palette.text,
+            greeting,
+            color = Color(0xFF171717),
             fontFamily = OracleSans,
             fontWeight = FontWeight.SemiBold,
-            fontSize = 21.sp,
+            fontSize = 18.sp,
+            lineHeight = 25.sp,
             textAlign = TextAlign.Center
         )
-        Text(
-            "Research, build, calculate, create. Give ORACLE a direction.",
-            modifier = Modifier.padding(top = 9.dp, bottom = 24.dp).widthIn(max = 300.dp),
-            color = palette.textSecondary,
-            fontFamily = OracleSans,
-            fontSize = 12.sp,
-            lineHeight = 18.sp,
-            textAlign = TextAlign.Center
-        )
-        Text("START WITH A MISSION", color = palette.accent, fontFamily = OracleMono, fontSize = 9.sp, letterSpacing = 1.2.sp)
-        Spacer(Modifier.height(12.dp))
-        listOf(
-            "Research a topic and build a cited report" to "Research a topic and create a concise report with reliable sources.",
-            "Analyze a file on my phone" to "Help me analyze a file I choose from my phone.",
-            "Write and run a Python script" to "Write a useful Python script, run it, and explain the output.",
-            "Create an image or visual concept" to "Create an original visual concept for my idea."
-        ).forEachIndexed { index, pair ->
-            Row(
-                Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(palette.surface.copy(alpha = 0.82f))
-                    .border(1.dp, palette.outlineSoft, RoundedCornerShape(14.dp))
-                    .clickable { onPrompt(pair.second) }
-                    .padding(horizontal = 13.dp, vertical = 13.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(listOf("⌕", "▤", "⌘", "✳", "↗")[index], color = palette.accent, fontSize = 17.sp)
-                Spacer(Modifier.width(11.dp))
-                Text(pair.first, modifier = Modifier.weight(1f), color = palette.text, fontFamily = OracleSans, fontSize = 12.sp)
-                Text("↗", color = palette.textTertiary, fontSize = 14.sp)
-            }
-        }
-        Spacer(Modifier.height(20.dp))
-        Text("YOUR WORKSPACE · YOUR TOOLS · YOUR CONTROL", color = palette.textTertiary, fontFamily = OracleMono, fontSize = 8.sp, letterSpacing = 0.6.sp, textAlign = TextAlign.Center)
     }
 }
