@@ -46,9 +46,9 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 
 ### Agentic Operator
 - Gemini Interactions loop: model → tool call → execution → function result → model, with a hard limit of 16 model rounds and 32 combined tool calls per run; transient network failures retry with backoff and cancellation stops in-flight OkHttp calls.
-- Built-in Gemini capabilities: URL Context and hosted Python. Gemini Google Search grounding is not enabled.
+- Built-in Gemini capabilities: URL Context and hosted Python. Both are disabled by default and require explicit opt-in in the composer quick switches. Gemini Google Search grounding is not enabled.
 - Independent live web research via Tavily and a separately encrypted API key stored through Android Keystore.
-- Composer quick switches independently enable web search, phone files, local Python, hosted Python, URL Context, image generation and all custom tools.
+- Composer quick switches independently enable web search, phone files, local Python, hosted Python, URL Context, image generation and all custom tools. Hosted Python and URL Context start off until the user enables them.
 - The main agent exposes a DRAW tool that calls Gemini 3.1 Flash Image as a separate service. Generated PNGs are saved in the app workspace and displayed inline. The direct image model can also be selected in the Model Atlas; direct image mode omits tool payloads because the model does not support function calling.
 - Phone files are accessed through a user-selected Storage Access Framework folder. Paths are scoped, traversal is rejected, and text read/write operations have size limits.
 - Reading file contents sent to Gemini, modifying files, running local Python, web searches sent to Tavily, and generating images require explicit permission. Session approvals are capability-scoped and limited to the current conversation: Python approval does not authorize phone-file access, file reads do not authorize file writes, and web-search approval does not authorize other tools. Each Tavily query is shown before sending unless web-search access was explicitly approved for that conversation.
