@@ -61,6 +61,20 @@ class WorkflowRulesTest {
     }
 
     @Test
+    fun audioSearchRequiresAQueryAndNoBody() {
+        assertTrue(
+            WorkflowRules.validate(
+                listOf(step(action = WorkflowAction.SEARCH_AUDIO.key, title = " "))
+            )!!.contains("search query")
+        )
+        assertNull(
+            WorkflowRules.validate(
+                listOf(step(action = WorkflowAction.SEARCH_AUDIO.key, title = "meeting notes", input = ""))
+            )
+        )
+    }
+
+    @Test
     fun rejectsStepsFromAnotherWorkflowWhenAnExecutionTargetIsProvided() {
         val foreignStep = step().copy(workflowId = "another-workflow")
         assertTrue(
