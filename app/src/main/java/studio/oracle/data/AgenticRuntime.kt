@@ -1,7 +1,9 @@
 package studio.oracle.data
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Call
 import okhttp3.Callback
@@ -78,6 +80,49 @@ interface AgenticToolExecutor {
 }
 
 /**
+ * Per-run guardrails prevent a model/tool loop from consuming unbounded requests or local actions.
+ * A batch is reserved atomically so a response that exceeds the remaining budget executes no
+ * additional local function calls.
+ */
+internal class AgenticExecutionBudget(
+    private val maxRounds: Int = MAX_ROUNDS,
+    private val maxToolCalls: Int = MAX_TOOL_CALLS
+) {
+    init {
+        require(maxRounds > 0) { "maxRounds must be positive." }
+        require(maxToolCalls > 0) { "maxToolCalls must be positive." }
+    }
+
+    var roundsUsed: Int = 0
+        private set
+
+    var toolCallsUsed: Int = 0
+        private set
+
+    val canStartRound: Boolean
+        get() = roundsUsed < maxRounds
+
+    fun beginRound(): Boolean {
+        if (!canStartRound) return false
+        roundsUsed += 1
+        return true
+    }
+
+    fun reserveToolCalls(count: Int): Boolean {
+        if (count < 0 || count > maxToolCalls || toolCallsUsed > maxToolCalls - count) {
+            return false
+        }
+        toolCallsUsed += count
+        return true
+    }
+
+    companion object {
+        const val MAX_ROUNDS = 16
+        const val MAX_TOOL_CALLS = 32
+    }
+}
+
+/**
  * Model-directed Gemini Interactions loop:
  * model -> function calls -> local execution -> function results -> model.
  * The loop is bounded, cancellable, and logs actions/results, never private thoughts.
@@ -120,8 +165,10 @@ class GeminiAgenticRuntime(
         var input: Any = makeInput(prompt, media)
         val transcript = StringBuilder()
         var planSummaryEmitted = false
+        val executionBudget = AgenticExecutionBudget()
 
-        while (true) {
+        while (executionBudget.beginRound()) {
+            currentCoroutineContext().ensureActive()
             val body = JSONObject()
                 .put("model", model)
                 .put("input", input)
@@ -250,10 +297,30 @@ class GeminiAgenticRuntime(
                     "url_context_call"
                 )
             }
+            val toolStepCount = (0 until steps.length()).count { index ->
+                steps.optJSONObject(index)?.optString("type") in setOf(
+                    "function_call",
+                    "code_execution_call",
+                    "url_context_call"
+                )
+            }
+            if (hasToolCalls && !executionBudget.canStartRound) {
+                val message = "ORACLE reached the safety limit of ${AgenticExecutionBudget.MAX_ROUNDS} model rounds. " +
+                    "No additional local tools were executed; start a new turn to continue."
+                onEvent(AgenticEvent("execution_limit", "Agent run limit reached", message))
+                return AgenticResult.Failed(message)
+            }
+            if (!executionBudget.reserveToolCalls(toolStepCount)) {
+                val message = "ORACLE reached the safety limit of ${AgenticExecutionBudget.MAX_TOOL_CALLS} tool calls. " +
+                    "The remaining local actions were not executed; start a new turn to continue."
+                onEvent(AgenticEvent("execution_limit", "Tool budget reached", message))
+                return AgenticResult.Failed(message)
+            }
             val functionResults = JSONArray()
             var functionCalls = 0
 
             for (index in 0 until steps.length()) {
+                currentCoroutineContext().ensureActive()
                 val step = steps.optJSONObject(index) ?: continue
                 when (step.optString("type")) {
                     // Gemini thought summaries are intentionally not shown in the transcript.
@@ -378,7 +445,10 @@ class GeminiAgenticRuntime(
             input = functionResults
         }
 
-        return AgenticResult.Failed("The agent stopped before producing a final answer.")
+        val message = "ORACLE reached the safety limit of ${AgenticExecutionBudget.MAX_ROUNDS} model rounds before a final answer. " +
+            "Start a new turn to continue with a fresh execution budget."
+        onEvent(AgenticEvent("execution_limit", "Agent run limit reached", message))
+        return AgenticResult.Failed(message)
     }
 
     private fun makeInput(prompt: String, media: List<AgentMediaInput>): JSONArray {
