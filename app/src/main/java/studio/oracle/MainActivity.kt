@@ -36,6 +36,7 @@ import studio.oracle.data.WorkspaceRepository
 import studio.oracle.data.local.OracleDatabase
 import studio.oracle.ui.HandcraftedLogo
 import studio.oracle.ui.LibraryScreen
+import studio.oracle.ui.AudioMemoryScreen
 import studio.oracle.ui.OracleGlyph
 import studio.oracle.ui.OracleIconButton
 import studio.oracle.ui.OracleScreen
@@ -60,6 +61,7 @@ private enum class OracleDestination {
     CHAT,
     LIBRARY,
     WORKFLOWS,
+    AUDIO,
     SETTINGS
 }
 
@@ -161,6 +163,7 @@ private fun OracleWorkspaceRoot() {
             onOpenLibrary = { destination = OracleDestination.LIBRARY },
             onOpenSettings = { destination = OracleDestination.SETTINGS },
             onOpenWorkflows = { destination = OracleDestination.WORKFLOWS },
+            onOpenAudio = { destination = OracleDestination.AUDIO },
             workspaceId = activeWorkspaceId,
             workspaces = workspaces,
             onWorkspaceChange = ::selectWorkspace,
@@ -179,6 +182,13 @@ private fun OracleWorkspaceRoot() {
             onBack = { destination = OracleDestination.CHAT }
         ) {
             WorkflowScreen(workspaceId = activeWorkspaceId)
+        }
+
+        OracleDestination.AUDIO -> OracleSection(
+            title = "Audio Memory",
+            onBack = { destination = OracleDestination.CHAT }
+        ) {
+            AudioMemoryScreen(workspaceId = activeWorkspaceId)
         }
 
         OracleDestination.SETTINGS -> OracleSection(
