@@ -83,6 +83,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import studio.oracle.data.AgentConversationPolicy
@@ -489,7 +490,21 @@ fun OracleScreen(
 
         requestJob = scope.launch {
             var userMessagePersisted = retry
+            var userMessageId: Long? = if (retry) messages.lastOrNull()?.id else null
+            val priorUserTrace = if (retry) {
+                messages.lastOrNull()?.let { AgenticEventCodec.decodeTrace(it.agentTrace) }.orEmpty()
+            } else emptyList()
             val runEvents = java.util.Collections.synchronizedList(mutableListOf<AgenticEvent>())
+            suspend fun persistRunTrace() {
+                val messageId = userMessageId ?: return
+                val current = synchronized(runEvents) { runEvents.toList() }
+                if (current.isNotEmpty()) {
+                    repository.updateMessageTrace(
+                        messageId,
+                        AgenticEventCodec.encodeTrace(priorUserTrace + current)
+                    )
+                }
+            }
             try {
                 val sessionId = selectedSession
                     ?: repository.createSession(model).also { activeSessionId = it }
@@ -565,7 +580,7 @@ fun OracleScreen(
                 }
 
                 if (!retry) {
-                    repository.appendMessage(
+                    userMessageId = repository.appendMessage(
                         sessionId = sessionId,
                         role = "user",
                         content = submitted,
@@ -707,6 +722,7 @@ fun OracleScreen(
                         }
                     }
                     is AgenticResult.Failed -> {
+                        persistRunTrace()
                         error = result.message
                         failedPrompt = submitted
                         failedPromptPersisted = userMessagePersisted
@@ -714,6 +730,7 @@ fun OracleScreen(
                     }
                 }
             } catch (cancelled: CancellationException) {
+                withContext(NonCancellable) { runCatching { persistRunTrace() } }
                 if (!suppressCancelledPromptRestore) {
                     failedPrompt = submitted
                     failedPromptPersisted = userMessagePersisted
@@ -722,6 +739,7 @@ fun OracleScreen(
                 }
                 throw cancelled
             } catch (exception: Exception) {
+                runCatching { persistRunTrace() }
                 error = exception.message ?: "Something went wrong. Check your connection and try again."
                 failedPrompt = submitted
                 failedPromptPersisted = userMessagePersisted
@@ -1102,16 +1120,21 @@ private fun OracleMessageRow(
         exit = fadeOut(tween(120))
     ) {
         if (message.role == "user") {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Column(
-                    Modifier.widthIn(max = 340.dp).clip(RoundedCornerShape(22.dp))
-                        .background(Color(0xFFEDF2FC)).padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (message.content.isNotBlank()) Text(message.content,
-                        color = Color(0xFF171717), fontFamily = OracleSans,
-                        fontSize = 16.sp, lineHeight = 24.sp)
-                    attachments.forEach { attachment ->
+            Column(
+                Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    Column(
+                        Modifier.widthIn(max = 340.dp).clip(RoundedCornerShape(22.dp))
+                            .background(Color(0xFFEDF2FC)).padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (message.content.isNotBlank()) Text(message.content,
+                            color = Color(0xFF171717), fontFamily = OracleSans,
+                            fontSize = 16.sp, lineHeight = 24.sp)
+                        attachments.forEach { attachment ->
                         if (attachment.mimeType.startsWith("image/")) {
                             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp))
                                 .background(Color.White).padding(7.dp),
@@ -1145,6 +1168,11 @@ private fun OracleMessageRow(
                                 }
                             }
                         }
+                    }
+                }
+                if (events.isNotEmpty()) {
+                    Column(Modifier.widthIn(max = 340.dp)) {
+                        AgentExecutionTrace(events, onOpenFile)
                     }
                 }
             }
