@@ -402,6 +402,68 @@ interface WorkflowDao {
     @Query("DELETE FROM workflows WHERE id = :workflowId AND workspaceId = :workspaceId")
     suspend fun deleteWorkflow(workflowId: String, workspaceId: String): Int
 }
+
+@Entity(
+    tableName = "audio_memories",
+    indices = [
+        Index(value = ["workspaceId", "createdAt"]),
+        Index(value = ["workspaceId", "title"])
+    ]
+)
+data class AudioMemoryEntity(
+    @PrimaryKey val id: String,
+    val workspaceId: String,
+    val title: String,
+    val storagePath: String,
+    val mimeType: String,
+    val sizeBytes: Long,
+    val durationMs: Long,
+    val createdAt: Long,
+    val transcript: String,
+    val summary: String,
+    val tasksJson: String,
+    val decisionsJson: String
+)
+
+@Dao
+interface AudioMemoryDao {
+    @Query("SELECT * FROM audio_memories WHERE workspaceId = :workspaceId ORDER BY createdAt DESC")
+    fun observeRecords(workspaceId: String): Flow<List<AudioMemoryEntity>>
+
+    @Query("SELECT * FROM audio_memories WHERE id = :id AND workspaceId = :workspaceId LIMIT 1")
+    suspend fun findRecord(id: String, workspaceId: String): AudioMemoryEntity?
+
+    @Query(
+        "SELECT * FROM audio_memories WHERE workspaceId = :workspaceId AND (" +
+            "title LIKE '%' || :query || '%' COLLATE NOCASE OR " +
+            "transcript LIKE '%' || :query || '%' COLLATE NOCASE OR " +
+            "summary LIKE '%' || :query || '%' COLLATE NOCASE OR " +
+            "tasksJson LIKE '%' || :query || '%' COLLATE NOCASE OR " +
+            "decisionsJson LIKE '%' || :query || '%' COLLATE NOCASE) " +
+            "ORDER BY createdAt DESC LIMIT 100"
+    )
+    suspend fun search(workspaceId: String, query: String): List<AudioMemoryEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(record: AudioMemoryEntity)
+
+    @Query(
+        "UPDATE audio_memories SET transcript = :transcript, summary = :summary, " +
+            "tasksJson = :tasksJson, decisionsJson = :decisionsJson " +
+            "WHERE id = :id AND workspaceId = :workspaceId"
+    )
+    suspend fun saveAnalysis(
+        id: String, workspaceId: String, transcript: String, summary: String,
+        tasksJson: String, decisionsJson: String
+    ): Int
+
+    @Query("UPDATE audio_memories SET title = :title WHERE id = :id AND workspaceId = :workspaceId")
+    suspend fun rename(id: String, workspaceId: String, title: String): Int
+
+    @Query("DELETE FROM audio_memories WHERE id = :id AND workspaceId = :workspaceId")
+    suspend fun delete(id: String, workspaceId: String): Int
+}
+
 @Database(
     entities = [
         WorkspaceEntity::class,
@@ -413,9 +475,10 @@ interface WorkflowDao {
         WorkflowStepEntity::class,
         LocalNoteEntity::class,
         WorkflowRunEntity::class,
-        WorkflowRunLogEntity::class
+        WorkflowRunLogEntity::class,
+        AudioMemoryEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class OracleDatabase : RoomDatabase() {
@@ -423,6 +486,7 @@ abstract class OracleDatabase : RoomDatabase() {
     abstract fun agentDao(): AgentDao
     abstract fun documentDao(): DocumentDao
     abstract fun workflowDao(): WorkflowDao
+    abstract fun audioMemoryDao(): AudioMemoryDao
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -586,6 +650,28 @@ abstract class OracleDatabase : RoomDatabase() {
             }
         }
 
+
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS audio_memories (" +
+                        "id TEXT NOT NULL, workspaceId TEXT NOT NULL, title TEXT NOT NULL, " +
+                        "storagePath TEXT NOT NULL, mimeType TEXT NOT NULL, sizeBytes INTEGER NOT NULL, " +
+                        "durationMs INTEGER NOT NULL, createdAt INTEGER NOT NULL, transcript TEXT NOT NULL, " +
+                        "summary TEXT NOT NULL, tasksJson TEXT NOT NULL, decisionsJson TEXT NOT NULL, " +
+                        "PRIMARY KEY(id))"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_audio_memories_workspaceId_createdAt " +
+                        "ON audio_memories(workspaceId, createdAt)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_audio_memories_workspaceId_title " +
+                        "ON audio_memories(workspaceId, title)"
+                )
+            }
+        }
+
         private fun SupportSQLiteDatabase.hasColumn(table: String, column: String): Boolean =
             query("PRAGMA table_info($table)").use { cursor ->
                 val nameIndex = cursor.getColumnIndex("name")
@@ -605,7 +691,7 @@ abstract class OracleDatabase : RoomDatabase() {
                     OracleDatabase::class.java,
                     "oracle_studio.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     .build()
                     .also { instance = it }
             }
