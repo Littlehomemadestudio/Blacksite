@@ -2107,6 +2107,19 @@ private fun OracleThreadDrawer(
                         )
                     }
                 }
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                        .background(palette.accentSoft)
+                        .clickable(onClick = onNewThread)
+                        .padding(horizontal = 11.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("New conversation", color = palette.accent,
+                        fontFamily = OracleSans, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.weight(1f))
+                    Text("+", color = palette.accent, fontSize = 17.sp)
+                }
                 Spacer(Modifier.height(16.dp))
                 Row(Modifier.fillMaxWidth().padding(horizontal = 3.dp),
                     verticalAlignment = Alignment.CenterVertically) {
@@ -2148,7 +2161,14 @@ private fun OracleThreadDrawer(
                             color = palette.textTertiary, fontFamily = OracleSans, fontSize = 13.sp) }
                     }
                 }
-                Spacer(Modifier.height(7.dp))
+                Spacer(Modifier.height(8.dp))
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    DrawerAction(OracleGlyph.Library, "Library", onOpenLibrary)
+                    DrawerAction(OracleGlyph.Spark, "Workflow Studio", onOpenWorkflows)
+                    DrawerAction(OracleGlyph.Audio, "Audio Memory", onOpenAudio)
+                    DrawerAction(OracleGlyph.Settings, "Settings", onOpenSettings)
+                }
+                Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
                     .clickable { workspaceListExpanded = !workspaceListExpanded }
                     .padding(horizontal = 3.dp, vertical = 5.dp),
@@ -2176,10 +2196,6 @@ private fun OracleThreadDrawer(
                     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
                         .background(palette.surfaceRaised).padding(9.dp),
                         verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        DrawerAction(OracleGlyph.Library, "Library", onOpenLibrary)
-                        DrawerAction(OracleGlyph.Spark, "Workflow Studio", onOpenWorkflows)
-                        DrawerAction(OracleGlyph.Audio, "Audio Memory", onOpenAudio)
-                        DrawerAction(OracleGlyph.Settings, "Settings", onOpenSettings)
                         Box(Modifier.fillMaxWidth().height(1.dp).background(palette.outlineSoft))
                         workspaces.forEach { workspace ->
                             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
@@ -2283,7 +2299,7 @@ private fun DrawerSessionRow(title: String, selected: Boolean, onClick: () -> Un
             fontFamily = OracleSans, fontSize = 12.sp,
             fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (selected) Text("•••", color = Color(0xFF8D8D8D), fontSize = 15.sp)
+        if (selected) Text("•", color = palette.accent, fontSize = 15.sp)
     }
 }
 
@@ -2316,24 +2332,16 @@ private fun DrawerAction(
 ) {
     val palette = LocalOraclePalette.current
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(13.dp))
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(7.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 11.dp, vertical = 13.dp),
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        OracleGlyphIcon(glyph, Modifier.size(18.dp), palette.textSecondary)
-        Spacer(Modifier.width(12.dp))
-        Text(
-            label,
-            color = palette.textSecondary,
-            fontFamily = OracleSans,
-            fontSize = 13.sp
-        )
+        Text(label, color = palette.textSecondary, fontFamily = OracleSans,
+            fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
 }
-
 
 @Composable
 private fun OracleEmptyState(onPrompt: (String) -> Unit) {
