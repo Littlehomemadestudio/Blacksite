@@ -466,7 +466,9 @@ fun DeepSeekInputPill(
     onRemoveAttachment: (AgentAttachmentRef) -> Unit = {},
     onVoiceClick: () -> Unit = {},
     voiceReplyEnabled: Boolean = false,
-    onVoiceReplyToggle: () -> Unit = {}
+    onVoiceReplyToggle: () -> Unit = {},
+    searchEnabled: Boolean = false,
+    onSearchClick: () -> Unit = {}
 ) {
     val palette = LocalOraclePalette.current
     val interaction = remember { MutableInteractionSource() }
@@ -497,19 +499,11 @@ fun DeepSeekInputPill(
                 scaleY = scale
                 translationY = if (pressed) 1.dp.toPx() else 0f
             }
-             .shadow(elevation + 2.dp, RoundedCornerShape(22.dp))
-            .clip(RoundedCornerShape(22.dp))
-            .background(
-                androidx.compose.ui.graphics.Brush.linearGradient(
-                    colors = if (palette.isDark) {
-                        listOf(Color(0xEE303947), Color(0xD91E2631), Color(0xF0262E3A), Color(0xEA202832))
-                    } else {
-                        listOf(Color(0xF9FFFFFF), Color(0xDCECF1FB), Color(0xF4FFFFFF), Color(0xEAF7F8FC))
-                    }
-                )
-            )
-            .border(1.dp, borderColor.copy(alpha = 0.82f), RoundedCornerShape(22.dp))
-            .padding(start = 17.dp, end = 10.dp, top = 12.dp, bottom = 10.dp)
+             .shadow(elevation + 3.dp, RoundedCornerShape(28.dp), clip = false)
+            .clip(RoundedCornerShape(28.dp))
+            .background(Color.White)
+            .border(1.dp, Color(0xFFECECEC), RoundedCornerShape(28.dp))
+            .padding(start = 14.dp, end = 12.dp, top = 9.dp, bottom = 8.dp)
     ) {
         if (attachments.isNotEmpty()) {
             Row(
@@ -556,7 +550,7 @@ fun DeepSeekInputPill(
             onValueChange = onValueChange,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 42.dp, max = 156.dp),
+                .heightIn(min = 34.dp, max = 132.dp),
             textStyle = androidx.compose.material3.MaterialTheme.typography.bodyLarge.copy(
                 color = palette.text,
                 fontFamily = OracleSans,
@@ -575,12 +569,12 @@ fun DeepSeekInputPill(
             maxLines = 6,
             decorationBox = { innerTextField ->
                 Box(
-                    Modifier.fillMaxWidth().defaultMinSize(minHeight = 42.dp),
+                    Modifier.fillMaxWidth().defaultMinSize(minHeight = 34.dp),
                     contentAlignment = Alignment.CenterStart
                 ) {
                     if (value.isEmpty()) {
                         androidx.compose.material3.Text(
-                            "Message...",
+                            "Type a message or hold to speak",
                             color = palette.textTertiary,
                             fontFamily = OracleSans,
                             fontSize = 15.sp
@@ -594,31 +588,22 @@ fun DeepSeekInputPill(
         Spacer(Modifier.height(8.dp))
 
         Row(
-            Modifier.fillMaxWidth().height(42.dp),
+            Modifier.fillMaxWidth().height(36.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            ThinkPill(onClick = onThinkClick, expanded = thinkExpanded)
+            Spacer(Modifier.width(7.dp))
+            SearchPill(enabled = searchEnabled, onClick = onSearchClick)
+            Spacer(Modifier.weight(1f))
             Box(
-                Modifier.size(38.dp).clip(RoundedCornerShape(12.dp))
-                    .background(palette.surfaceRaised)
-                    .border(1.dp, palette.outlineSoft, RoundedCornerShape(12.dp))
+                Modifier.size(36.dp).clip(CircleShape)
+                    .background(Color.White)
+                    .border(1.dp, Color(0xFFE6E6E6), CircleShape)
                     .clickable(onClick = onAttachClick),
                 contentAlignment = Alignment.Center
             ) {
-                androidx.compose.material3.Text("＋", color = palette.textSecondary, fontSize = 23.sp, lineHeight = 24.sp)
+                androidx.compose.material3.Text("＋", color = Color(0xFF171717), fontSize = 23.sp, lineHeight = 24.sp)
             }
-            Spacer(Modifier.width(8.dp))
-            ThinkPill(onClick = onThinkClick, expanded = thinkExpanded)
-            Spacer(Modifier.width(6.dp))
-            Box(
-                Modifier.size(36.dp).clip(RoundedCornerShape(11.dp))
-                    .background(if (voiceReplyEnabled) palette.accentSoft else palette.surfaceRaised)
-                    .border(1.dp, if (voiceReplyEnabled) palette.accent.copy(alpha = 0.55f) else palette.outlineSoft, RoundedCornerShape(11.dp))
-                    .clickable(onClick = onVoiceReplyToggle),
-                contentAlignment = Alignment.Center
-            ) {
-                androidx.compose.material3.Text(if (voiceReplyEnabled) "◖))" else "◖)", color = if (voiceReplyEnabled) palette.accent else palette.textSecondary, fontSize = 11.sp)
-            }
-            Spacer(Modifier.weight(1f))
             androidx.compose.animation.AnimatedVisibility(
                 visible = busy,
                 enter = androidx.compose.animation.fadeIn(tween(150)) +
@@ -633,6 +618,7 @@ fun DeepSeekInputPill(
                     fontSize = 9.sp
                 )
             }
+            Spacer(Modifier.width(8.dp))
             Spacer(Modifier.width(8.dp))
             OracleSendButton(
                 enabled = true,
@@ -666,9 +652,9 @@ private fun ThinkPill(onClick: () -> Unit, expanded: Boolean) {
                 scaleY = scale
                 translationY = if (pressed) 1.dp.toPx() else 0f
             }
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (pressed || expanded) palette.surfaceRaised else palette.canvas)
-            .border(1.dp, palette.outlineSoft, RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(22.dp))
+            .background(if (pressed || expanded) Color(0xFFF1F1F1) else Color.White)
+            .border(1.dp, Color(0xFFE9E9E9), RoundedCornerShape(22.dp))
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(start = 11.dp, end = 10.dp, top = 7.dp, bottom = 7.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -676,11 +662,11 @@ private fun ThinkPill(onClick: () -> Unit, expanded: Boolean) {
         OracleGlyphIcon(OracleGlyph.Spark, Modifier.size(13.dp), palette.textSecondary, 1.35f)
         Spacer(Modifier.width(7.dp))
         androidx.compose.material3.Text(
-            "Model / Tools",
+            "Think",
             color = palette.textSecondary,
-            fontFamily = OracleMono,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium
+            fontFamily = OracleSans,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold
         )
         Spacer(Modifier.width(4.dp))
         OracleGlyphIcon(
@@ -688,6 +674,29 @@ private fun ThinkPill(onClick: () -> Unit, expanded: Boolean) {
             Modifier.size(11.dp).graphicsLayer { rotationZ = chevronRotation },
             palette.textTertiary,
             1.4f
+        )
+    }
+}
+
+@Composable
+private fun SearchPill(enabled: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(22.dp))
+            .background(if (enabled) Color(0xFFEAF1FF) else Color.White)
+            .border(1.dp, if (enabled) Color(0xFFD8E4FF) else Color(0xFFE9E9E9), RoundedCornerShape(22.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        androidx.compose.material3.Text("◎", color = Color(0xFF4F78D8), fontSize = 14.sp)
+        Spacer(Modifier.width(5.dp))
+        androidx.compose.material3.Text(
+            "Search",
+            color = Color(0xFF4F78D8),
+            fontFamily = OracleSans,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold
         )
     }
 }
