@@ -1537,6 +1537,7 @@ private fun AgentEventRow(index: Int, event: AgenticEvent, onOpenFile: (String) 
 
 @Composable
 private fun LiveAgentActivity(events: List<AgenticEvent>) {
+    val palette = LocalOraclePalette.current
     val last = events.lastOrNull { it.kind != "usage" }
     Row(
         Modifier.fillMaxWidth().padding(start = 32.dp, end = 12.dp)
