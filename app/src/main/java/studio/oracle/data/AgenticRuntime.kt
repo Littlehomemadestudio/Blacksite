@@ -123,6 +123,18 @@ internal class AgenticExecutionBudget(
 }
 
 /**
+ * Session grants are capability-scoped. Approving Python in a conversation must not
+ * implicitly authorize file reads, file writes, web queries, or image generation.
+ */
+internal object AgenticPermissionPolicy {
+    fun sessionGrantKey(sessionId: String, permissionGroup: String): String {
+        require(sessionId.isNotBlank()) { "An active conversation is required for a session grant." }
+        require(permissionGroup.isNotBlank()) { "A permission group is required for a session grant." }
+        return sessionId.trim() + "\u001f" + permissionGroup.trim()
+    }
+}
+
+/**
  * Model-directed Gemini Interactions loop:
  * model -> function calls -> local execution -> function results -> model.
  * The loop is bounded, cancellable, and logs actions/results, never private thoughts.
@@ -179,7 +191,8 @@ class GeminiAgenticRuntime(
                         "For multi-step work, plan briefly, perform tool calls, inspect their actual results, and continue until complete. " +
                         "Never claim an action succeeded unless a tool result confirms it. " +
                         "Phone file tools are limited to the folder the user granted. " +
-                        "The app obtains approval for file access and local Python once per session or once per action. " +
+                        "The app obtains approval before sending web-search queries to Tavily, reading or modifying phone files, running local Python, or generating images. " +
+                        "Session approvals are scoped to one capability group and do not authorize unrelated tools. " +
                         "You may use the local Python tool for normal Python work, including standard-library networking and file downloads. " +
                         "Keep progress updates brief. Do not output private chain-of-thought; provide a concise user-facing summary and final deliverable."
                 )
