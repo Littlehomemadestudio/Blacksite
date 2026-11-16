@@ -75,7 +75,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Recording requires the Android microphone permission, has a 10-minute per-recording limit, and is never uploaded automatically.
 - Audio files, titles, transcripts, summaries, extracted tasks, and decisions are stored in the active workspace and indexed for offline search.
 - Recordings can be played back locally. Transcription requires a separate per-recording confirmation that explains the Google Gemini upload.
-- The selected Gemini model receives only the approved recording through the Gemini Files API. ORACLE requests a verbatim transcript in the spoken language, a concise summary, explicit tasks, and decisions; it then attempts to delete the temporary remote file.
+- The approved WAV is uploaded through the Gemini Files API and transcribed with Google's dedicated Gemini 3.5 Transcribe model in VERBATIM mode with automatic language detection. ORACLE then sends the resulting transcript—not the audio again—to the selected Gemini model for a concise summary, explicit tasks, and decisions. It attempts to delete the temporary remote audio file immediately after transcription.
 - The UI reports when remote cleanup cannot be confirmed. Local recordings remain available; audio and the Room database are app-private but not encrypted at rest.
 - This is file-based, user-initiated transcription—not live transcription, background capture, or Gemini Live streaming.
 
