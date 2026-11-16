@@ -232,7 +232,12 @@ fun OracleScreen(
                 .edit().putString("phone_tree_uri", uri.toString()).apply()
         }.onFailure { error = "Android could not persist access to that folder. Choose it again." }
     }
-    suspend fun authorizeTool(action: String, permissionGroup: String, authorizationSessionId: String): Boolean {
+    suspend fun authorizeTool(
+        action: String,
+        permissionGroup: String,
+        authorizationSessionId: String,
+        onDecision: (AgenticEvent) -> Unit = {}
+    ): Boolean {
         val grantKey = AgenticPermissionPolicy.sessionGrantKey(authorizationSessionId, permissionGroup)
         if (grantKey in approvedToolSessions) return true
         val deferred = CompletableDeferred<String>()
@@ -242,7 +247,8 @@ fun OracleScreen(
             approvalDeferred = deferred
         }
         return try {
-            when (deferred.await()) {
+            val decision = deferred.await()
+            val approved = when (decision) {
                 "session" -> {
                     withContext(Dispatchers.Main.immediate) {
                         approvedToolSessions = approvedToolSessions + grantKey
@@ -252,6 +258,18 @@ fun OracleScreen(
                 "once" -> true
                 else -> false
             }
+            onDecision(
+                AgenticEvent(
+                    kind = if (approved) "permission_granted" else "permission_denied",
+                    title = if (approved) "Permission approved" else "Permission denied",
+                    detail = scopeLabel + " · " + when (decision) {
+                        "session" -> "for this conversation"
+                        "once" -> "for this action"
+                        else -> "denied"
+                    }
+                )
+            )
+            approved
         } finally {
             withContext(Dispatchers.Main.immediate) {
                 if (approvalDeferred === deferred) {
@@ -586,7 +604,14 @@ fun OracleScreen(
                     phoneFilesEnabled = agenticSettings.localTools && agenticSettings.phoneFiles,
                     localPythonEnabled = agenticSettings.localTools && agenticSettings.localPython,
                     imageGenerationEnabled = agenticSettings.localTools && agenticSettings.imageGeneration,
-                    authorize = { action, group -> authorizeTool(action, group, sessionId) },
+                    authorize = { action, group ->
+                        authorizeTool(action, group, sessionId) { event ->
+                            runEvents.add(event)
+                            scope.launch(Dispatchers.Main.immediate) {
+                                agentEvents = (agentEvents + event).takeLast(60)
+                            }
+                        }
+                    },
                     python = { code ->
                         val before = pythonRuntime.workspaceDirectory().walkTopDown()
                             .filter { it.isFile }
