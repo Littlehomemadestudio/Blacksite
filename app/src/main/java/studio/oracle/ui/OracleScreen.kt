@@ -1694,35 +1694,35 @@ private fun ModelControlPanel(
         }
         Box(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                .background(Color(0x157B8FE8))
+                .background(palette.accentSoft.copy(alpha = 0.62f))
                 .clickable(onClick = onOpenModelBrowser)
                 .padding(horizontal = 12.dp, vertical = 11.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(28.dp).clip(RoundedCornerShape(9.dp)).background(Color(0x287B8FE8)),
+                Box(Modifier.size(28.dp).clip(RoundedCornerShape(9.dp)).background(palette.accentSoft),
                     contentAlignment = Alignment.Center) {
-                    Text("✦", color = Color(0xFF7185DE), fontSize = 17.sp)
+                    Text("✦", color = palette.accent, fontSize = 17.sp)
                 }
                 Spacer(Modifier.width(9.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("EXPLORE MODELS", color = Color(0xFF6579CF), fontFamily = OracleMono,
+                    Text("EXPLORE MODELS", color = palette.accent, fontFamily = OracleMono,
                         fontSize = 9.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.7.sp)
                     Text("Compare capabilities, context windows and model families",
                         color = palette.textSecondary, fontFamily = OracleSans, fontSize = 10.sp)
                 }
-                Text("↗", color = Color(0xFF6579CF), fontSize = 16.sp)
+                Text("↗", color = palette.accent, fontSize = 16.sp)
             }
         }
         if (selectedModel.contains("flash-image", ignoreCase = true)) {
             Row(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(11.dp))
-                    .background(Color(0x1642A68A)).padding(10.dp),
+                    .background(palette.success.copy(alpha = 0.10f)).padding(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("✦", color = Color(0xFF369A7B), fontSize = 17.sp)
+                Text("✦", color = palette.success, fontSize = 17.sp)
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("IMAGE GENERATION MODEL", color = Color(0xFF369A7B),
+                    Text("IMAGE GENERATION MODEL", color = palette.success,
                         fontFamily = OracleMono, fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
                     Text("Dedicated image output. For web, files and Python, use the main agent model and its DRAW tool.",
                         color = palette.textSecondary, fontFamily = OracleSans, fontSize = 10.sp, lineHeight = 14.sp)
