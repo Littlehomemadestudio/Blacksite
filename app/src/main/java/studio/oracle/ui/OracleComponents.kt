@@ -11,6 +11,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -89,7 +90,7 @@ fun OracleSpinner(
 
 enum class OracleGlyph {
     Menu, NewChat, Library, Settings, Back, Close, ArrowUp, ChevronDown,
-    Search, Spark, Chat, Refresh, More, Key, Eye, EyeOff, Check, Shield, Trash, Audio
+    Search, Spark, Chat, Refresh, More, Key, Eye, EyeOff, Check, Shield, Trash, Audio, Speaker, SpeakerOff, AddCircle
 }
 
 @Composable
@@ -327,6 +328,30 @@ fun OracleGlyphIcon(
                 arc(7f, 8f, 17f, 18f, 0f, 180f, sw * 1.1f)
                 line(12f, 18f, 12f, 21f)
                 line(8f, 21f, 16f, 21f)
+            }
+            OracleGlyph.Speaker, OracleGlyph.SpeakerOff -> {
+                val speaker = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(3.5f * sx, 9f * sy)
+                    lineTo(7.5f * sx, 9f * sy)
+                    lineTo(12.5f * sx, 5f * sy)
+                    lineTo(12.5f * sx, 19f * sy)
+                    lineTo(7.5f * sx, 15f * sy)
+                    lineTo(3.5f * sx, 15f * sy)
+                    close()
+                }
+                drawPath(speaker, tint, style = Stroke(sw, cap = StrokeCap.Round))
+                if (glyph == OracleGlyph.Speaker) {
+                    arc(10f, 5f, 19f, 19f, -48f, 96f, sw)
+                    arc(10f, 1.5f, 23f, 22.5f, -48f, 96f, sw)
+                } else {
+                    line(15f, 8f, 21f, 16f, sw * 1.15f)
+                    line(21f, 8f, 15f, 16f, sw * 1.15f)
+                }
+            }
+            OracleGlyph.AddCircle -> {
+                circle(12f, 12f, 9f, sw)
+                line(12f, 7f, 12f, 17f)
+                line(7f, 12f, 17f, 12f)
             }
         }
     }
@@ -857,7 +882,7 @@ private fun OracleSendButton(
             .background(Color.White)
             .border(1.dp, Color(0xFFE4E4E4), CircleShape)
             .pointerInput(busy, listeningAction) {
-                androidx.compose.foundation.gestures.detectTapGestures(
+                detectTapGestures(
                     onPress = {
                         held = false
                         val released = tryAwaitRelease()
