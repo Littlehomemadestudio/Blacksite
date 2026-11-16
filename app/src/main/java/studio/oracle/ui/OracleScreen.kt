@@ -1003,20 +1003,15 @@ private fun CustomTopBar(
         Spacer(Modifier.weight(1f))
         Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onVoiceToggle),
             contentAlignment = Alignment.Center) {
-            androidx.compose.material3.Icon(
-                imageVector = if (voiceReplyEnabled)
-                    androidx.compose.material.icons.Icons.Outlined.VolumeUp
-                else androidx.compose.material.icons.Icons.Outlined.VolumeOff,
-                contentDescription = if (voiceReplyEnabled) "Mute voice replies" else "Enable voice replies",
-                tint = Color(0xFF171717), modifier = Modifier.size(26.dp))
+            OracleGlyphIcon(
+                if (voiceReplyEnabled) OracleGlyph.Speaker else OracleGlyph.SpeakerOff,
+                Modifier.size(26.dp), Color(0xFF171717), 1.7f
+            )
         }
         Spacer(Modifier.width(6.dp))
         Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onNewThread),
             contentAlignment = Alignment.Center) {
-            androidx.compose.material3.Icon(
-                imageVector = androidx.compose.material.icons.Icons.Outlined.AddCircleOutline,
-                contentDescription = "New conversation",
-                tint = Color(0xFF171717), modifier = Modifier.size(28.dp))
+            OracleGlyphIcon(OracleGlyph.AddCircle, Modifier.size(28.dp), Color(0xFF171717), 1.7f)
         }
     }
 }
