@@ -543,75 +543,58 @@ fun DeepSeekInputPill(
 ) {
     val palette = LocalOraclePalette.current
     var attachmentTrayOpen by remember { androidx.compose.runtime.mutableStateOf(false) }
-
+    val listeningAction = value.isBlank() && attachments.isEmpty() && !busy
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .animateContentSize(spring(stiffness = 420f, dampingRatio = 0.88f))
+        modifier = modifier.fillMaxWidth()
+            .animateContentSize(spring(stiffness = 420f, dampingRatio = 0.9f))
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .shadow(18.dp, RoundedCornerShape(25.dp), clip = false)
-                .clip(RoundedCornerShape(25.dp))
-                .background(Color.White)
-                .border(1.dp, Color(0xFFEAEAEA), RoundedCornerShape(25.dp))
-                .padding(start = 14.dp, end = 12.dp, top = 10.dp, bottom = 9.dp)
+            Modifier.fillMaxWidth()
+                .shadow(12.dp, RoundedCornerShape(15.dp), clip = false)
+                .clip(RoundedCornerShape(15.dp))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(palette.surfaceRaised.copy(alpha = 0.98f), palette.surface)
+                    )
+                )
+                .border(1.dp, palette.outline.copy(alpha = 0.82f), RoundedCornerShape(15.dp))
+                .padding(horizontal = 11.dp, vertical = 9.dp)
         ) {
             if (attachments.isNotEmpty()) {
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(7.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     attachments.forEach { attachment ->
                         Row(
-                            Modifier.clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFFF4F4F4))
-                                .border(1.dp, Color(0xFFEAEAEA), RoundedCornerShape(12.dp))
-                                .padding(start = 9.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                            Modifier.clip(RoundedCornerShape(7.dp))
+                                .background(palette.surfaceSunken)
+                                .border(1.dp, palette.outlineSoft, RoundedCornerShape(7.dp))
+                                .padding(start = 8.dp, end = 5.dp, top = 5.dp, bottom = 5.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                when {
-                                    attachment.mimeType.startsWith("image/") -> "▧"
-                                    attachment.mimeType.startsWith("video/") -> "▶"
-                                    attachment.mimeType.startsWith("audio/") -> "♫"
-                                    else -> "▤"
-                                },
-                                color = Color(0xFF6B87D9), fontSize = 13.sp
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                attachment.name.take(19),
-                                color = Color(0xFF555555), fontFamily = OracleSans,
-                                fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                                attachment.name.take(18), color = palette.textSecondary,
+                                fontFamily = OracleSans, fontSize = 10.sp, maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             Spacer(Modifier.width(5.dp))
-                            Text(
-                                "×",
-                                modifier = Modifier.clickable { onRemoveAttachment(attachment) }
-                                    .padding(horizontal = 3.dp),
-                                color = Color(0xFF888888), fontSize = 17.sp
-                            )
+                            Text("×", Modifier.clickable { onRemoveAttachment(attachment) }
+                                .padding(horizontal = 2.dp), color = palette.textTertiary, fontSize = 15.sp)
                         }
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(7.dp))
             }
-
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 34.dp, max = 132.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 34.dp, max = 118.dp),
                 textStyle = TextStyle(
-                    color = Color(0xFF171717),
-                    fontFamily = OracleSans,
-                    fontSize = 16.sp,
-                    lineHeight = 23.sp
+                    color = palette.text, fontFamily = OracleSans,
+                    fontSize = 14.sp, lineHeight = 21.sp
                 ),
-                cursorBrush = SolidColor(Color(0xFF5279D8)),
+                cursorBrush = SolidColor(palette.accent),
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Sentences,
                     imeAction = ImeAction.Send
@@ -619,248 +602,129 @@ fun DeepSeekInputPill(
                 keyboardActions = KeyboardActions(
                     onSend = { if (busy) onCancel() else onSend() }
                 ),
-                maxLines = 6,
-                decorationBox = { innerTextField ->
-                    Box(
-                        Modifier.fillMaxWidth().defaultMinSize(minHeight = 34.dp),
-                        contentAlignment = Alignment.CenterStart
-                    ) {
-                        if (value.isEmpty()) {
-                            Text(
-                                "Type a message or hold to speak",
-                                color = Color(0xFFB3B3B3),
-                                fontFamily = OracleSans,
-                                fontSize = 16.sp
-                            )
-                        }
-                        innerTextField()
+                maxLines = 5,
+                decorationBox = { inner ->
+                    Box(Modifier.fillMaxWidth().defaultMinSize(minHeight = 34.dp),
+                        contentAlignment = Alignment.CenterStart) {
+                        if (value.isEmpty()) Text(
+                            "Message ORACLE…", color = palette.textTertiary,
+                            fontFamily = OracleSans, fontSize = 14.sp
+                        )
+                        inner()
                     }
                 }
             )
-
-            Spacer(Modifier.height(9.dp))
-
+            Spacer(Modifier.height(8.dp))
             Row(
-                Modifier.fillMaxWidth().height(37.dp),
+                Modifier.fillMaxWidth().height(31.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                ThinkPill(onClick = onThinkClick, expanded = thinkExpanded)
-                Spacer(Modifier.width(7.dp))
-                SearchPill(enabled = searchEnabled, onClick = onSearchClick)
-                Spacer(Modifier.weight(1f))
-
-                if (attachmentTrayOpen) {
-                    RoundComposerAction(
-                        symbol = "×",
-                        description = "Close attachments",
-                        onClick = { attachmentTrayOpen = false }
-                    )
-                } else {
-                    RoundComposerAction(
-                        symbol = "+",
-                        description = "Add attachment",
-                        onClick = {
-                            attachmentTrayOpen = true
-                            onAttachClick()
-                        }
-                    )
+                Row(
+                    Modifier.clip(RoundedCornerShape(7.dp))
+                        .background(if (thinkExpanded) palette.accentSoft else Color.Transparent)
+                        .clickable(onClick = onThinkClick)
+                        .padding(horizontal = 7.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Agent", color = if (thinkExpanded) palette.accent else palette.textSecondary,
+                        fontFamily = OracleSans, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.width(4.dp))
+                    OracleGlyphIcon(OracleGlyph.ChevronDown, Modifier.size(10.dp),
+                        if (thinkExpanded) palette.accent else palette.textTertiary, 1.5f)
                 }
-                Spacer(Modifier.width(7.dp))
-                OracleSendButton(
-                    busy = busy,
-                    listeningAction = value.isBlank() && attachments.isEmpty() && !busy,
-                    onTap = {
-                        when {
-                            busy -> onCancel()
-                            value.isBlank() && attachments.isEmpty() -> onVoiceClick()
-                            else -> onSend()
-                        }
-                    },
-                    onVoiceHoldStart = {
-                        onVoiceHoldChanged(true)
-                        onVoiceClick()
-                    },
-                    onVoiceHoldEnd = {
-                        onVoiceHoldChanged(false)
-                        onVoiceRelease()
-                    },
-                    onVoiceHoldCancel = {
-                        onVoiceHoldChanged(false)
-                        onVoiceCancel()
+                Spacer(Modifier.width(5.dp))
+                Row(
+                    Modifier.clip(RoundedCornerShape(7.dp))
+                        .background(if (searchEnabled) palette.accentSoft else Color.Transparent)
+                        .clickable(onClick = onSearchClick)
+                        .padding(horizontal = 7.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Web", color = if (searchEnabled) palette.accent else palette.textSecondary,
+                        fontFamily = OracleSans, fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium)
+                }
+                Spacer(Modifier.weight(1f))
+                Box(
+                    Modifier.size(30.dp).clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            attachmentTrayOpen = !attachmentTrayOpen
+                            if (!attachmentTrayOpen) onAttachClick()
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(if (attachmentTrayOpen) "×" else "+",
+                        color = palette.textSecondary, fontSize = 20.sp, lineHeight = 20.sp)
+                }
+                Spacer(Modifier.width(5.dp))
+                var held by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                Box(
+                    Modifier.size(31.dp).clip(RoundedCornerShape(9.dp))
+                        .background(if (busy) palette.surfaceSunken else palette.accent)
+                        .pointerInput(busy, listeningAction) {
+                            detectTapGestures(
+                                onPress = {
+                                    held = false
+                                    val released = tryAwaitRelease()
+                                    if (held) {
+                                        onVoiceHoldChanged(false)
+                                        if (released) onVoiceRelease() else onVoiceCancel()
+                                    }
+                                },
+                                onLongPress = {
+                                    if (listeningAction) {
+                                        held = true
+                                        onVoiceHoldChanged(true)
+                                        onVoiceClick()
+                                    }
+                                },
+                                onTap = {
+                                    when {
+                                        busy -> onCancel()
+                                        listeningAction -> onVoiceClick()
+                                        else -> onSend()
+                                    }
+                                }
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    when {
+                        busy -> Text("×", color = palette.text, fontSize = 19.sp)
+                        listeningAction -> OracleGlyphIcon(OracleGlyph.Audio, Modifier.size(16.dp),
+                            palette.onAccent, 1.7f)
+                        else -> OracleGlyphIcon(OracleGlyph.ArrowUp, Modifier.size(16.dp),
+                            palette.onAccent, 1.8f)
                     }
-                )
+                }
             }
         }
-
         androidx.compose.animation.AnimatedVisibility(
             visible = attachmentTrayOpen,
-            enter = androidx.compose.animation.fadeIn(tween(160)) +
-                androidx.compose.animation.expandVertically(tween(220)),
-            exit = androidx.compose.animation.fadeOut(tween(110)) +
-                androidx.compose.animation.shrinkVertically(tween(160))
+            enter = fadeIn(tween(140)) + expandVertically(tween(180)),
+            exit = fadeOut(tween(100)) + shrinkVertically(tween(130))
         ) {
             Row(
-                Modifier.fillMaxWidth().padding(start = 5.dp, end = 5.dp, top = 13.dp, bottom = 5.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 7.dp),
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
             ) {
-                AttachmentChoice("Camera", "▣", onCameraClick, Modifier.weight(1f))
-                AttachmentChoice("Photo", "▧", onPhotoClick, Modifier.weight(1f))
-                AttachmentChoice("Document", "⌁", onDocumentClick, Modifier.weight(1f))
+                listOf(
+                    "Camera" to onCameraClick,
+                    "Photo" to onPhotoClick,
+                    "File" to onDocumentClick
+                ).forEach { (label, action) ->
+                    Box(
+                        Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
+                            .background(palette.surfaceRaised)
+                            .border(1.dp, palette.outlineSoft, RoundedCornerShape(8.dp))
+                            .clickable(onClick = action).padding(vertical = 9.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(label, color = palette.textSecondary,
+                            fontFamily = OracleSans, fontSize = 10.sp)
+                    }
+                }
             }
-        }
-
-
-    }
-}
-
-@Composable
-private fun AttachmentChoice(
-    label: String,
-    symbol: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.height(86.dp)
-            .clip(RoundedCornerShape(17.dp))
-            .background(Color(0xFFF4F4F4))
-            .clickable(onClick = onClick)
-            .padding(vertical = 11.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(5.dp)
-    ) {
-        Text(symbol, color = Color(0xFF171717), fontSize = 26.sp, lineHeight = 29.sp)
-        Text(label, color = Color(0xFF171717), fontFamily = OracleSans,
-            fontSize = 13.sp, fontWeight = FontWeight.Medium)
-    }
-}
-
-@Composable
-private fun RoundComposerAction(
-    symbol: String,
-    description: String,
-    onClick: () -> Unit
-) {
-    Box(
-        Modifier.size(37.dp)
-            .semantics { contentDescription = description }
-            .clip(CircleShape)
-            .border(1.dp, Color(0xFFE2E2E2), CircleShape)
-            .background(Color.White)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            symbol,
-            color = Color(0xFF171717),
-            fontFamily = OracleSans,
-            fontSize = if (symbol == "+") 25.sp else 23.sp,
-            lineHeight = 25.sp
-        )
-    }
-}
-
-@Composable
-private fun ThinkPill(onClick: () -> Unit, expanded: Boolean) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        if (pressed) 0.97f else 1f,
-        spring(stiffness = 560f, dampingRatio = 0.82f),
-        label = "think-pill"
-    )
-    val rotation by animateFloatAsState(
-        if (expanded) 180f else 0f,
-        spring(stiffness = 420f, dampingRatio = 0.82f),
-        label = "think-chevron"
-    )
-    Row(
-        modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(RoundedCornerShape(22.dp))
-            .background(if (expanded || pressed) Color(0xFFF3F3F3) else Color.White)
-            .border(1.dp, Color(0xFFE9E9E9), RoundedCornerShape(22.dp))
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 11.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        OracleGlyphIcon(OracleGlyph.Spark, Modifier.size(14.dp), Color(0xFF181818), 1.5f)
-        Spacer(Modifier.width(6.dp))
-        Text("Think", color = Color(0xFF171717), fontFamily = OracleSans,
-            fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.width(3.dp))
-        OracleGlyphIcon(
-            OracleGlyph.ChevronDown,
-            Modifier.size(10.dp).graphicsLayer { rotationZ = rotation },
-            Color(0xFF777777),
-            1.4f
-        )
-    }
-}
-
-@Composable
-private fun SearchPill(enabled: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier.clip(RoundedCornerShape(22.dp))
-            .background(if (enabled) Color(0xFFEAF1FF) else Color(0xFFF5F7FA))
-            .border(1.dp, if (enabled) Color(0xFFD7E3FF) else Color(0xFFE8EBF0), RoundedCornerShape(22.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 11.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text("◎", color = Color(0xFF4F78D8), fontSize = 15.sp)
-        Spacer(Modifier.width(5.dp))
-        Text("Search", color = Color(0xFF4F78D8), fontFamily = OracleSans,
-            fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun OracleSendButton(
-    busy: Boolean,
-    listeningAction: Boolean,
-    onTap: () -> Unit,
-    onVoiceHoldStart: () -> Unit,
-    onVoiceHoldEnd: () -> Unit,
-    onVoiceHoldCancel: () -> Unit
-) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        if (pressed) 0.95f else 1f,
-        spring(stiffness = 560f, dampingRatio = 0.8f),
-        label = "composer-action-press"
-    )
-    var held by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    Box(
-        modifier = Modifier.size(39.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(CircleShape)
-            .background(Color.White)
-            .border(1.dp, Color(0xFFE4E4E4), CircleShape)
-            .pointerInput(busy, listeningAction) {
-                detectTapGestures(
-                    onPress = {
-                        held = false
-                        val released = tryAwaitRelease()
-                        if (held) {
-                            if (released) onVoiceHoldEnd() else onVoiceHoldCancel()
-                        }
-                    },
-                    onLongPress = {
-                        if (listeningAction) {
-                            held = true
-                            onVoiceHoldStart()
-                        }
-                    },
-                    onTap = { onTap() }
-                )
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        when {
-            busy -> Text("×", color = Color(0xFF171717), fontSize = 23.sp)
-            listeningAction -> OracleGlyphIcon(OracleGlyph.Audio, Modifier.size(20.dp), Color(0xFF171717), 1.7f)
-            else -> OracleGlyphIcon(OracleGlyph.ArrowUp, Modifier.size(19.dp), Color(0xFF171717), 1.9f)
         }
     }
 }
