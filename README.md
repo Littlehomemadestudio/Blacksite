@@ -66,7 +66,10 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 ### Workflow Studio
 - Create, edit, reorder, save, and delete workflows with up to 20 ordered steps.
 - Four explicit local actions: create a note, append to a note by exact title, search the on-device document index, and search the active workspace's audio titles/transcripts/summaries/tasks/decisions. Audio search never uploads recordings or transcripts.
-- Runs require a manual confirmation. Successful runs keep their execution trace on the assistant response; failed and cancelled runs attach permission decisions and completed tool events to the originating user turn, so retries retain the audit history.
+- Manual runs require an explicit confirmation. An optional recurring schedule can be enabled per workflow and workspace; enabling or changing it saves the current plan and requires a separate confirmation. Scheduled runs use Android WorkManager and execute the same allowlisted local actions without Gemini or network access.
+- Scheduled runs are labeled in the execution log. Invalid saved plans are recorded as skipped/invalid runs instead of being silently ignored. Schedules can be disabled at any time and are cancelled when their workflow is deleted.
+- WorkManager periodic schedules have a 15-minute minimum and are deferrable: Android may run them later to respect battery and system constraints. They are not exact alarms or event-based triggers. Repeated create/append steps can create duplicate notes or repeated text; the schedule confirmation calls this out before opt-in.
+- Successful runs keep their execution trace on the assistant response; failed and cancelled runs attach permission decisions and completed tool events to the originating user turn, so retries retain the audit history.
 - A failed step stops the run. Deleting a workflow removes its steps and run history but preserves notes created by previous runs.
 - Workflow execution is local-only: no Gemini request, network calls, shell access, arbitrary scripts, app launching, scheduled triggers, or background execution.
 
@@ -84,7 +87,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 
 ## In progress / not yet available
 - Office document extraction, image OCR, scanned-PDF OCR, document summaries, flashcards, quizzes, semantic embeddings, and knowledge graph.
-- Scheduled, event-based, and background workflow triggers. Workflow runs are manual only.
+- Event-based triggers, exact-time alarms, and arbitrary external integrations. Periodic schedules are available through Android WorkManager and remain subject to OS deferral.
 - Additional workflow actions such as export, file operations, notifications, and external integrations.
 - Persistent full-duplex Gemini Live audio streaming and interruption handling. Audio Memory provides saved recordings and file-based Gemini transcription, not live streaming.
 - Arbitrary OS-level shell/Termux access, app launching, UI automation, scheduled triggers, and background agents are not implemented. The Agent can use the scoped tools described above, subject to user-selected capabilities and per-session/action approval.
@@ -104,7 +107,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - User-facing thread deletion, workspace deletion, and full workspace export are not available yet. Uninstalling the app removes its app-private data.
 
 ## Database compatibility
-Room schema v7 retains existing agent, document, workflow, and workspace data. Migration 6→7 adds workspace-scoped Audio Memory records and search indexes without modifying existing rows. Earlier 3→4 compatibility remains idempotent across the two v3 layouts.
+Room schema v8 retains existing agent, document, workflow, and workspace data. Migration 6→7 adds workspace-scoped Audio Memory records and search indexes; migration 7→8 adds workspace-scoped recurring workflow trigger records without modifying existing rows. Earlier 3→4 compatibility remains idempotent across the two v3 layouts.
 
 
 ### Release polish
