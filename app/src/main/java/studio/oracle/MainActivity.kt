@@ -57,7 +57,7 @@ class MainActivity : ComponentActivity() {
             isAppearanceLightNavigationBars = true
         }
         setContent {
-            OracleTheme {
+            OracleTheme(darkTheme = false) {
                 OracleRoot()
             }
         }
