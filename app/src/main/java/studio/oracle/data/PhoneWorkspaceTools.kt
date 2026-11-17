@@ -148,7 +148,7 @@ class PhoneWorkspaceTools(
                 if (code.length > MAX_PYTHON_SOURCE_CHARS) return@withContext "Python source exceeds the 16 KB reviewable execution limit."
                 val approval = buildString {
                     append("Execute this exact Python program on this device?\n\n")
-                    append("PRIVACY & EXECUTION: Python runs with ORACLE's Android app UID. It can read or modify ORACLE app-private data (including imported documents, notes, recordings and the local database) and it has network access. This is not an OS-level sandbox. Do not run untrusted code.\n\n")
+                    append("PRIVACY & EXECUTION: Python runs with ORACLE's Android app UID. It can read or modify ORACLE app-private data (including imported documents, notes, recordings and the local database) and it has network access. Anything printed is returned to Gemini as tool output. This is not an OS-level sandbox. Do not run untrusted code.\n\n")
                     append("----- EXACT PYTHON SOURCE -----\n")
                     append(code)
                     append("\n----- END SOURCE -----")
