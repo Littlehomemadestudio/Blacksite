@@ -16,8 +16,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
@@ -68,7 +66,7 @@ class PhoneWorkspaceTools(
             ))
         }
         if (localPythonEnabled) {
-            put(function("run_local_python", "Run Python 3 on-device in ORACLE's bundled CPython runtime. Network access and normal Python standard-library imports are enabled. Use it for calculations, data processing, code and downloads.", schema("code" to property("Python 3 source code to execute.")), arrayOf("code")))
+            put(function("run_local_python", "Run Python 3 on-device in ORACLE's bundled CPython runtime. Code runs with ORACLE's Android app permissions, can access app-private ORACLE files, and has network access. Every execution requires approval.", schema("code" to property("Python 3 source code to execute.")), arrayOf("code")))
         }
     }
 
@@ -90,7 +88,7 @@ class PhoneWorkspaceTools(
                 if (file.length() > MAX_PHONE_READ_BYTES) return@withContext "The file is larger than ORACLE's 10 MB text-read limit."
                 if (!authorize("Read '" + path.joinToString("/") + "' and send its contents to Gemini for this task?", "phone_files_read")) return@withContext "The user declined file access."
                 context.contentResolver.openInputStream(file.uri)?.use {
-                    BufferedReader(InputStreamReader(it, StandardCharsets.UTF_8)).readText()
+                    BoundedUtf8Reader.read(it, MAX_PHONE_READ_BYTES)
                 } ?: "Android could not open the selected file."
             }
             "create_phone_file" -> {
@@ -147,8 +145,15 @@ class PhoneWorkspaceTools(
             "run_local_python" -> {
                 val code = arguments.optString("code")
                 if (code.isBlank()) return@withContext "Python source is empty."
-                if (code.length > MAX_PYTHON_SOURCE_CHARS) return@withContext "Python source exceeds the 256 KB request limit."
-                if (!authorize("Execute this Python program on this device? Network access and normal Python imports are enabled.", "python")) return@withContext "The user declined Python execution."
+                if (code.length > MAX_PYTHON_SOURCE_CHARS) return@withContext "Python source exceeds the 16 KB reviewable execution limit."
+                val approval = buildString {
+                    append("Execute this exact Python program on this device?\n\n")
+                    append("PRIVACY & EXECUTION: Python runs with ORACLE's Android app UID. It can read or modify ORACLE app-private data (including imported documents, notes, recordings and the local database) and it has network access. This is not an OS-level sandbox. Do not run untrusted code.\n\n")
+                    append("----- EXACT PYTHON SOURCE -----\n")
+                    append(code)
+                    append("\n----- END SOURCE -----")
+                }
+                if (!authorize(approval, "python")) return@withContext "The user declined Python execution."
                 python(code)
             }
             else -> "Unknown or disabled tool: " + name
@@ -157,6 +162,7 @@ class PhoneWorkspaceTools(
 
     private suspend fun search(query: String): String {
         if (query.isBlank()) return "Search query is empty."
+        if (query.length > MAX_WEB_SEARCH_QUERY_CHARS) return "Search query exceeds the 2,000-character limit."
         val key = tavilyKey?.takeIf { it.isNotBlank() } ?: return "Web search is not configured. Ask the user to add a Tavily API key in ORACLE Settings."
         if (!authorize(
                 "Send this exact query to Tavily Search?\n\n" + query,
@@ -250,7 +256,8 @@ class PhoneWorkspaceTools(
     companion object {
         private const val MAX_PHONE_READ_BYTES = 10L * 1024L * 1024L
         private const val MAX_PHONE_WRITE_BYTES = 10 * 1024 * 1024
-        private const val MAX_PYTHON_SOURCE_CHARS = 256 * 1024
+        private const val MAX_PYTHON_SOURCE_CHARS = 16 * 1024
+        private const val MAX_WEB_SEARCH_QUERY_CHARS = 2_000
     }
 }
 
