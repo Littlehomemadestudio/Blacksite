@@ -435,6 +435,7 @@ fun SettingsScreen() {
             PrivacyLine("Credential is sent to Google's Gemini API over HTTPS when a model action is invoked.")
             PrivacyLine("No API key is embedded in the APK, source code, analytics, or logs.")
             PrivacyLine("Workspace content, imported files, transcripts and recordings are app-private but not encrypted at rest. Avoid storing highly sensitive material.")
+            PrivacyLine("Approved local Python runs with the app's permissions, can access app-private files and the network, and returns printed output to Gemini. Review each source before allowing it.")
         }
     }
 }
