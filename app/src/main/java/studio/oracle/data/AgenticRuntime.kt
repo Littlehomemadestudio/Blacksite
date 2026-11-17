@@ -127,6 +127,11 @@ internal class AgenticExecutionBudget(
  * implicitly authorize file reads, file writes, web queries, or image generation.
  */
 internal object AgenticPermissionPolicy {
+    private val oneShotGroups = setOf("python", "phone_files_write")
+
+    fun allowsSessionGrant(permissionGroup: String): Boolean =
+        permissionGroup.trim() !in oneShotGroups
+
     fun sessionGrantKey(sessionId: String, permissionGroup: String): String {
         require(sessionId.isNotBlank()) { "An active conversation is required for a session grant." }
         require(permissionGroup.isNotBlank()) { "A permission group is required for a session grant." }
