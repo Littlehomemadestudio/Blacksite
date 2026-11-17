@@ -131,7 +131,7 @@ fun SettingsScreen() {
                 color = palette.textSecondary, fontFamily = OracleSans, fontSize = 11.sp, lineHeight = 16.sp
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Stored on this device · not uploaded as a separate memory database",
+                Text("Stored locally; relevant memory excerpts are included in Gemini requests",
                     modifier = Modifier.weight(1f), color = palette.textTertiary,
                     fontFamily = OracleSans, fontSize = 10.sp, lineHeight = 14.sp)
                 Text(
