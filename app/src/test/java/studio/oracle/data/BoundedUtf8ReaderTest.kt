@@ -31,7 +31,7 @@ class BoundedUtf8ReaderTest {
         }.exceptionOrNull()
 
         assertTrue(error is IOException)
-        assertTrue(error?.message.orEmpty().contains("text-read limit"))
+        assertTrue(error?.message.orEmpty().contains("read limit"))
     }
 
     @Test
