@@ -853,6 +853,10 @@ fun OracleScreen(
                             OracleMessageRow(
                                 message = message,
                                 onOpenFile = ::openArtifact,
+                                onSubmitChoice = { answer ->
+                                    prompt = answer
+                                    submitPrompt()
+                                },
                                 modifier = Modifier.animateItem()
                             )
                         }
@@ -1114,6 +1118,7 @@ private fun CustomTopBar(
 private fun OracleMessageRow(
     message: AgentMessageEntity,
     onOpenFile: (String) -> Unit,
+    onSubmitChoice: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -1192,7 +1197,7 @@ private fun OracleMessageRow(
                     it.kind == "generated_image" || it.kind == "generated_audio" ||
                         it.kind == "generated_video" || it.kind == "generated_document"
                 }.forEach { event -> GeneratedMediaArtifact(event, onOpenFile) }
-                OracleRichMessage(message.content, onSubmitText = { answer -> prompt = answer; submitPrompt() })
+                OracleRichMessage(message.content, onSubmitText = onSubmitChoice)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically) {
                     events.lastOrNull { it.kind == "usage" }?.let { TokenUsageChip(it.detail) }
