@@ -128,7 +128,7 @@ fun OracleScreen(
     val context = LocalContext.current
     val palette = LocalOraclePalette.current
     val keyboard = LocalSoftwareKeyboardController.current
-    val keyStore = remember { SecureKeyStore(context) .
+    val keyStore = remember { SecureKeyStore(context) }
     val api = remember { GeminiApi() }
     val agenticRuntime = remember { GeminiAgenticRuntime() }
     val fileUploader = remember { GeminiFileUploader() }
@@ -1951,11 +1951,11 @@ private fun ModelBrowserDialog(
                                 )
                                 Spacer(Modifier.width(11.dp))
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text(candidate.displayName, color = Color(0xFF20283A),
+                                    Text(candidate.displayName, color = palette.text,
                                         fontFamily = OracleSans, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                                    Text(candidate.name, color = Color(0xFF788195),
+                                    Text(candidate.name, color = palette.textTertiary,
                                         fontFamily = OracleMono, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(modelDescription(candidate), color = Color(0xFF596273),
+                                    Text(modelDescription(candidate), color = palette.textSecondary,
                                         fontFamily = OracleSans, fontSize = 10.sp, lineHeight = 14.sp)
                                 }
                             }
@@ -1964,20 +1964,20 @@ private fun ModelBrowserDialog(
                                 modelTags(candidate).forEach { tag ->
                                     Box(Modifier.clip(RoundedCornerShape(7.dp)).background(Color(0xFF202027))
                                         .padding(horizontal = 7.dp, vertical = 5.dp)) {
-                                        Text(tag, color = Color(0xFF6878B5), fontFamily = OracleMono,
+                                        Text(tag, color = palette.accent, fontFamily = OracleMono,
                                             fontSize = 8.sp, fontWeight = FontWeight.Medium)
                                     }
                                 }
                                 if (active) Box(Modifier.clip(RoundedCornerShape(7.dp)).background(Color(0xFF1B2A22))
                                     .padding(horizontal = 7.dp, vertical = 5.dp)) {
-                                    Text("ACTIVE", color = Color(0xFF2D8A68), fontFamily = OracleMono, fontSize = 8.sp)
+                                    Text("ACTIVE", color = palette.success, fontFamily = OracleMono, fontSize = 8.sp)
                                 }
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     (candidate.inputTokenLimit?.let { "%,d in".format(it) } ?: "Input limit n/a") +
                                         "   ·   " + (candidate.outputTokenLimit?.let { "%,d out".format(it) } ?: "Output n/a"),
-                                    Modifier.weight(1f), color = Color(0xFF848C9C), fontFamily = OracleMono, fontSize = 8.sp
+                                    Modifier.weight(1f), color = palette.textTertiary, fontFamily = OracleMono, fontSize = 8.sp
                                 )
                                 OracleSolidAction(
                                     label = if (active) "SELECTED" else "USE MODEL",

@@ -180,6 +180,13 @@ private fun HomeWebView(onNavigate: (Destination) -> Unit) {
 @Composable
 private fun SectionShell(title: String, onBack: () -> Unit, navigate: (Destination) -> Unit, content: @Composable () -> Unit) {
     val palette = LocalOraclePalette.current
+    val currentDestination = when (title) {
+        "Knowledge library" -> Destination.LIBRARY
+        "Workflow studio" -> Destination.WORKFLOWS
+        "Audio memory" -> Destination.AUDIO
+        "Settings" -> Destination.SETTINGS
+        else -> Destination.HOME
+    }
     Column(Modifier.fillMaxSize().background(palette.canvas).windowInsetsPadding(WindowInsets.statusBars)) {
         Row(Modifier.fillMaxWidth().height(49.dp).background(Panel).border(.5.dp, palette.outlineSoft), verticalAlignment = Alignment.CenterVertically) {
             Spacer(Modifier.width(7.dp))
@@ -201,11 +208,13 @@ private fun SectionShell(title: String, onBack: () -> Unit, navigate: (Destinati
             .windowInsetsPadding(WindowInsets.navigationBars), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             listOf(Triple(Destination.HOME, "⌂", "HOME"), Triple(Destination.CHAT, "✳", "AGENT"),
                 Triple(Destination.LIBRARY, "▤", "FILES"), Triple(Destination.WORKFLOWS, "⑂", "FLOWS"),
-                Triple(Destination.AUDIO, "◖", "AUDIO")).forEach { (target, glyph, label) ->
+                Triple(Destination.AUDIO, "◖", "AUDIO"), Triple(Destination.SETTINGS, "⚙", "SETTINGS")).forEach { (target, glyph, label) ->
+                val active = target == currentDestination
                 Column(Modifier.weight(1f).fillMaxHeight().clickable { if (target == Destination.HOME) onBack() else navigate(target) },
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    Text(glyph, color = palette.accent, fontSize = 15.sp)
-                    Text(label, color = palette.textTertiary, fontSize = 6.sp, letterSpacing = .5.sp)
+                    Text(glyph, color = if (active) palette.accent else palette.textTertiary, fontSize = 15.sp)
+                    Text(label, color = if (active) palette.accent else palette.textTertiary,
+                        fontSize = 6.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal, letterSpacing = .5.sp)
                 }
             }
         }
