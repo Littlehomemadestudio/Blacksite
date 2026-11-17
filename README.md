@@ -84,7 +84,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - This is file-based, user-initiated transcription—not live transcription, background capture, or Gemini Live streaming.
 
 ### Verification
-- Unit tests cover conversation context, session naming, workspace-name normalization (including Persian text), document chunk boundaries, PDF citations, stable text sections, keyword ranking, workflow plan validation, audio-memory workflow execution and workspace isolation, and Room workspace-isolation queries/mutations under Robolectric.
+- Unit tests cover conversation context, session naming, workspace-name normalization (including Persian text), document chunk boundaries, PDF citations, stable text sections, keyword ranking, DOCX/PPTX/XLSX extraction and source labels, XLSX shared/inline cell values and unsafe relationship rejection, workflow plan validation, audio-memory workflow execution and workspace isolation, and Room workspace-isolation queries/mutations under Robolectric.
 
 ## In progress / not yet available
 - Image OCR, scanned-PDF OCR, document summaries, flashcards, quizzes, semantic embeddings, and knowledge graph. Legacy binary DOC/XLS/PPT formats remain unsupported.
@@ -103,8 +103,8 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 
 ## Document library scope and limits
 - Supported imports: PDF with selectable text, UTF-8 plain text, Markdown, DOCX, PPTX, and XLSX. Maximum source file size is 20 MB; PDFs and presentations are limited to 400 pages/slides; workbooks are limited to 100 worksheets; extracted text is capped at 1.5 million characters per file. Office XML parts are capped at 12 MB, archive expansion at 80 MB, and archives at 2,000 entries.
-- PDFs with no selectable text are rejected; image-only pages in mixed PDFs are skipped. Office embedded images/charts and scanned content are not OCR-extracted. Standalone images and legacy binary DOC/XLS/PPT are not supported.
-- Retrieval uses on-device lexical keyword matching, not embeddings or semantic vector search. PDF answers cite original page numbers; text and Markdown answers cite indexed sections.
+- PDFs with no selectable text are rejected; image-only pages in mixed PDFs are skipped. DOCX currently indexes the main document body (not headers, footers, or footnotes); PPTX indexes slide text (not speaker notes); XLSX indexes cached/displayed cell values and does not evaluate formulas. Office embedded images/charts and scanned content are not OCR-extracted. Standalone images and legacy binary DOC/XLS/PPT are not supported.
+- Retrieval uses on-device lexical keyword matching, not embeddings or semantic vector search. PDF answers cite original page numbers; DOCX citations identify the document body; PPTX citations identify slide numbers; XLSX citations identify worksheet names; TXT/Markdown answers cite indexed sections.
 - User-facing thread deletion, workspace deletion, and full workspace export are not available yet. Uninstalling the app removes its app-private data.
 
 ## Database compatibility
