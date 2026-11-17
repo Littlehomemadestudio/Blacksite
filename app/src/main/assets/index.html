@@ -1,65 +1,14 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <meta name="theme-color" content="#f4f5f8">
-  <title>ORACLE Studio</title>
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-  <div class="app-shell">
-    <header class="titlebar">
-      <div class="traffic" aria-hidden="true"><i></i><i></i><i></i></div>
-      <div class="brand"><span class="brand-mark">o</span><span>ORACLE</span><small>STUDIO</small></div>
-      <div class="title-center">Workspace <span class="slash">/</span> Overview</div>
-      <button class="avatar" aria-label="Open settings" onclick="openView('settings')">L</button>
-    </header>
-    <div class="workspace">
-      <aside class="sidebar">
-        <div class="workspace-switch"><div class="workspace-icon">L</div><div><b>Personal workspace</b><small>Free plan <span class="dot"></span> Local</small></div><span class="chevron">⌄</span></div>
-        <button class="side-action selected" onclick="setActive(this);openView('home')"><span class="nav-icon">⌂</span> Overview</button>
-        <button class="side-action" onclick="setActive(this);openView('assistant')"><span class="nav-icon">✳</span> Assistant <kbd>⌘ 1</kbd></button>
-        <div class="side-label">YOUR WORKSPACE</div>
-        <button class="side-action" onclick="setActive(this);openView('library')"><span class="nav-icon">▤</span> Knowledge library</button>
-        <button class="side-action" onclick="setActive(this);openView('workflows')"><span class="nav-icon">⑂</span> Automations</button>
-        <button class="side-action" onclick="setActive(this);openView('audio')"><span class="nav-icon">◖</span> Audio memory</button>
-        <div class="sidebar-bottom">
-          <div class="storage"><div class="storage-top"><span>Local workspace</span><span>On device</span></div><div class="storage-track"><i></i></div><small>Your content stays on this device.</small></div>
-          <button class="side-action" onclick="openView('settings')"><span class="nav-icon">⚙</span> Settings</button>
-          <div class="profile"><div class="profile-avatar">L</div><div><b>Littlehomemadestudio</b><small>Personal account</small></div><span class="more">···</span></div>
-        </div>
-      </aside>
-      <main class="main">
-        <div class="mobile-top"><span class="brand-mark">o</span><b>ORACLE</b><button onclick="openView('settings')">•••</button></div>
-        <div class="content">
-          <div class="eyebrow"><span class="pulse"></span> YOUR PRIVATE WORKSPACE <span class="date" id="today"></span></div>
-          <section class="welcome">
-            <div><div class="overline">A LITTLE MORE CLARITY.</div><h1>Good to see you.</h1><p>What would you like to make progress on?</p></div>
-            <div class="welcome-orbit"><div class="orbit o1"></div><div class="orbit o2"></div><div class="core">o</div><span class="orbit-label">THINK · MAKE · REMEMBER</span></div>
-          </section>
-          <section class="quick-grid">
-            <button class="quick-card primary" onclick="openView('assistant')"><span class="card-icon sparkle">✳</span><span class="card-arrow">↗</span><b>Start a conversation</b><small>Think through a problem, research, or get something done.</small><em>OPEN ASSISTANT <span>→</span></em></button>
-            <button class="quick-card" onclick="openView('library')"><span class="card-icon">▤</span><span class="card-arrow">↗</span><b>Explore your library</b><small>Bring your documents, notes and knowledge together.</small><em>VIEW LIBRARY <span>→</span></em></button>
-            <button class="quick-card" onclick="openView('workflows')"><span class="card-icon">⑂</span><span class="card-arrow">↗</span><b>Build an automation</b><small>Turn repeatable work into a reliable workflow.</small><em>OPEN STUDIO <span>→</span></em></button>
-          </section>
-          <div class="section-heading"><div><div class="overline">YOUR TOOLKIT</div><h2>Everything in its place.</h2></div><span class="section-note">A connected workspace</span></div>
-          <section class="tool-list">
-            <button class="tool-row" onclick="openView('audio')"><span class="tool-icon audio">◖</span><span class="tool-copy"><b>Audio memory</b><small>Capture conversations, thoughts and decisions.</small></span><span class="tool-status">READY</span><span class="row-arrow">↗</span></button>
-            <button class="tool-row" onclick="openView('library')"><span class="tool-icon files">▤</span><span class="tool-copy"><b>Document intelligence</b><small>Search and work with your personal knowledge.</small></span><span class="tool-status">ON DEVICE</span><span class="row-arrow">↗</span></button>
-            <button class="tool-row" onclick="openView('workflows')"><span class="tool-icon flows">⑂</span><span class="tool-copy"><b>Workflow studio</b><small>Design, run and inspect your automations.</small></span><span class="tool-status">LOCAL</span><span class="row-arrow">↗</span></button>
-          </section>
-          <footer><span>ORACLE STUDIO</span><span>BUILT FOR THE WAY YOU THINK</span><span>v0.5 · PRIVATE BY DESIGN</span></footer>
-        </div>
-      </main>
-    </div>
-    <nav class="mobile-nav">
-      <button class="active" onclick="mobileActive(this);openView('home')"><span>⌂</span>Home</button>
-      <button onclick="mobileActive(this);openView('assistant')"><span>✳</span>Assistant</button>
-      <button onclick="mobileActive(this);openView('library')"><span>▤</span>Library</button>
-      <button onclick="mobileActive(this);openView('workflows')"><span>⑂</span>Studio</button>
-    </nav>
-  </div>
-  <script src="app.js"></script>
-</body>
-</html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="theme-color" content="#0a0a0c"><meta name="color-scheme" content="dark"><title>ORACLE Studio</title><link rel="stylesheet" href="styles.css"></head><body><div class="app-shell">
+<header class="titlebar"><div class="traffic" aria-label="Window controls"><i></i><i></i><i></i></div><div class="brand"><span class="brand-mark">◈</span><span>ORACLE</span><small>STUDIO</small></div><div class="crumb"><span>PERSONAL WORKSPACE</span><b>/</b><strong>Overview</strong></div><div class="top-actions"><span class="local-state"><i></i> LOCAL</span><button class="icon-button" aria-label="Settings" onclick="openView('settings')">⚙</button><button class="avatar" onclick="openView('settings')">L</button></div></header>
+<div class="workspace"><aside class="activity-rail" aria-label="Workspace navigation"><button class="rail-button active" data-view="home" aria-label="Overview" onclick="navigate('home')">⌂</button><button class="rail-button" data-view="assistant" aria-label="Assistant" onclick="navigate('assistant')">✳</button><button class="rail-button" data-view="library" aria-label="Library" onclick="navigate('library')">▤</button><button class="rail-button" data-view="workflows" aria-label="Workflow studio" onclick="navigate('workflows')">⑂</button><button class="rail-button" data-view="audio" aria-label="Audio memory" onclick="navigate('audio')">◖</button><div class="rail-spacer"></div><button class="rail-button" data-view="settings" aria-label="Settings" onclick="navigate('settings')">⚙</button></aside>
+<aside class="sidebar"><div class="workspace-picker"><div class="workspace-glyph">L</div><div class="workspace-meta"><b>Personal</b><small>Private workspace</small></div><span class="chevron">⌄</span></div><div class="side-caption">WORKSPACE</div><button class="side-link selected" data-view="home" onclick="navigate('home')"><span>⌂</span>Overview</button><button class="side-link" data-view="assistant" onclick="navigate('assistant')"><span>✳</span>Assistant <kbd>⌘ 1</kbd></button><div class="side-caption spaced">YOUR TOOLS</div><button class="side-link" data-view="library" onclick="navigate('library')"><span>▤</span>Knowledge library</button><button class="side-link" data-view="workflows" onclick="navigate('workflows')"><span>⑂</span>Workflow studio</button><button class="side-link" data-view="audio" onclick="navigate('audio')"><span>◖</span>Audio memory</button><div class="sidebar-bottom"><div class="privacy-card"><div class="privacy-icon">⌑</div><div><b>Private by design</b><small>Your files stay on this device.</small></div><span class="privacy-dot"></span></div><button class="side-link" data-view="settings" onclick="navigate('settings')"><span>⚙</span>Settings</button><div class="account"><div class="account-avatar">L</div><div><b>Local account</b><small>On-device workspace</small></div><span class="more">···</span></div></div></aside>
+<main class="main-view"><div class="mobile-heading"><div><span class="brand-mark">◈</span><b>ORACLE STUDIO</b></div><button onclick="navigate('settings')">⚙</button></div><div class="page-toolbar"><div class="breadcrumb"><span>WORKSPACE</span><b>/</b><strong>Overview</strong></div><div class="toolbar-right"><span class="sync"><i></i> All changes saved locally</span><span class="toolbar-divider"></span><button class="toolbar-icon" aria-label="Search" onclick="navigate('library')">⌕</button></div></div>
+<div class="home-content"><div class="intro-row"><div><div class="eyebrow"><i></i> YOUR PRIVATE WORKSPACE <span id="today"></span></div><h1>Make room for<br><em>the important work.</em></h1><p class="intro-copy">A calm place to think, build, research and remember.</p></div><div class="orbital" aria-hidden="true"><div class="orbit orbit-a"></div><div class="orbit orbit-b"></div><div class="orbit orbit-c"></div><div class="orb-core">◈</div><span>THINK · MAKE · REMEMBER</span></div></div>
+<section class="workspace-grid"><div class="primary-column"><div class="section-head"><div><span class="section-kicker">START SOMETHING</span><h2>Your workspace</h2></div><span class="section-meta">READY WHEN YOU ARE</span></div>
+<button class="launch-card assistant-card" onclick="navigate('assistant')"><div class="launch-top"><span class="launch-icon">✳</span><span class="launch-arrow">↗</span></div><div class="launch-title">Work with ORACLE</div><p>Ask, explore, plan, create or delegate a task to your AI workspace.</p><div class="launch-footer"><span>OPEN ASSISTANT</span><b>→</b></div></button>
+<div class="tool-cards"><button class="tool-card" onclick="navigate('library')"><span class="tool-icon files">▤</span><b>Knowledge library</b><small>Documents, notes &amp; source-grounded answers</small><span class="card-chevron">↗</span></button><button class="tool-card" onclick="navigate('workflows')"><span class="tool-icon flows">⑂</span><b>Workflow studio</b><small>Build, run and inspect automations</small><span class="card-chevron">↗</span></button><button class="tool-card" onclick="navigate('audio')"><span class="tool-icon audio">◖</span><b>Audio memory</b><small>Capture ideas, meetings and decisions</small><span class="card-chevron">↗</span></button></div>
+<div class="section-head recent-head"><div><span class="section-kicker">YOUR WORK</span><h2>Continue where you left off</h2></div><button class="text-action" onclick="navigate('assistant')">OPEN ASSISTANT ↗</button></div><div class="empty-work"><div class="empty-mark">⌁</div><div><b>Your workspace is ready.</b><p>Conversations and recent work will appear here as you use ORACLE.</p></div><span class="empty-state">NO RECENT ACTIVITY</span></div></div>
+<aside class="agent-column"><div class="agent-panel"><div class="agent-panel-head"><div class="agent-heading"><span class="agent-avatar">◈</span><div><b>ORACLE AGENT</b><small>Personal intelligence workspace</small></div></div><span class="agent-state"><i></i> STANDBY</span></div><div class="agent-panel-body"><div class="agent-greeting"><span class="agent-overline">READY TO THINK WITH YOU</span><h3>What are we<br>working on?</h3><p>Describe the outcome. ORACLE can plan the work, use available tools and show you what it does.</p></div><div class="capability-list"><div><span class="cap-icon">⌕</span><span><b>Research &amp; reasoning</b><small>Explore questions with context</small></span><i>READY</i></div><div><span class="cap-icon">▤</span><span><b>Files &amp; knowledge</b><small>Work with your local library</small></span><i>LOCAL</i></div><div><span class="cap-icon">⌘</span><span><b>Tools &amp; actions</b><small>Review before sensitive actions</small></span><i>CONTROLLED</i></div></div><button class="agent-cta" onclick="navigate('assistant')"><span>Start a task</span><b>↗</b></button></div><div class="agent-panel-foot"><span><i></i> LOCAL WORKSPACE</span><span>GEMINI CONNECTED IN SETTINGS</span></div></div>
+<div class="system-card"><div class="system-head"><span>WORKSPACE STATUS</span><span class="status-led"></span></div><div class="system-row"><span>Local storage</span><b>AVAILABLE</b></div><div class="system-row"><span>Document index</span><b>ON DEVICE</b></div><div class="system-row"><span>AI connection</span><b class="muted">CONFIGURABLE</b></div></div></aside></section>
+<footer><span>ORACLE STUDIO <b>·</b> PRIVATE WORKSPACE</span><span>DESIGNED FOR FOCUS <b>·</b> V0.5</span></footer></div></main></div>
+<nav class="mobile-nav"><button class="active" data-view="home" onclick="navigate('home')"><span>⌂</span>Home</button><button data-view="assistant" onclick="navigate('assistant')"><span>✳</span>Assistant</button><button data-view="library" onclick="navigate('library')"><span>▤</span>Library</button><button data-view="workflows" onclick="navigate('workflows')"><span>⑂</span>Studio</button><button data-view="audio" onclick="navigate('audio')"><span>◖</span>Audio</button></nav></div><script src="app.js"></script></body></html>

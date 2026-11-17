@@ -128,7 +128,7 @@ fun OracleScreen(
     val context = LocalContext.current
     val palette = LocalOraclePalette.current
     val keyboard = LocalSoftwareKeyboardController.current
-    val keyStore = remember { SecureKeyStore(context) }
+    val keyStore = remember { SecureKeyStore(context) .
     val api = remember { GeminiApi() }
     val agenticRuntime = remember { GeminiAgenticRuntime() }
     val fileUploader = remember { GeminiFileUploader() }
@@ -1118,15 +1118,16 @@ private fun CustomTopBar(
     showTitle: Boolean,
     conversationTitle: String
 ) {
+    val palette = LocalOraclePalette.current
     Row(
         modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         OracleIconButton(OracleGlyph.Menu, "Open conversations", onMenu,
-            tint = Color(0xFF171717), size = 40.dp)
+            tint = Color(0xFFA5A1A8), size = 40.dp)
         if (showTitle) {
             Spacer(Modifier.width(10.dp))
-            Text(conversationTitle.ifBlank { "New chat" }, color = Color(0xFF171717),
+            Text(conversationTitle.ifBlank { "New chat" }, color = Color(0xFFE8E7E3),
                 fontFamily = OracleSans, fontWeight = FontWeight.SemiBold, fontSize = 15.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
@@ -1135,13 +1136,13 @@ private fun CustomTopBar(
             contentAlignment = Alignment.Center) {
             OracleGlyphIcon(
                 if (voiceReplyEnabled) OracleGlyph.Speaker else OracleGlyph.SpeakerOff,
-                Modifier.size(26.dp), Color(0xFF171717), 1.7f
+                Modifier.size(26.dp), Color(0xFFA5A1A8), 1.7f
             )
         }
         Spacer(Modifier.width(6.dp))
         Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onNewThread),
             contentAlignment = Alignment.Center) {
-            OracleGlyphIcon(OracleGlyph.AddCircle, Modifier.size(28.dp), Color(0xFF171717), 1.7f)
+            OracleGlyphIcon(OracleGlyph.AddCircle, Modifier.size(28.dp), Color(0xFFE2B15C), 1.7f)
         }
     }
 }
@@ -1169,16 +1170,16 @@ private fun OracleMessageRow(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     Column(
                         Modifier.widthIn(max = 340.dp).clip(RoundedCornerShape(22.dp))
-                            .background(Color(0xFFEDF2FC)).padding(horizontal = 14.dp, vertical = 10.dp),
+                            .background(Color(0xFF1B1A1F)).padding(horizontal = 14.dp, vertical = 10.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         if (message.content.isNotBlank()) Text(message.content,
-                            color = Color(0xFF171717), fontFamily = OracleSans,
+                            color = Color(0xFFE8E7E3), fontFamily = OracleSans,
                             fontSize = 16.sp, lineHeight = 24.sp)
                         attachments.forEach { attachment ->
                         if (attachment.mimeType.startsWith("image/")) {
                             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp))
-                                .background(Color.White).padding(7.dp),
+                                .background(Color(0xFF222128)).padding(7.dp),
                                 verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                 AsyncImage(
                                     model = Uri.parse(attachment.uri),
@@ -1192,7 +1193,7 @@ private fun OracleMessageRow(
                             }
                         } else {
                             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(11.dp))
-                                .background(Color.White).padding(horizontal = 10.dp, vertical = 9.dp),
+                                .background(Color(0xFF222128)).padding(horizontal = 10.dp, vertical = 9.dp),
                                 verticalAlignment = Alignment.CenterVertically) {
                                 Text(when {
                                     attachment.mimeType.startsWith("video/") -> "▶"
@@ -1201,10 +1202,10 @@ private fun OracleMessageRow(
                                 }, color = Color(0xFF587DD8), fontSize = 15.sp)
                                 Spacer(Modifier.width(8.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text(attachment.name, color = Color(0xFF222222),
+                                    Text(attachment.name, color = Color(0xFFE8E7E3),
                                         fontSize = 12.sp, fontFamily = OracleSans,
                                         maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(attachment.mimeType, color = Color(0xFF8B8B8B),
+                                    Text(attachment.mimeType, color = Color(0xFF99959E),
                                         fontSize = 10.sp, fontFamily = OracleSans)
                                 }
                             }
@@ -1280,7 +1281,7 @@ private fun GeneratedFileArtifact(event: AgenticEvent, onOpenFile: (String) -> U
     ) {
         Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Color(0x1FE08A45)),
             contentAlignment = Alignment.Center) {
-            Text(glyph, color = Color(0xFFE08A45), fontFamily = OracleMono,
+            Text(glyph, color = Color(0xFFE2B15C), fontFamily = OracleMono,
                 fontWeight = FontWeight.Bold, fontSize = if (glyph.length > 2) 9.sp else 15.sp)
         }
         Spacer(Modifier.width(11.dp))
@@ -1891,7 +1892,7 @@ private fun ModelBrowserDialog(
         Surface(
             Modifier.fillMaxWidth(0.97f).fillMaxHeight(0.95f),
             shape = RoundedCornerShape(25.dp),
-            color = Color(0xFFF4F5F9),
+            color = palette.canvas,
             shadowElevation = 22.dp
         ) {
             Column(Modifier.fillMaxSize()) {
@@ -1936,8 +1937,8 @@ private fun ModelBrowserDialog(
                         val active = candidate.name == selectedModel
                         Column(
                             Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                                .background(Color.White)
-                                .border(1.dp, if (active) Color(0x777B8FE8) else Color(0x1F25324A), RoundedCornerShape(16.dp))
+                                .background(palette.surface)
+                                .border(1.dp, if (active) palette.accent.copy(alpha = .55f) else palette.outlineSoft, RoundedCornerShape(16.dp))
                                 .padding(11.dp),
                             verticalArrangement = Arrangement.spacedBy(9.dp)
                         ) {
@@ -1961,13 +1962,13 @@ private fun ModelBrowserDialog(
                             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                                 horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                                 modelTags(candidate).forEach { tag ->
-                                    Box(Modifier.clip(RoundedCornerShape(7.dp)).background(Color(0xFFEFF1F8))
+                                    Box(Modifier.clip(RoundedCornerShape(7.dp)).background(Color(0xFF202027))
                                         .padding(horizontal = 7.dp, vertical = 5.dp)) {
                                         Text(tag, color = Color(0xFF6878B5), fontFamily = OracleMono,
                                             fontSize = 8.sp, fontWeight = FontWeight.Medium)
                                     }
                                 }
-                                if (active) Box(Modifier.clip(RoundedCornerShape(7.dp)).background(Color(0xFFE4F3EC))
+                                if (active) Box(Modifier.clip(RoundedCornerShape(7.dp)).background(Color(0xFF1B2A22))
                                     .padding(horizontal = 7.dp, vertical = 5.dp)) {
                                     Text("ACTIVE", color = Color(0xFF2D8A68), fontFamily = OracleMono, fontSize = 8.sp)
                                 }
@@ -2099,6 +2100,7 @@ private fun OracleThreadDrawer(
     }
     val older = visibleSessions.filter { it.updatedAt < todayStart - 7L * 86_400_000L }
 
+    val palette = LocalOraclePalette.current
     Box(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().background(Color(0x55000000)).clickable(onClick = onClose))
         AnimatedVisibility(
@@ -2109,33 +2111,33 @@ private fun OracleThreadDrawer(
             Column(
                 modifier = Modifier.fillMaxHeight().fillMaxWidth(0.77f).widthIn(max = 360.dp)
                     .clip(RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp))
-                    .background(Color.White)
+                    .background(palette.surface)
                     .windowInsetsPadding(WindowInsets.safeDrawing)
                     .padding(start = 16.dp, end = 15.dp, top = 16.dp, bottom = 11.dp)
             ) {
                 Row(Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(24.dp))
-                    .background(Color(0xFFF3F3F3)).padding(horizontal = 12.dp),
+                    .background(palette.surfaceRaised).padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     OracleGlyphIcon(OracleGlyph.Search, Modifier.size(22.dp), Color(0xFF8A8A8A), 1.6f)
                     Spacer(Modifier.width(9.dp))
                     Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                         if (searchQuery.isEmpty()) Text("Search chat content...",
-                            color = Color(0xFF929292), fontFamily = OracleSans, fontSize = 14.sp)
+                            color = palette.textTertiary, fontFamily = OracleSans, fontSize = 14.sp)
                         BasicTextField(
                             value = searchQuery, onValueChange = { searchQuery = it }, singleLine = true,
-                            textStyle = TextStyle(color = Color(0xFF171717),
+                            textStyle = TextStyle(color = palette.text,
                                 fontFamily = OracleSans, fontSize = 14.sp),
-                            cursorBrush = SolidColor(Color(0xFF557BDD)), modifier = Modifier.fillMaxWidth()
+                            cursorBrush = SolidColor(palette.accent), modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
                 Spacer(Modifier.height(16.dp))
                 Row(Modifier.fillMaxWidth().padding(horizontal = 3.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    Text("Recent", color = Color(0xFF8C8C8C), fontFamily = OracleSans,
+                    Text("Recent", color = palette.textSecondary, fontFamily = OracleSans,
                         fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.weight(1f))
-                    Text(visibleSessions.size.toString(), color = Color(0xFFAAAAAA),
+                    Text(visibleSessions.size.toString(), color = palette.textTertiary,
                         fontFamily = OracleSans, fontSize = 11.sp)
                 }
                 LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -2167,7 +2169,7 @@ private fun OracleThreadDrawer(
                     if (visibleSessions.isEmpty()) {
                         item { Text(if (searchQuery.isBlank()) "No conversations yet" else "No matching conversations",
                             Modifier.padding(horizontal = 7.dp, vertical = 15.dp),
-                            color = Color(0xFF969696), fontFamily = OracleSans, fontSize = 13.sp) }
+                            color = palette.textTertiary, fontFamily = OracleSans, fontSize = 13.sp) }
                     }
                 }
                 Spacer(Modifier.height(7.dp))
@@ -2175,20 +2177,20 @@ private fun OracleThreadDrawer(
                     .clickable { workspaceListExpanded = !workspaceListExpanded }
                     .padding(horizontal = 3.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(34.dp).clip(CircleShape).background(Color(0xFF171717)),
+                    Box(Modifier.size(34.dp).clip(CircleShape).background(palette.surfaceRaised),
                         contentAlignment = Alignment.Center) {
-                        Text("L", color = Color.White, fontFamily = OracleSans,
+                        Text("L", color = palette.accent, fontFamily = OracleSans,
                             fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     }
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Littlehomemadestudio", color = Color(0xFF171717),
+                        Text("Littlehomemadestudio", color = palette.text,
                             fontFamily = OracleSans, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                        Text(activeWorkspace?.name ?: "Workspace", color = Color(0xFF8B8B8B),
+                        Text(activeWorkspace?.name ?: "Workspace", color = palette.textTertiary,
                             fontFamily = OracleSans, fontSize = 11.sp,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    Text("•••", color = Color(0xFF999999), fontSize = 16.sp)
+                    Text("•••", color = palette.textTertiary, fontSize = 16.sp)
                 }
                 AnimatedVisibility(
                     visible = workspaceListExpanded || workspaceComposerExpanded,
@@ -2196,16 +2198,16 @@ private fun OracleThreadDrawer(
                     exit = fadeOut(tween(90)) + shrinkVertically(tween(130))
                 ) {
                     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp))
-                        .background(Color(0xFFF5F5F5)).padding(9.dp),
+                        .background(palette.surfaceRaised).padding(9.dp),
                         verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         DrawerAction(OracleGlyph.Library, "Library", onOpenLibrary)
                         DrawerAction(OracleGlyph.Spark, "Workflow Studio", onOpenWorkflows)
                         DrawerAction(OracleGlyph.Audio, "Audio Memory", onOpenAudio)
                         DrawerAction(OracleGlyph.Settings, "Settings", onOpenSettings)
-                        Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE7E7E7)))
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(palette.outlineSoft))
                         workspaces.forEach { workspace ->
                             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
-                                .background(if (workspace.id == activeWorkspaceId) Color(0xFFE8EFFF) else Color.Transparent)
+                                .background(if (workspace.id == activeWorkspaceId) palette.accentSoft else Color.Transparent)
                                 .clickable {
                                     onWorkspaceChange(workspace.id)
                                     workspaceListExpanded = false
@@ -2213,10 +2215,10 @@ private fun OracleThreadDrawer(
                                 }.padding(horizontal = 9.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically) {
                                 Text(workspace.name, Modifier.weight(1f),
-                                    color = if (workspace.id == activeWorkspaceId) Color(0xFF5278D8) else Color(0xFF333333),
+                                    color = if (workspace.id == activeWorkspaceId) palette.accent else palette.textSecondary,
                                     fontFamily = OracleSans, fontSize = 12.sp)
                                 if (workspace.id == activeWorkspaceId) Text("ACTIVE",
-                                    color = Color(0xFF5278D8), fontFamily = OracleSans, fontSize = 9.sp)
+                                    color = palette.accent, fontFamily = OracleSans, fontSize = 9.sp)
                             }
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2224,16 +2226,16 @@ private fun OracleThreadDrawer(
                                 BasicTextField(
                                     value = workspaceName,
                                     onValueChange = { workspaceName = it.take(WorkspacePolicy.MAX_NAME_LENGTH); workspaceError = null },
-                                    modifier = Modifier.weight(1f).background(Color.White, RoundedCornerShape(8.dp))
+                                    modifier = Modifier.weight(1f).background(palette.surfaceRaised, RoundedCornerShape(8.dp))
                                         .padding(horizontal = 9.dp, vertical = 9.dp),
                                     singleLine = true,
-                                    textStyle = TextStyle(color = Color(0xFF171717),
+                                    textStyle = TextStyle(color = palette.text,
                                         fontFamily = OracleSans, fontSize = 12.sp),
-                                    cursorBrush = SolidColor(Color(0xFF5278D8)),
+                                    cursorBrush = SolidColor(palette.accent),
                                     decorationBox = { inner ->
                                         Box {
                                             if (workspaceName.isBlank()) Text("Workspace name",
-                                                color = Color(0xFF999999), fontSize = 12.sp)
+                                                color = palette.textTertiary, fontSize = 12.sp)
                                             inner()
                                         }
                                     }
@@ -2263,7 +2265,7 @@ private fun OracleThreadDrawer(
                                             }
                                         }
                                     }.padding(horizontal = 6.dp, vertical = 8.dp),
-                                    color = Color(0xFF5278D8), fontFamily = OracleSans,
+                                    color = palette.accent, fontFamily = OracleSans,
                                     fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             } else {
                                 Text("New workspace", Modifier.clickable {
@@ -2292,14 +2294,15 @@ private fun DrawerDateLabel(label: String) {
 
 @Composable
 private fun DrawerSessionRow(title: String, selected: Boolean, onClick: () -> Unit) {
+    val palette = LocalOraclePalette.current
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-            .background(if (selected) Color(0xFFEDF2FE) else Color.Transparent)
+            .background(if (selected) Color(0xFF302517) else Color.Transparent)
             .clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(title, Modifier.weight(1f),
-            color = if (selected) Color(0xFF5278D8) else Color(0xFF171717),
+            color = if (selected) Color(0xFFE2B15C) else Color(0xFFE8E7E3),
             fontFamily = OracleSans, fontSize = 14.sp,
             fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -2376,12 +2379,12 @@ private fun OracleEmptyState(onPrompt: (String) -> Unit) {
     ) {
         OracleWhaleMark(
             modifier = Modifier.size(width = 38.dp, height = 30.dp),
-            color = Color(0xFF4F78E8)
+            color = palette.accent
         )
         Spacer(Modifier.height(17.dp))
         Text(
             greeting,
-            color = Color(0xFF171717),
+            color = palette.text,
             fontFamily = OracleSans,
             fontWeight = FontWeight.SemiBold,
             fontSize = 18.sp,
