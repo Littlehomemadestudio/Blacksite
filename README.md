@@ -39,8 +39,9 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Identically named workflows and notes can exist independently in separate workspaces; a workspace cannot update or delete another workspace's workflows through repository operations.
 
 ### Document Library
-- Imports PDF with selectable text, UTF-8 plain text, and Markdown from Android's document picker; originals are copied into app-private storage.
-- PDF extraction preserves page numbers. TXT/Markdown are segmented into stable section citations; extracted text is chunked and indexed in Room.
+- Imports PDF with selectable text, UTF-8 plain text, Markdown, and Office Open XML DOCX/PPTX/XLSX from Android's document picker; originals are copied into app-private storage.
+- PDF extraction preserves page numbers. DOCX citations retain the document-body label; PPTX citations retain slide numbers; XLSX citations retain worksheet names. TXT/Markdown use stable section citations. Extracted text is chunked and indexed in Room.
+- Office extraction is offline and bounded: it reads only required XML parts from the archive, never executes macros, and does not extract embedded images, charts, comments, or tracked-change metadata.
 - Offline keyword retrieval, document reader, and Gemini library Q&A.
 - Library Q&A displays the exact retrieved excerpts and requires confirmation before sending them to Gemini.
 
@@ -86,7 +87,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Unit tests cover conversation context, session naming, workspace-name normalization (including Persian text), document chunk boundaries, PDF citations, stable text sections, keyword ranking, workflow plan validation, audio-memory workflow execution and workspace isolation, and Room workspace-isolation queries/mutations under Robolectric.
 
 ## In progress / not yet available
-- Office document extraction, image OCR, scanned-PDF OCR, document summaries, flashcards, quizzes, semantic embeddings, and knowledge graph.
+- Image OCR, scanned-PDF OCR, document summaries, flashcards, quizzes, semantic embeddings, and knowledge graph. Legacy binary DOC/XLS/PPT formats remain unsupported.
 - Event-based triggers, exact-time alarms, and arbitrary external integrations. Periodic schedules are available through Android WorkManager and remain subject to OS deferral.
 - Additional workflow actions such as export, file operations, notifications, and external integrations.
 - Persistent full-duplex Gemini Live audio streaming and interruption handling. Audio Memory provides saved recordings and file-based Gemini transcription, not live streaming.
@@ -101,8 +102,8 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Library Q&A is opt-in: only the question and up to six retrieved excerpts are sent to the selected Gemini model after explicit confirmation. Audio transcription is also opt-in per recording; only that selected WAV is uploaded, and ORACLE attempts remote file deletion immediately after transcription.
 
 ## Document library scope and limits
-- Supported imports: PDF with selectable text, UTF-8 plain text, and Markdown. Maximum file size is 20 MB; PDFs are limited to 400 pages; extracted text is capped at 1.5 million characters per file.
-- PDFs with no selectable text are rejected; image-only pages in mixed PDFs are skipped. OCR, standalone images, DOC/DOCX, spreadsheets, and presentations are not supported yet.
+- Supported imports: PDF with selectable text, UTF-8 plain text, Markdown, DOCX, PPTX, and XLSX. Maximum source file size is 20 MB; PDFs and presentations are limited to 400 pages/slides; workbooks are limited to 100 worksheets; extracted text is capped at 1.5 million characters per file. Office XML parts are capped at 12 MB, archive expansion at 80 MB, and archives at 2,000 entries.
+- PDFs with no selectable text are rejected; image-only pages in mixed PDFs are skipped. Office embedded images/charts and scanned content are not OCR-extracted. Standalone images and legacy binary DOC/XLS/PPT are not supported.
 - Retrieval uses on-device lexical keyword matching, not embeddings or semantic vector search. PDF answers cite original page numbers; text and Markdown answers cite indexed sections.
 - User-facing thread deletion, workspace deletion, and full workspace export are not available yet. Uninstalling the app removes its app-private data.
 

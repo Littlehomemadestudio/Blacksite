@@ -17,7 +17,8 @@ data class DocumentChunkDraft(
 
 /**
  * Deterministic, offline text segmentation and retrieval helpers.
- * PDF pages retain their original page numbers; text files use stable section labels.
+ * PDF pages retain original page numbers; Office slides/sheets retain source
+ * labels; text files receive stable section citations.
  */
 object DocumentTextProcessor {
     const val MAX_CHUNK_CHARS = 1_200
@@ -39,15 +40,15 @@ object DocumentTextProcessor {
                         charArrayOf(' ', '\n', '\t', '\r'),
                         end
                     )
-                    if (boundary > start + (MAX_CHUNK_CHARS * 0.65).toInt()) {
-                        end = boundary
-                    }
+                    if (boundary > start + (MAX_CHUNK_CHARS * 0.65).toInt()) end = boundary
                 }
 
                 val body = normalized.substring(start, end).trim()
                 if (body.isNotEmpty()) {
                     val ordinal = output.size
-                    val label = page.pageNumber?.let { "Page $it" } ?: "Section ${ordinal + 1}"
+                    val label = page.pageNumber?.let { "Page $it" }
+                        ?: page.label.takeIf { it.isNotBlank() && it != "Document text" }
+                        ?: "Section ${ordinal + 1}"
                     output += DocumentChunkDraft(
                         ordinal = ordinal,
                         pageNumber = page.pageNumber,
