@@ -434,6 +434,7 @@ fun SettingsScreen() {
             PrivacyLine("AES-GCM encryption; key material held by Android Keystore.")
             PrivacyLine("Credential is sent to Google's Gemini API over HTTPS when a model action is invoked.")
             PrivacyLine("No API key is embedded in the APK, source code, analytics, or logs.")
+            PrivacyLine("Workspace content, imported files, transcripts and recordings are app-private but not encrypted at rest. Avoid storing highly sensitive material.")
         }
     }
 }
