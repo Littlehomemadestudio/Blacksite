@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +39,8 @@ import androidx.compose.ui.unit.sp
 import studio.oracle.ui.theme.LocalOraclePalette
 import studio.oracle.ui.theme.OracleMono
 import studio.oracle.ui.theme.OracleSans
+import studio.oracle.data.ExamBundle
+import studio.oracle.data.ExamPaperCodec
 
 private sealed interface RichBlock {
     data class Heading(val text: String, val level: Int) : RichBlock
@@ -47,6 +51,8 @@ private sealed interface RichBlock {
     data class RemoteImage(val alt: String, val url: String) : RichBlock
     data class Quote(val text: String) : RichBlock
     data class Table(val header: List<String>, val rows: List<List<String>>) : RichBlock
+    data class Choice(val question: String, val options: List<String>, val multiple: Boolean) : RichBlock
+    data class Exam(val bundle: ExamBundle) : RichBlock
     data object Divider : RichBlock
 }
 
@@ -54,7 +60,8 @@ private sealed interface RichBlock {
 fun OracleRichMessage(
     markdown: String,
     modifier: Modifier = Modifier,
-    onOpenUrl: ((String) -> Unit)? = null
+    onOpenUrl: ((String) -> Unit)? = null,
+    onSubmitText: ((String) -> Unit)? = null
 ) {
     val blocks = remember(markdown) { parseRichBlocks(markdown) }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(11.dp)) {
@@ -107,6 +114,13 @@ fun OracleRichMessage(
                     RichInlineText(block.text, fontSize = 13, color = LocalOraclePalette.current.textSecondary, onOpenUrl = onOpenUrl)
                 }
                 is RichBlock.Table -> RichTable(block)
+                is RichBlock.Choice -> OracleChoiceBlock(
+                    question = block.question,
+                    options = block.options,
+                    multiple = block.multiple,
+                    onSubmit = onSubmitText
+                )
+                is RichBlock.Exam -> ExamRichArtifact(block.bundle, onSubmitText)
                 RichBlock.Divider -> Box(
                     Modifier.fillMaxWidth().padding(vertical = 4.dp).height(1.dp)
                         .background(LocalOraclePalette.current.outlineSoft)
@@ -238,6 +252,66 @@ private fun RichTable(table: RichBlock.Table) {
     }
 }
 
+
+@Composable
+private fun OracleChoiceBlock(
+    question: String,
+    options: List<String>,
+    multiple: Boolean,
+    onSubmit: ((String) -> Unit)?
+) {
+    val palette = LocalOraclePalette.current
+    var selected by remember(question) { androidx.compose.runtime.mutableStateOf(setOf<Int>()) }
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+            .background(palette.surface).border(1.dp, palette.outline, RoundedCornerShape(14.dp))
+            .padding(13.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(if (multiple) "SELECT ALL THAT APPLY" else "CHOOSE ONE",
+                color = palette.accent, fontFamily = OracleMono, fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+            Spacer(Modifier.weight(1f))
+            Text("${options.size} options", color = palette.textTertiary, fontSize = 10.sp)
+        }
+        Text(question, color = palette.text, fontFamily = OracleSans,
+            fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 22.sp)
+        options.forEachIndexed { index, option ->
+            val active = index in selected
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                    .background(if (active) palette.accentSoft else palette.surfaceRaised)
+                    .border(1.dp, if (active) palette.accent else palette.outlineSoft, RoundedCornerShape(10.dp))
+                    .clickable {
+                        selected = if (multiple) {
+                            if (active) selected - index else selected + index
+                        } else setOf(index)
+                    }.padding(horizontal = 11.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(if (multiple) if (active) "☑" else "□" else if (active) "◉" else "○",
+                    color = if (active) palette.accent else palette.textTertiary, fontSize = 17.sp)
+                Spacer(Modifier.width(10.dp))
+                Text(option, color = palette.text, fontSize = 13.sp, lineHeight = 18.sp)
+            }
+        }
+        androidx.compose.material3.Button(
+            onClick = {
+                val answer = selected.sorted().joinToString(", ") { options[it] }
+                onSubmit?.invoke("My answer to \"$question\": $answer")
+            },
+            enabled = selected.isNotEmpty() && onSubmit != null,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(9.dp)
+        ) {
+            Text("Submit answer")
+        }
+        if (onSubmit == null) Text("Interactive response unavailable in this view.",
+            color = palette.textTertiary, fontSize = 10.sp)
+    }
+}
+
 private fun parseRichBlocks(source: String): List<RichBlock> {
     val lines = source.replace("\r\n", "\n").lines()
     val result = mutableListOf<RichBlock>()
@@ -258,7 +332,22 @@ private fun parseRichBlocks(source: String): List<RichBlock> {
             index++
             while (index < lines.size && !lines[index].trim().startsWith("```")) { code.add(lines[index]); index++ }
             if (index < lines.size) index++
-            result.add(RichBlock.Code(language, code.joinToString("\n")))
+            val source = code.joinToString("\n")
+            if (language.equals("oracle-exam", true)) {
+                val exam = runCatching { ExamPaperCodec.parseBundle(source, requireAnswerKey = false) }
+                    .getOrNull()
+                result.add(exam?.let { RichBlock.Exam(it) } ?: RichBlock.Code(language, source))
+            } else if (language.equals("oracle-choice", true)) {
+                val choice = runCatching {
+                    val json = org.json.JSONObject(source)
+                    val question = json.getString("question")
+                    val optionsJson = json.getJSONArray("options")
+                    val options = (0 until optionsJson.length()).map { optionsJson.getString(it) }
+                    require(question.isNotBlank() && options.size in 2..8 && options.all { it.isNotBlank() })
+                    RichBlock.Choice(question, options, json.optBoolean("multiple", false))
+                }.getOrNull()
+                result.add(choice ?: RichBlock.Code(language, source))
+            } else result.add(RichBlock.Code(language, source))
             continue
         }
         if (trimmed == "---" || trimmed == "***" || trimmed == "___") {

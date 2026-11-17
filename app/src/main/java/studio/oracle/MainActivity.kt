@@ -39,6 +39,7 @@ import studio.oracle.ui.HandcraftedLogo
 import studio.oracle.ui.OracleWhaleMark
 import studio.oracle.ui.LibraryScreen
 import studio.oracle.ui.AudioMemoryScreen
+import studio.oracle.ui.ExamStudioScreen
 import studio.oracle.ui.OracleGlyph
 import studio.oracle.ui.OracleIconButton
 import studio.oracle.ui.OracleScreen
@@ -57,7 +58,7 @@ class MainActivity : ComponentActivity() {
             isAppearanceLightNavigationBars = true
         }
         setContent {
-            OracleTheme {
+            OracleTheme(darkTheme = false) {
                 OracleRoot()
             }
         }
@@ -69,6 +70,7 @@ private enum class OracleDestination {
     LIBRARY,
     WORKFLOWS,
     AUDIO,
+    EXAMS,
     SETTINGS
 }
 
@@ -91,24 +93,28 @@ private fun OracleRoot() {
 @Composable
 private fun OracleStartupSplash() {
     Box(
-        Modifier.fillMaxSize().background(Color.White),
+        Modifier.fillMaxSize().background(Color(0xFFF8FAFC)),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(15.dp)
+            verticalArrangement = Arrangement.spacedBy(9.dp)
         ) {
-            OracleWhaleMark(
-                Modifier.size(width = 39.dp, height = 31.dp),
-                Color(0xFF4F78E8)
-            )
             Text(
-                "Hi. What can I do for you?",
-                color = Color(0xFF171717),
+                "ORACLE",
+                color = Color(0xFF17212B),
                 fontFamily = OracleSans,
-                fontSize = 18.sp,
-                lineHeight = 25.sp,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                fontSize = 19.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                letterSpacing = 3.2.sp
+            )
+            Box(Modifier.width(24.dp).height(1.dp).background(Color(0xFF7EA9D4)))
+            Text(
+                "PERSONAL INTELLIGENCE",
+                color = Color(0xFF7B8793),
+                fontFamily = OracleSans,
+                fontSize = 8.sp,
+                letterSpacing = 1.65.sp
             )
         }
     }
@@ -168,6 +174,7 @@ private fun OracleWorkspaceRoot() {
             onOpenSettings = { destination = OracleDestination.SETTINGS },
             onOpenWorkflows = { destination = OracleDestination.WORKFLOWS },
             onOpenAudio = { destination = OracleDestination.AUDIO },
+            onOpenExams = { destination = OracleDestination.EXAMS },
             workspaceId = activeWorkspaceId,
             workspaces = workspaces,
             onWorkspaceChange = ::selectWorkspace,
@@ -195,6 +202,13 @@ private fun OracleWorkspaceRoot() {
             AudioMemoryScreen(workspaceId = activeWorkspaceId)
         }
 
+        OracleDestination.EXAMS -> OracleSection(
+            title = "Exam Studio",
+            onBack = { destination = OracleDestination.CHAT }
+        ) {
+            ExamStudioScreen(workspaceId = activeWorkspaceId)
+        }
+
         OracleDestination.SETTINGS -> OracleSection(
             title = "Settings",
             onBack = { destination = OracleDestination.CHAT }
@@ -220,7 +234,7 @@ private fun OracleSection(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(58.dp)
+                .height(50.dp)
                 .padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -230,7 +244,7 @@ private fun OracleSection(
                 onClick = onBack
             )
             Spacer(Modifier.width(10.dp))
-            HandcraftedLogo(Modifier.size(25.dp), palette.accent)
+            Text("ORACLE", color = palette.text, fontFamily = OracleSans, fontSize = 13.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, letterSpacing = 1.4.sp)
             Spacer(Modifier.width(9.dp))
             Text(
                 title,

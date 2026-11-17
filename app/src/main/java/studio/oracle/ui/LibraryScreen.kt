@@ -231,7 +231,12 @@ fun LibraryScreen(workspaceId: String) {
                 OracleSolidAction(
                     label = if (importing) "INDEXING…" else "IMPORT",
                     onClick = {
-                        picker.launch(arrayOf("application/pdf", "text/plain", "text/markdown", "text/x-markdown"))
+                        picker.launch(arrayOf(
+                            "application/pdf", "text/plain", "text/markdown", "text/x-markdown",
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        ))
                     },
                     enabled = !importing && !asking
                 )

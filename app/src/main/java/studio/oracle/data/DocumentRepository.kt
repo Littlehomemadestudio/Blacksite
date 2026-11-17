@@ -56,7 +56,7 @@ class DocumentRepository(
             val mimeType = appContext.contentResolver.getType(uri).orEmpty()
             val format = detectFormat(displayName, mimeType)
                 ?: throw DocumentImportException(
-                    "Unsupported file. ORACLE currently imports PDF, TXT, and Markdown only."
+                    "Unsupported file. Supported formats: PDF, TXT, Markdown, DOCX, PPTX, and XLSX."
                 )
 
             if (!documentsDirectory.exists() && !documentsDirectory.mkdirs()) {
@@ -96,14 +96,17 @@ class DocumentRepository(
             val pages = when (format) {
                 SupportedFormat.PDF -> extractPdf(destination)
                 SupportedFormat.TEXT, SupportedFormat.MARKDOWN -> extractText(destination)
+                SupportedFormat.DOCX -> OfficeDocumentExtractor.extract(destination, OfficeDocumentFormat.DOCX)
+                SupportedFormat.PPTX -> OfficeDocumentExtractor.extract(destination, OfficeDocumentFormat.PPTX)
+                SupportedFormat.XLSX -> OfficeDocumentExtractor.extract(destination, OfficeDocumentFormat.XLSX)
             }
             val extractedCharacters = pages.sumOf { it.text.length }
             if (extractedCharacters == 0) {
                 throw DocumentImportException(
-                    if (format == SupportedFormat.PDF) {
-                        "No selectable text was found. Scanned/image-only PDFs need OCR, which is not available yet."
-                    } else {
-                        "This file contains no readable text."
+                    when (format) {
+                        SupportedFormat.PDF -> "No selectable text was found. Scanned/image-only PDFs need OCR, which is not available yet."
+                        SupportedFormat.DOCX, SupportedFormat.PPTX, SupportedFormat.XLSX -> "No readable text was found in this Office file. Embedded images, charts, and scanned content are not OCR-extracted."
+                        else -> "This file contains no readable text."
                     }
                 )
             }
@@ -207,6 +210,9 @@ class DocumentRepository(
                 mimeType.equals("text/markdown", ignoreCase = true) ||
                 mimeType.equals("text/x-markdown", ignoreCase = true) ->
                 SupportedFormat.MARKDOWN
+            extension == "docx" || mimeType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document", ignoreCase = true) -> SupportedFormat.DOCX
+            extension == "pptx" || mimeType.equals("application/vnd.openxmlformats-officedocument.presentationml.presentation", ignoreCase = true) -> SupportedFormat.PPTX
+            extension == "xlsx" || mimeType.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ignoreCase = true) -> SupportedFormat.XLSX
             else -> null
         }
     }
@@ -280,7 +286,10 @@ class DocumentRepository(
     private enum class SupportedFormat(val extension: String, val mimeType: String) {
         PDF("pdf", "application/pdf"),
         TEXT("txt", "text/plain"),
-        MARKDOWN("md", "text/markdown")
+        MARKDOWN("md", "text/markdown"),
+        DOCX("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+        PPTX("pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+        XLSX("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     }
 
     private class DocumentImportException(message: String) : Exception(message)

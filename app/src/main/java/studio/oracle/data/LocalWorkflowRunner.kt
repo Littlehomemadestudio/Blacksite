@@ -20,6 +20,20 @@ data class WorkflowRunResult(
     val summary: String
 )
 
+enum class WorkflowRunOrigin(
+    val initialSummary: String,
+    val startLog: String
+) {
+    MANUAL(
+        "Started after explicit user confirmation.",
+        "Manual run started after explicit confirmation. All actions execute locally; no Gemini request is made."
+    ),
+    SCHEDULED(
+        "Started by an enabled local recurring trigger.",
+        "Scheduled trigger started this run. The saved workflow executes locally; no Gemini request or network access is used."
+    )
+}
+
 /** Executes only the explicit local actions in WorkflowAction. */
 class LocalWorkflowRunner(
     private val dao: WorkflowDao,
@@ -29,13 +43,32 @@ class LocalWorkflowRunner(
 ) {
     suspend fun execute(
         workflow: WorkflowEntity,
-        steps: List<WorkflowStepEntity>
+        steps: List<WorkflowStepEntity>,
+        origin: WorkflowRunOrigin = WorkflowRunOrigin.MANUAL
     ): WorkflowRunResult {
         if (workflow.workspaceId != workspaceId || dao.findWorkflow(workflow.id, workspaceId) == null) {
             return WorkflowRunResult("", "INVALID", "This workflow does not belong to the active workspace.")
         }
         val validation = WorkflowRules.validate(steps, expectedWorkflowId = workflow.id)
-        if (validation != null) return WorkflowRunResult("", "INVALID", validation)
+        if (validation != null) {
+            if (origin == WorkflowRunOrigin.SCHEDULED) {
+                val invalidRunId = UUID.randomUUID().toString()
+                val now = System.currentTimeMillis()
+                dao.insertRun(
+                    WorkflowRunEntity(
+                        id = invalidRunId,
+                        workflowId = workflow.id,
+                        status = "INVALID",
+                        startedAt = now,
+                        finishedAt = now,
+                        summary = validation
+                    )
+                )
+                log(invalidRunId, null, "FAILED", "Scheduled trigger skipped this run: $validation")
+                return WorkflowRunResult(invalidRunId, "INVALID", validation)
+            }
+            return WorkflowRunResult("", "INVALID", validation)
+        }
 
         val ordered = steps.sortedBy { it.position }
         val runId = UUID.randomUUID().toString()
@@ -49,11 +82,11 @@ class LocalWorkflowRunner(
                     status = "RUNNING",
                     startedAt = System.currentTimeMillis(),
                     finishedAt = null,
-                    summary = "Started after explicit user confirmation."
+                    summary = origin.initialSummary
                 )
             )
             runCreated = true
-            log(runId, null, "INFO", "Manual run started. All actions execute locally; no Gemini request is made.")
+            log(runId, null, "INFO", origin.startLog)
 
             ordered.forEachIndexed { index, step ->
                 currentCoroutineContext().ensureActive()

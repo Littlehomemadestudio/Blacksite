@@ -99,6 +99,7 @@ import studio.oracle.data.PhoneWorkspaceTools
 import studio.oracle.data.AgentRepository
 import studio.oracle.data.AgentTurn
 import studio.oracle.data.GeminiApi
+import studio.oracle.data.CrossMemoryStore
 import studio.oracle.data.GeminiModel
 import studio.oracle.data.GeminiModelsResult
 import studio.oracle.data.ModelPreferences
@@ -118,6 +119,7 @@ fun OracleScreen(
     onOpenSettings: () -> Unit,
     onOpenWorkflows: () -> Unit,
     onOpenAudio: () -> Unit,
+    onOpenExams: () -> Unit,
     workspaceId: String,
     workspaces: List<WorkspaceEntity>,
     onWorkspaceChange: (String) -> Unit,
@@ -128,6 +130,7 @@ fun OracleScreen(
     val keyboard = LocalSoftwareKeyboardController.current
     val keyStore = remember { SecureKeyStore(context) }
     val api = remember { GeminiApi() }
+    val crossMemory = remember(context) { CrossMemoryStore(context) }
     val agenticRuntime = remember { GeminiAgenticRuntime() }
     val fileUploader = remember { GeminiFileUploader() }
     val imageGenerator = remember { GeminiImageGenerator() }
@@ -598,7 +601,9 @@ fun OracleScreen(
                     "Conversation history (use as context):\n" + priorContext + "\n\n"
                 val attachedText = if (textAttachmentContext.isEmpty()) "" else
                     "\n\n" + textAttachmentContext.joinToString("\n\n")
-                val agentPrompt = historyText + "Current user request:\n" + submitted + attachedText
+                val agentPrompt = crossMemory.contextBlock() + historyText +
+                    "EXAM STUDIO POLICY: Examination authoring is explicit opt-in. Never create an exam, mock examination, graded assessment, or exam paper during ordinary tutoring, explanations, summaries, homework help, or casual conversation. Do not overuse quizzes. Only when the user explicitly asks to create, make, or generate an exam, test paper, mock exam, or assessment, create a complete structured paper in exactly one fenced oracle-exam code block containing valid JSON. The JSON object must contain title, schoolName, subject, grade, className, teacherName, semester, examDate, durationMinutes, totalMarks, language, instructions array, sections array with title, instructions and questions, and answerKey array with questionId, expectedAnswer, acceptedAnswers and markingGuide. Each question must contain id, number, type, prompt, marks, options, topic, difficulty, cognitiveLevel and answerLines. Supported types: multiple_choice, true_false, short_answer, long_answer, fill_blank, matching, calculation, proof and essay. Make a real paper with sections, exact mark totals, question taxonomy and a separate marking scheme; never put answers in question prompts. Use supplied course materials and source citations when available; never invent source-specific claims. ORACLE renders this block as a document with answer spaces and attempt mode. Use oracle-choice only for a short interactive practice question when the user explicitly asks for a quick quiz or interactive check; do not insert it into ordinary explanations. Continue to use Markdown for headings, **bold**, *italic*, tables, lists, quotes, and code. When CrossMemory is enabled, append an <oracle-memory> JSON trailer only when a durable, useful, non-sensitive fact or preference should be remembered: {\"items\":[{\"category\":\"preference|project|decision|fact\",\"content\":\"concise standalone memory\"}]}. Never include transient details, guesses, secrets, or sensitive personal data. Do not mention the trailer in the visible answer.\n\n" +
+                    "Current user request:\n" + submitted + attachedText
                 val tavilyKey = withContext(Dispatchers.IO) { runCatching { keyStore.readTavilyKey() }.getOrNull() }
                 val reportCreatedFile: (CreatedAgentFile) -> Unit = { file ->
                     val event = AgenticEvent(
@@ -707,10 +712,11 @@ fun OracleScreen(
                 )) {
                     is AgenticResult.Success -> {
                         val trace = synchronized(runEvents) { runEvents.toList() }
+                        val visibleReply = crossMemory.consumeReply(result.text)
                         repository.appendMessage(
                             sessionId = sessionId,
                             role = "assistant",
-                            content = result.text,
+                            content = visibleReply,
                             model = result.model,
                             agentTrace = AgenticEventCodec.encodeTrace(trace)
                         )
@@ -718,7 +724,7 @@ fun OracleScreen(
                         failedPromptPersisted = false
                         if (voiceReplyEnabled && ttsReady) {
                             textToSpeech.language = Locale.getDefault()
-                            textToSpeech.speak(result.text.take(5000), TextToSpeech.QUEUE_FLUSH, null, "oracle-voice-reply")
+                            textToSpeech.speak(visibleReply.take(5000), TextToSpeech.QUEUE_FLUSH, null, "oracle-voice-reply")
                         }
                     }
                     is AgenticResult.Failed -> {
@@ -840,14 +846,18 @@ fun OracleScreen(
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 18.dp),
-                        verticalArrangement = Arrangement.spacedBy(22.dp),
-                        contentPadding = PaddingValues(top = 18.dp, bottom = 22.dp)
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(18.dp),
+                        contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp)
                     ) {
                         items(messages, key = { it.id }) { message ->
                             OracleMessageRow(
                                 message = message,
                                 onOpenFile = ::openArtifact,
+                                onSubmitChoice = { answer ->
+                                    prompt = answer
+                                    submitPrompt()
+                                },
                                 modifier = Modifier.animateItem()
                             )
                         }
@@ -940,7 +950,7 @@ fun OracleScreen(
                     }
                 },
                 modifier = Modifier
-                    .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 10.dp)
+                    .padding(start = 12.dp, end = 12.dp, top = 5.dp, bottom = 7.dp)
             )
 
             Spacer(Modifier.height(WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().coerceAtLeast(4.dp)))
@@ -1011,6 +1021,10 @@ fun OracleScreen(
                 onOpenAudio = {
                     drawerOpen = false
                     onOpenAudio()
+                },
+                onOpenExams = {
+                    drawerOpen = false
+                    onOpenExams()
                 }
             )
         }
@@ -1077,30 +1091,46 @@ private fun CustomTopBar(
     showTitle: Boolean,
     conversationTitle: String
 ) {
+    val palette = LocalOraclePalette.current
     Row(
-        modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 11.dp),
+        modifier = Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        OracleIconButton(OracleGlyph.Menu, "Open conversations", onMenu,
-            tint = Color(0xFF171717), size = 40.dp)
-        if (showTitle) {
-            Spacer(Modifier.width(10.dp))
-            Text(conversationTitle.ifBlank { "New chat" }, color = Color(0xFF171717),
-                fontFamily = OracleSans, fontWeight = FontWeight.SemiBold, fontSize = 15.sp,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        Spacer(Modifier.weight(1f))
-        Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onVoiceToggle),
-            contentAlignment = Alignment.Center) {
-            OracleGlyphIcon(
-                if (voiceReplyEnabled) OracleGlyph.Speaker else OracleGlyph.SpeakerOff,
-                Modifier.size(26.dp), Color(0xFF171717), 1.7f
+        OracleIconButton(
+            OracleGlyph.Menu, "Open conversations", onMenu,
+            size = 34.dp, tint = palette.textSecondary
+        )
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+            Text(
+                if (showTitle) conversationTitle.ifBlank { "New conversation" } else "ORACLE",
+                color = palette.text, fontFamily = OracleSans,
+                fontWeight = FontWeight.SemiBold, fontSize = if (showTitle) 13.sp else 15.sp,
+                letterSpacing = if (showTitle) 0.sp else 1.45.sp,
+                maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+            if (!showTitle) Text(
+                "PERSONAL INTELLIGENCE", color = palette.textTertiary,
+                fontFamily = OracleMono, fontSize = 8.sp, letterSpacing = 1.05.sp
             )
         }
-        Spacer(Modifier.width(6.dp))
-        Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onNewThread),
-            contentAlignment = Alignment.Center) {
-            OracleGlyphIcon(OracleGlyph.AddCircle, Modifier.size(28.dp), Color(0xFF171717), 1.7f)
+        Box(
+            Modifier.size(32.dp).clip(RoundedCornerShape(9.dp))
+                .clickable(onClick = onVoiceToggle),
+            contentAlignment = Alignment.Center
+        ) {
+            OracleGlyphIcon(
+                if (voiceReplyEnabled) OracleGlyph.Speaker else OracleGlyph.SpeakerOff,
+                Modifier.size(17.dp), if (voiceReplyEnabled) palette.accent else palette.textTertiary, 1.55f
+            )
+        }
+        Spacer(Modifier.width(4.dp))
+        Box(
+            Modifier.size(32.dp).clip(RoundedCornerShape(9.dp))
+                .clickable(onClick = onNewThread),
+            contentAlignment = Alignment.Center
+        ) {
+            OracleGlyphIcon(OracleGlyph.NewChat, Modifier.size(17.dp), palette.textSecondary, 1.55f)
         }
     }
 }
@@ -1109,9 +1139,11 @@ private fun CustomTopBar(
 private fun OracleMessageRow(
     message: AgentMessageEntity,
     onOpenFile: (String) -> Unit,
+    onSubmitChoice: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val palette = LocalOraclePalette.current
     val attachments = remember(message.attachments) { AgenticEventCodec.decodeAttachments(message.attachments) }
     val events = remember(message.agentTrace) { AgenticEventCodec.decodeTrace(message.agentTrace) }
     androidx.compose.animation.AnimatedVisibility(
@@ -1127,17 +1159,17 @@ private fun OracleMessageRow(
             ) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     Column(
-                        Modifier.widthIn(max = 340.dp).clip(RoundedCornerShape(22.dp))
-                            .background(Color(0xFFEDF2FC)).padding(horizontal = 14.dp, vertical = 10.dp),
+                        Modifier.widthIn(max = 340.dp).clip(RoundedCornerShape(14.dp))
+                            .background(palette.surfaceRaised).padding(horizontal = 14.dp, vertical = 10.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         if (message.content.isNotBlank()) Text(message.content,
-                            color = Color(0xFF171717), fontFamily = OracleSans,
+                            color = palette.text, fontFamily = OracleSans,
                             fontSize = 16.sp, lineHeight = 24.sp)
                         attachments.forEach { attachment ->
                         if (attachment.mimeType.startsWith("image/")) {
-                            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp))
-                                .background(Color.White).padding(7.dp),
+                            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                                .background(palette.surface).padding(7.dp),
                                 verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                 AsyncImage(
                                     model = Uri.parse(attachment.uri),
@@ -1145,25 +1177,25 @@ private fun OracleMessageRow(
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp)
                                         .clip(RoundedCornerShape(9.dp)))
-                                Text(attachment.name, color = Color(0xFF6A6A6A),
+                                Text(attachment.name, color = palette.textSecondary,
                                     fontFamily = OracleSans, fontSize = 11.sp, maxLines = 1,
                                     overflow = TextOverflow.Ellipsis)
                             }
                         } else {
                             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(11.dp))
-                                .background(Color.White).padding(horizontal = 10.dp, vertical = 9.dp),
+                                .background(palette.surface).padding(horizontal = 10.dp, vertical = 9.dp),
                                 verticalAlignment = Alignment.CenterVertically) {
                                 Text(when {
                                     attachment.mimeType.startsWith("video/") -> "▶"
                                     attachment.mimeType.startsWith("audio/") -> "♫"
                                     else -> "▤"
-                                }, color = Color(0xFF587DD8), fontSize = 15.sp)
+                                }, color = palette.accent, fontSize = 15.sp)
                                 Spacer(Modifier.width(8.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text(attachment.name, color = Color(0xFF222222),
+                                    Text(attachment.name, color = palette.text,
                                         fontSize = 12.sp, fontFamily = OracleSans,
                                         maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(attachment.mimeType, color = Color(0xFF8B8B8B),
+                                    Text(attachment.mimeType, color = palette.textTertiary,
                                         fontSize = 10.sp, fontFamily = OracleSans)
                                 }
                             }
@@ -1187,7 +1219,7 @@ private fun OracleMessageRow(
                     it.kind == "generated_image" || it.kind == "generated_audio" ||
                         it.kind == "generated_video" || it.kind == "generated_document"
                 }.forEach { event -> GeneratedMediaArtifact(event, onOpenFile) }
-                OracleRichMessage(message.content)
+                OracleRichMessage(message.content, onSubmitText = onSubmitChoice)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically) {
                     events.lastOrNull { it.kind == "usage" }?.let { TokenUsageChip(it.detail) }
@@ -1195,7 +1227,7 @@ private fun OracleMessageRow(
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                         clipboard.setPrimaryClip(android.content.ClipData.newPlainText("ORACLE response", message.content))
                     }.padding(horizontal = 8.dp, vertical = 5.dp),
-                        color = Color(0xFF909090), fontFamily = OracleSans, fontSize = 11.sp)
+                        color = palette.textTertiary, fontFamily = OracleSans, fontSize = 11.sp)
                     Text("Share", Modifier.clickable {
                         val intent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
@@ -1203,7 +1235,7 @@ private fun OracleMessageRow(
                         }
                         context.startActivity(Intent.createChooser(intent, "Share response"))
                     }.padding(horizontal = 7.dp, vertical = 5.dp),
-                        color = Color(0xFF909090), fontFamily = OracleSans, fontSize = 11.sp)
+                        color = palette.textTertiary, fontFamily = OracleSans, fontSize = 11.sp)
                 }
             }
         }
@@ -1419,7 +1451,7 @@ private fun AgentExecutionTrace(events: List<AgenticEvent>, onOpenFile: (String)
                 .padding(vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(Modifier.width(2.dp).height(20.dp).background(Color(0xFFE08A45), RoundedCornerShape(2.dp)))
+            Box(Modifier.width(2.dp).height(20.dp).background(palette.accent, RoundedCornerShape(2.dp)))
             Spacer(Modifier.width(9.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("REASONING SUMMARY  ·  ACTIVITY", color = Color(0xFFE08A45), fontFamily = OracleMono,
@@ -1432,7 +1464,7 @@ private fun AgentExecutionTrace(events: List<AgenticEvent>, onOpenFile: (String)
                 )
             }
             Spacer(Modifier.width(8.dp))
-            Text(if (expanded) "−" else "⌄", color = Color(0xFF7E8FE0), fontSize = 15.sp)
+            Text(if (expanded) "−" else "⌄", color = palette.textTertiary, fontSize = 15.sp)
         }
         AnimatedVisibility(
             visible = expanded,
@@ -1456,16 +1488,16 @@ private fun AgentEventRow(index: Int, event: AgenticEvent, onOpenFile: (String) 
     val isCode = event.code.isNotBlank()
     var expanded by remember(event.title, event.kind, event.code) { mutableStateOf(false) }
     val accent = when {
-        isFile -> Color(0xFF42A68A)
+        isFile -> palette.success
         event.kind.contains("network") -> Color(0xFFE08A45)
-        event.kind.contains("python") || event.kind.contains("hosted") -> Color(0xFFBF8B52)
-        event.kind.contains("search") || event.kind.contains("url") -> Color(0xFF5C9ACB)
-        else -> Color(0xFF7B8FE8)
+        event.kind.contains("python") || event.kind.contains("hosted") -> palette.textSecondary
+        event.kind.contains("search") || event.kind.contains("url") -> palette.textSecondary
+        else -> palette.textSecondary
     }
     Row(Modifier.fillMaxWidth().heightIn(min = 30.dp), verticalAlignment = Alignment.Top) {
         Column(Modifier.width(25.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Box(
-                Modifier.size(22.dp).clip(RoundedCornerShape(7.dp))
+                Modifier.size(20.dp).clip(RoundedCornerShape(7.dp))
                     .background(accent.copy(alpha = 0.13f))
                     .border(1.dp, accent.copy(alpha = 0.28f), RoundedCornerShape(7.dp)),
                 contentAlignment = Alignment.Center
@@ -1477,7 +1509,7 @@ private fun AgentEventRow(index: Int, event: AgenticEvent, onOpenFile: (String) 
         }
         Spacer(Modifier.width(8.dp))
         Column(
-            Modifier.weight(1f).clip(RoundedCornerShape(9.dp))
+            Modifier.weight(1f).clip(RoundedCornerShape(7.dp))
                 .background(palette.surfaceRaised.copy(alpha = 0.72f))
                 .clickable(enabled = isCode || isFile || event.detail.isNotBlank()) { expanded = !expanded }
                 .padding(horizontal = 10.dp, vertical = 8.dp),
@@ -1510,7 +1542,7 @@ private fun AgentEventRow(index: Int, event: AgenticEvent, onOpenFile: (String) 
                     fontSize = 10.sp, lineHeight = 15.sp)
             }
             if (isCode && expanded) {
-                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFF171D29)).padding(9.dp)) {
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(palette.surfaceSunken).padding(9.dp)) {
                     OracleSyntaxCode(event.code.take(16000))
                 }
             }
@@ -1520,14 +1552,15 @@ private fun AgentEventRow(index: Int, event: AgenticEvent, onOpenFile: (String) 
 
 @Composable
 private fun LiveAgentActivity(events: List<AgenticEvent>) {
+    val palette = LocalOraclePalette.current
     val last = events.lastOrNull { it.kind != "usage" }
     Row(
         Modifier.fillMaxWidth().padding(start = 32.dp, end = 12.dp)
-            .clip(RoundedCornerShape(11.dp)).background(Color(0x147B8FE8))
+            .clip(RoundedCornerShape(8.dp)).background(Color(0x147B8FE8))
             .padding(horizontal = 11.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        OracleSpinner(Modifier.size(15.dp), Color(0xFF788CE5))
+        OracleSpinner(Modifier.size(15.dp), palette.accent)
         Spacer(Modifier.width(9.dp))
         Text(last?.title ?: "ORACLE is planning the next step",
             Modifier.weight(1f), color = Color(0xFF788CE5), fontFamily = OracleMono,
@@ -1644,17 +1677,17 @@ private fun ModelControlPanel(
     }
     Column(
         modifier = modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(13.dp))
             .background(
                 androidx.compose.ui.graphics.Brush.linearGradient(
                     if (palette.isDark) {
-                        listOf(Color(0xED303A49), Color(0xD91E2631), Color(0xF0262E3A))
+                        listOf(palette.surfaceRaised.copy(alpha = 0.98f), palette.surface.copy(alpha = 0.96f))
                     } else {
                         listOf(Color(0xF5FFFFFF), Color(0xDCECF1FA), Color(0xF4FFFFFF))
                     }
                 )
             )
-            .border(1.dp, Color(0x66FFFFFF), RoundedCornerShape(22.dp))
+            .border(1.dp, palette.outline, RoundedCornerShape(13.dp))
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -1677,35 +1710,35 @@ private fun ModelControlPanel(
         }
         Box(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                .background(Color(0x157B8FE8))
+                .background(palette.accentSoft.copy(alpha = 0.62f))
                 .clickable(onClick = onOpenModelBrowser)
                 .padding(horizontal = 12.dp, vertical = 11.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(28.dp).clip(RoundedCornerShape(9.dp)).background(Color(0x287B8FE8)),
+                Box(Modifier.size(28.dp).clip(RoundedCornerShape(9.dp)).background(palette.accentSoft),
                     contentAlignment = Alignment.Center) {
-                    Text("✦", color = Color(0xFF7185DE), fontSize = 17.sp)
+                    Text("✦", color = palette.accent, fontSize = 17.sp)
                 }
                 Spacer(Modifier.width(9.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("EXPLORE MODELS", color = Color(0xFF6579CF), fontFamily = OracleMono,
+                    Text("EXPLORE MODELS", color = palette.accent, fontFamily = OracleMono,
                         fontSize = 9.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.7.sp)
                     Text("Compare capabilities, context windows and model families",
                         color = palette.textSecondary, fontFamily = OracleSans, fontSize = 10.sp)
                 }
-                Text("↗", color = Color(0xFF6579CF), fontSize = 16.sp)
+                Text("↗", color = palette.accent, fontSize = 16.sp)
             }
         }
         if (selectedModel.contains("flash-image", ignoreCase = true)) {
             Row(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(11.dp))
-                    .background(Color(0x1642A68A)).padding(10.dp),
+                    .background(palette.success.copy(alpha = 0.10f)).padding(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("✦", color = Color(0xFF369A7B), fontSize = 17.sp)
+                Text("✦", color = palette.success, fontSize = 17.sp)
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("IMAGE GENERATION MODEL", color = Color(0xFF369A7B),
+                    Text("IMAGE GENERATION MODEL", color = palette.success,
                         fontFamily = OracleMono, fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
                     Text("Dedicated image output. For web, files and Python, use the main agent model and its DRAW tool.",
                         color = palette.textSecondary, fontFamily = OracleSans, fontSize = 10.sp, lineHeight = 14.sp)
@@ -2030,8 +2063,10 @@ private fun OracleThreadDrawer(
     onOpenLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenWorkflows: () -> Unit,
-    onOpenAudio: () -> Unit
-) {
+    onOpenAudio: () -> Unit,
+    onOpenExams: () -> Unit
+ ) {
+    val palette = LocalOraclePalette.current
     val scope = rememberCoroutineScope()
     var searchQuery by remember { mutableStateOf("") }
     var workspaceListExpanded by remember { mutableStateOf(false) }
@@ -2059,42 +2094,56 @@ private fun OracleThreadDrawer(
     val older = visibleSessions.filter { it.updatedAt < todayStart - 7L * 86_400_000L }
 
     Box(Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize().background(Color(0x55000000)).clickable(onClick = onClose))
+        Box(Modifier.fillMaxSize().background(palette.scrim).clickable(onClick = onClose))
         AnimatedVisibility(
             visible = true, modifier = Modifier.align(Alignment.CenterStart),
             enter = slideInHorizontally(initialOffsetX = { -it }) + fadeIn(),
             exit = slideOutHorizontally(targetOffsetX = { -it }) + fadeOut()
         ) {
             Column(
-                modifier = Modifier.fillMaxHeight().fillMaxWidth(0.77f).widthIn(max = 360.dp)
-                    .clip(RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp))
-                    .background(Color.White)
+                modifier = Modifier.fillMaxHeight().fillMaxWidth(0.82f).widthIn(max = 344.dp)
+                    .clip(RoundedCornerShape(topEnd = 10.dp, bottomEnd = 10.dp))
+                    .background(palette.surface)
+                    .border(1.dp, palette.outlineSoft, RoundedCornerShape(topEnd = 10.dp, bottomEnd = 10.dp))
                     .windowInsetsPadding(WindowInsets.safeDrawing)
                     .padding(start = 16.dp, end = 15.dp, top = 16.dp, bottom = 11.dp)
             ) {
-                Row(Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(24.dp))
-                    .background(Color(0xFFF3F3F3)).padding(horizontal = 12.dp),
+                Row(Modifier.fillMaxWidth().height(38.dp).clip(RoundedCornerShape(10.dp))
+                    .background(palette.surfaceRaised).padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    OracleGlyphIcon(OracleGlyph.Search, Modifier.size(22.dp), Color(0xFF8A8A8A), 1.6f)
+                    OracleGlyphIcon(OracleGlyph.Search, Modifier.size(22.dp), palette.textTertiary, 1.6f)
                     Spacer(Modifier.width(9.dp))
                     Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                         if (searchQuery.isEmpty()) Text("Search chat content...",
-                            color = Color(0xFF929292), fontFamily = OracleSans, fontSize = 14.sp)
+                            color = palette.textTertiary, fontFamily = OracleSans, fontSize = 14.sp)
                         BasicTextField(
                             value = searchQuery, onValueChange = { searchQuery = it }, singleLine = true,
-                            textStyle = TextStyle(color = Color(0xFF171717),
+                            textStyle = TextStyle(color = palette.text,
                                 fontFamily = OracleSans, fontSize = 14.sp),
-                            cursorBrush = SolidColor(Color(0xFF557BDD)), modifier = Modifier.fillMaxWidth()
+                            cursorBrush = SolidColor(palette.accent), modifier = Modifier.fillMaxWidth()
                         )
                     }
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                        .background(palette.accentSoft)
+                        .clickable(onClick = onNewThread)
+                        .padding(horizontal = 11.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("New conversation", color = palette.accent,
+                        fontFamily = OracleSans, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.weight(1f))
+                    Text("+", color = palette.accent, fontSize = 17.sp)
                 }
                 Spacer(Modifier.height(16.dp))
                 Row(Modifier.fillMaxWidth().padding(horizontal = 3.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    Text("Recent", color = Color(0xFF8C8C8C), fontFamily = OracleSans,
+                    Text("Recent", color = palette.textTertiary, fontFamily = OracleSans,
                         fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.weight(1f))
-                    Text(visibleSessions.size.toString(), color = Color(0xFFAAAAAA),
+                    Text(visibleSessions.size.toString(), color = palette.textTertiary,
                         fontFamily = OracleSans, fontSize = 11.sp)
                 }
                 LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -2126,45 +2175,49 @@ private fun OracleThreadDrawer(
                     if (visibleSessions.isEmpty()) {
                         item { Text(if (searchQuery.isBlank()) "No conversations yet" else "No matching conversations",
                             Modifier.padding(horizontal = 7.dp, vertical = 15.dp),
-                            color = Color(0xFF969696), fontFamily = OracleSans, fontSize = 13.sp) }
+                            color = palette.textTertiary, fontFamily = OracleSans, fontSize = 13.sp) }
                     }
                 }
-                Spacer(Modifier.height(7.dp))
+                Spacer(Modifier.height(8.dp))
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    DrawerAction(OracleGlyph.Library, "Library", onOpenLibrary)
+                    DrawerAction(OracleGlyph.Spark, "Workflow Studio", onOpenWorkflows)
+                    DrawerAction(OracleGlyph.Audio, "Audio Memory", onOpenAudio)
+                    DrawerAction(OracleGlyph.Library, "Exam Studio", onOpenExams)
+                    DrawerAction(OracleGlyph.Settings, "Settings", onOpenSettings)
+                }
+                Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
                     .clickable { workspaceListExpanded = !workspaceListExpanded }
                     .padding(horizontal = 3.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(34.dp).clip(CircleShape).background(Color(0xFF171717)),
+                    Box(Modifier.size(34.dp).clip(CircleShape).background(palette.text),
                         contentAlignment = Alignment.Center) {
-                        Text("L", color = Color.White, fontFamily = OracleSans,
+                        Text("L", color = palette.surface, fontFamily = OracleSans,
                             fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     }
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Littlehomemadestudio", color = Color(0xFF171717),
+                        Text("Littlehomemadestudio", color = palette.text,
                             fontFamily = OracleSans, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                        Text(activeWorkspace?.name ?: "Workspace", color = Color(0xFF8B8B8B),
+                        Text(activeWorkspace?.name ?: "Workspace", color = palette.textTertiary,
                             fontFamily = OracleSans, fontSize = 11.sp,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    Text("•••", color = Color(0xFF999999), fontSize = 16.sp)
+                    Text("•••", color = palette.textTertiary, fontSize = 16.sp)
                 }
                 AnimatedVisibility(
                     visible = workspaceListExpanded || workspaceComposerExpanded,
                     enter = fadeIn(tween(120)) + expandVertically(tween(160)),
                     exit = fadeOut(tween(90)) + shrinkVertically(tween(130))
                 ) {
-                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp))
-                        .background(Color(0xFFF5F5F5)).padding(9.dp),
+                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                        .background(palette.surfaceRaised).padding(9.dp),
                         verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        DrawerAction(OracleGlyph.Library, "Library", onOpenLibrary)
-                        DrawerAction(OracleGlyph.Spark, "Workflow Studio", onOpenWorkflows)
-                        DrawerAction(OracleGlyph.Audio, "Audio Memory", onOpenAudio)
-                        DrawerAction(OracleGlyph.Settings, "Settings", onOpenSettings)
-                        Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE7E7E7)))
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(palette.outlineSoft))
                         workspaces.forEach { workspace ->
                             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
-                                .background(if (workspace.id == activeWorkspaceId) Color(0xFFE8EFFF) else Color.Transparent)
+                                .background(if (workspace.id == activeWorkspaceId) palette.accentSoft else Color.Transparent)
                                 .clickable {
                                     onWorkspaceChange(workspace.id)
                                     workspaceListExpanded = false
@@ -2172,10 +2225,10 @@ private fun OracleThreadDrawer(
                                 }.padding(horizontal = 9.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically) {
                                 Text(workspace.name, Modifier.weight(1f),
-                                    color = if (workspace.id == activeWorkspaceId) Color(0xFF5278D8) else Color(0xFF333333),
+                                    color = if (workspace.id == activeWorkspaceId) palette.accent else palette.textSecondary,
                                     fontFamily = OracleSans, fontSize = 12.sp)
                                 if (workspace.id == activeWorkspaceId) Text("ACTIVE",
-                                    color = Color(0xFF5278D8), fontFamily = OracleSans, fontSize = 9.sp)
+                                    color = palette.accent, fontFamily = OracleSans, fontSize = 9.sp)
                             }
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2183,16 +2236,16 @@ private fun OracleThreadDrawer(
                                 BasicTextField(
                                     value = workspaceName,
                                     onValueChange = { workspaceName = it.take(WorkspacePolicy.MAX_NAME_LENGTH); workspaceError = null },
-                                    modifier = Modifier.weight(1f).background(Color.White, RoundedCornerShape(8.dp))
+                                    modifier = Modifier.weight(1f).background(palette.surface, RoundedCornerShape(8.dp))
                                         .padding(horizontal = 9.dp, vertical = 9.dp),
                                     singleLine = true,
-                                    textStyle = TextStyle(color = Color(0xFF171717),
+                                    textStyle = TextStyle(color = palette.text,
                                         fontFamily = OracleSans, fontSize = 12.sp),
-                                    cursorBrush = SolidColor(Color(0xFF5278D8)),
+                                    cursorBrush = SolidColor(palette.accent),
                                     decorationBox = { inner ->
                                         Box {
                                             if (workspaceName.isBlank()) Text("Workspace name",
-                                                color = Color(0xFF999999), fontSize = 12.sp)
+                                                color = palette.textTertiary, fontSize = 12.sp)
                                             inner()
                                         }
                                     }
@@ -2222,18 +2275,18 @@ private fun OracleThreadDrawer(
                                             }
                                         }
                                     }.padding(horizontal = 6.dp, vertical = 8.dp),
-                                    color = Color(0xFF5278D8), fontFamily = OracleSans,
+                                    color = palette.accent, fontFamily = OracleSans,
                                     fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             } else {
                                 Text("New workspace", Modifier.clickable {
                                     workspaceComposerExpanded = true
                                     workspaceListExpanded = true
-                                }.padding(6.dp), color = Color(0xFF5278D8),
+                                }.padding(6.dp), color = palette.accent,
                                     fontFamily = OracleSans, fontSize = 12.sp)
                             }
                         }
                         workspaceError?.let {
-                            Text(it, color = Color(0xFFB43B32), fontFamily = OracleSans, fontSize = 10.sp)
+                            Text(it, color = palette.error, fontFamily = OracleSans, fontSize = 10.sp)
                         }
                     }
                 }
@@ -2244,25 +2297,27 @@ private fun OracleThreadDrawer(
 
 @Composable
 private fun DrawerDateLabel(label: String) {
+    val palette = LocalOraclePalette.current
     Text(label, Modifier.padding(start = 3.dp, top = 15.dp, bottom = 7.dp),
-        color = Color(0xFF8D8D8D), fontFamily = OracleSans, fontSize = 12.sp,
+        color = palette.textTertiary, fontFamily = OracleSans, fontSize = 12.sp,
         fontWeight = FontWeight.SemiBold)
 }
 
 @Composable
-private fun DrawerSessionRow(title: String, selected: Boolean, onClick: () -> Unit) {
+private fun DrawerSessionRow(title: String, selected: Boolean, onClick: () -> Unit ) {
+    val palette = LocalOraclePalette.current
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-            .background(if (selected) Color(0xFFEDF2FE) else Color.Transparent)
-            .clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp))
+            .background(if (selected) palette.accentSoft else Color.Transparent)
+            .clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(title, Modifier.weight(1f),
-            color = if (selected) Color(0xFF5278D8) else Color(0xFF171717),
-            fontFamily = OracleSans, fontSize = 14.sp,
+            color = if (selected) palette.accent else palette.text,
+            fontFamily = OracleSans, fontSize = 12.sp,
             fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (selected) Text("•••", color = Color(0xFF8D8D8D), fontSize = 15.sp)
+        if (selected) Text("•", color = palette.accent, fontSize = 15.sp)
     }
 }
 
@@ -2295,57 +2350,45 @@ private fun DrawerAction(
 ) {
     val palette = LocalOraclePalette.current
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(13.dp))
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(7.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 11.dp, vertical = 13.dp),
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        OracleGlyphIcon(glyph, Modifier.size(18.dp), palette.textSecondary)
-        Spacer(Modifier.width(12.dp))
-        Text(
-            label,
-            color = palette.textSecondary,
-            fontFamily = OracleSans,
-            fontSize = 13.sp
-        )
+        Text(label, color = palette.textSecondary, fontFamily = OracleSans,
+            fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
 }
-
 
 @Composable
 private fun OracleEmptyState(onPrompt: (String) -> Unit) {
     val palette = LocalOraclePalette.current
     val greeting = remember {
-        listOf(
-            "Hi. What can I do for you?",
-            "Hello. What are we working on today?",
-            "What would you like to explore?",
-            "Ready when you are.",
-            "How can I help?"
-        ).random()
+        listOf("What are we working on?", "Where should we begin?", "Ready when you are.")
+            .random()
     }
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp),
+        horizontalAlignment = Alignment.Start,
         verticalArrangement = Arrangement.Center
     ) {
-        OracleWhaleMark(
-            modifier = Modifier.size(width = 38.dp, height = 30.dp),
-            color = Color(0xFF4F78E8)
-        )
-        Spacer(Modifier.height(17.dp))
         Text(
-            greeting,
-            color = Color(0xFF171717),
-            fontFamily = OracleSans,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 18.sp,
-            lineHeight = 25.sp,
-            textAlign = TextAlign.Center
+            "ORACLE", color = palette.text, fontFamily = OracleSans,
+            fontWeight = FontWeight.SemiBold, fontSize = 11.sp,
+            letterSpacing = 2.2.sp
+        )
+        Spacer(Modifier.height(13.dp))
+        Text(
+            greeting, color = palette.text, fontFamily = OracleSans,
+            fontWeight = FontWeight.Medium, fontSize = 23.sp,
+            lineHeight = 30.sp, letterSpacing = (-0.45).sp
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Ask, create, research, or get something done.",
+            color = palette.textTertiary, fontFamily = OracleSans,
+            fontSize = 12.sp, lineHeight = 18.sp
         )
     }
 }

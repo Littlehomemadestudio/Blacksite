@@ -120,6 +120,29 @@ data class WorkflowEntity(
 )
 
 @Entity(
+    tableName = "workflow_triggers",
+    foreignKeys = [
+        ForeignKey(
+            entity = WorkflowEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["workflowId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index(value = ["workspaceId", "enabled"]),
+        Index(value = ["workspaceId", "updatedAt"])
+    ]
+)
+data class WorkflowTriggerEntity(
+    @PrimaryKey val workflowId: String,
+    val workspaceId: String,
+    val intervalMinutes: Long,
+    val enabled: Boolean,
+    val updatedAt: Long
+)
+
+@Entity(
     tableName = "workflow_steps",
     foreignKeys = [
         ForeignKey(
@@ -406,6 +429,21 @@ interface WorkflowDao {
     suspend fun deleteWorkflow(workflowId: String, workspaceId: String): Int
 }
 
+@Dao
+interface WorkflowTriggerDao {
+    @Query("SELECT * FROM workflow_triggers WHERE workspaceId = :workspaceId ORDER BY updatedAt DESC")
+    fun observeTriggers(workspaceId: String): Flow<List<WorkflowTriggerEntity>>
+
+    @Query("SELECT * FROM workflow_triggers WHERE workflowId = :workflowId AND workspaceId = :workspaceId LIMIT 1")
+    suspend fun findTrigger(workflowId: String, workspaceId: String): WorkflowTriggerEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertTrigger(trigger: WorkflowTriggerEntity)
+
+    @Query("DELETE FROM workflow_triggers WHERE workflowId = :workflowId AND workspaceId = :workspaceId")
+    suspend fun deleteTrigger(workflowId: String, workspaceId: String): Int
+}
+
 @Entity(
     tableName = "audio_memories",
     indices = [
@@ -467,6 +505,59 @@ interface AudioMemoryDao {
     suspend fun delete(id: String, workspaceId: String): Int
 }
 
+
+@Entity(
+    tableName = "exam_papers",
+    indices = [
+        Index(value = ["workspaceId", "updatedAt"]),
+        Index(value = ["workspaceId", "status"])
+    ]
+)
+data class ExamPaperEntity(
+    @PrimaryKey val id: String,
+    val workspaceId: String,
+    val title: String,
+    val subject: String,
+    val grade: String,
+    val durationMinutes: Int,
+    val totalMarks: Double,
+    val paperJson: String,
+    val answerKeyJson: String,
+    val answersJson: String,
+    val status: String,
+    val score: Double?,
+    val createdAt: Long,
+    val updatedAt: Long
+)
+
+@Dao
+interface ExamPaperDao {
+    @Query("SELECT * FROM exam_papers WHERE workspaceId = :workspaceId ORDER BY updatedAt DESC")
+    fun observePapers(workspaceId: String): Flow<List<ExamPaperEntity>>
+
+    @Query("SELECT * FROM exam_papers WHERE id = :id AND workspaceId = :workspaceId LIMIT 1")
+    suspend fun find(id: String, workspaceId: String): ExamPaperEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entity: ExamPaperEntity)
+
+    @Query(
+        "UPDATE exam_papers SET answersJson = :answersJson, status = :status, score = :score, updatedAt = :updatedAt " +
+            "WHERE id = :id AND workspaceId = :workspaceId"
+    )
+    suspend fun updateAttempt(
+        id: String,
+        workspaceId: String,
+        answersJson: String,
+        status: String,
+        score: Double?,
+        updatedAt: Long
+    ): Int
+
+    @Query("DELETE FROM exam_papers WHERE id = :id AND workspaceId = :workspaceId")
+    suspend fun delete(id: String, workspaceId: String): Int
+}
+
 @Database(
     entities = [
         WorkspaceEntity::class,
@@ -479,9 +570,11 @@ interface AudioMemoryDao {
         LocalNoteEntity::class,
         WorkflowRunEntity::class,
         WorkflowRunLogEntity::class,
-        AudioMemoryEntity::class
+        WorkflowTriggerEntity::class,
+        AudioMemoryEntity::class,
+        ExamPaperEntity::class
     ],
-    version = 7,
+    version = 9,
     exportSchema = false
 )
 abstract class OracleDatabase : RoomDatabase() {
@@ -489,7 +582,9 @@ abstract class OracleDatabase : RoomDatabase() {
     abstract fun agentDao(): AgentDao
     abstract fun documentDao(): DocumentDao
     abstract fun workflowDao(): WorkflowDao
+    abstract fun workflowTriggerDao(): WorkflowTriggerDao
     abstract fun audioMemoryDao(): AudioMemoryDao
+    abstract fun examPaperDao(): ExamPaperDao
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -675,6 +770,49 @@ abstract class OracleDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS workflow_triggers (" +
+                        "workflowId TEXT NOT NULL, workspaceId TEXT NOT NULL, " +
+                        "intervalMinutes INTEGER NOT NULL, enabled INTEGER NOT NULL, " +
+                        "updatedAt INTEGER NOT NULL, PRIMARY KEY(workflowId), " +
+                        "FOREIGN KEY(workflowId) REFERENCES workflows(id) " +
+                        "ON UPDATE NO ACTION ON DELETE CASCADE)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_workflow_triggers_workspaceId_enabled " +
+                        "ON workflow_triggers(workspaceId, enabled)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_workflow_triggers_workspaceId_updatedAt " +
+                        "ON workflow_triggers(workspaceId, updatedAt)"
+                )
+            }
+        }
+
+
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS exam_papers (" +
+                        "id TEXT NOT NULL, workspaceId TEXT NOT NULL, title TEXT NOT NULL, " +
+                        "subject TEXT NOT NULL, grade TEXT NOT NULL, durationMinutes INTEGER NOT NULL, " +
+                        "totalMarks REAL NOT NULL, paperJson TEXT NOT NULL, answerKeyJson TEXT NOT NULL, " +
+                        "answersJson TEXT NOT NULL, status TEXT NOT NULL, score REAL, " +
+                        "createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, PRIMARY KEY(id))"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_exam_papers_workspaceId_updatedAt " +
+                        "ON exam_papers(workspaceId, updatedAt)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_exam_papers_workspaceId_status " +
+                        "ON exam_papers(workspaceId, status)"
+                )
+            }
+        }
+
         private fun SupportSQLiteDatabase.hasColumn(table: String, column: String): Boolean =
             query("PRAGMA table_info($table)").use { cursor ->
                 val nameIndex = cursor.getColumnIndex("name")
@@ -694,7 +832,7 @@ abstract class OracleDatabase : RoomDatabase() {
                     OracleDatabase::class.java,
                     "oracle_studio.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                     .build()
                     .also { instance = it }
             }

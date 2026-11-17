@@ -37,6 +37,10 @@ import studio.oracle.data.LocalWorkflowRunner
 import studio.oracle.data.WorkflowAction
 import studio.oracle.data.WorkflowRepository
 import studio.oracle.data.WorkflowRules
+import studio.oracle.data.WorkflowRunOrigin
+import studio.oracle.data.WorkflowSchedulePolicy
+import studio.oracle.data.WorkflowScheduleResult
+import studio.oracle.data.WorkflowTriggerScheduler
 import studio.oracle.data.local.OracleDatabase
 import studio.oracle.data.local.WorkflowEntity
 import studio.oracle.data.local.WorkflowRunLogEntity
@@ -48,6 +52,10 @@ fun WorkflowScreen(workspaceId: String) {
     val context = LocalContext.current
     val database = remember(context) { OracleDatabase.get(context) }
     val repository = remember(database, workspaceId) { WorkflowRepository(database.workflowDao(), workspaceId) }
+    val scheduleManager = remember(context, database, workspaceId) {
+        WorkflowTriggerScheduler(context, database.workflowTriggerDao(), database.workflowDao(), workspaceId)
+    }
+    val triggers by scheduleManager.triggers.collectAsState(initial = emptyList())
     val documentRepository = remember(context, database) {
         DocumentRepository(context, database.documentDao(), workspaceId)
     }
@@ -65,16 +73,24 @@ fun WorkflowScreen(workspaceId: String) {
     var draftTitle by remember { mutableStateOf("") }
     var draftDescription by remember { mutableStateOf("") }
     var steps by remember { mutableStateOf(emptyList<WorkflowStepEntity>()) }
-    var status by remember { mutableStateOf("LOCAL WORKSPACE · MANUAL TRIGGERS ONLY") }
+    var status by remember { mutableStateOf("LOCAL WORKSPACE · MANUAL + OPTIONAL SCHEDULED TRIGGERS") }
     var saving by remember { mutableStateOf(false) }
     var running by remember { mutableStateOf(false) }
     var showRunConfirmation by remember { mutableStateOf(false) }
+    var showScheduleConfirmation by remember { mutableStateOf(false) }
+    var scheduleInterval by remember { mutableStateOf(60L) }
+    var scheduleMenuExpanded by remember { mutableStateOf(false) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var viewingRunId by remember { mutableStateOf<String?>(null) }
     var viewingLogs by remember { mutableStateOf(emptyList<WorkflowRunLogEntity>()) }
     var viewingRunTitle by remember { mutableStateOf("") }
 
     val selectedWorkflow = workflows.firstOrNull { it.id == selectedWorkflowId }
+    val selectedTrigger = triggers.firstOrNull { it.workflowId == selectedWorkflowId && it.enabled }
+
+    LaunchedEffect(selectedWorkflowId, selectedTrigger?.intervalMinutes) {
+        scheduleInterval = selectedTrigger?.intervalMinutes ?: 60L
+    }
 
     LaunchedEffect(workspaceId) {
         selectedWorkflowId = null
@@ -161,7 +177,7 @@ fun WorkflowScreen(workspaceId: String) {
             Column(Modifier.weight(1f)) {
                 Text("AUTOMATION STUDIO", color = LocalOraclePalette.current.accent, fontSize = 9.sp, letterSpacing = 1.7.sp, fontWeight = FontWeight.Bold)
                 Text("Workflows", color = LocalOraclePalette.current.text, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-                Text("Local actions · explicit manual runs", color = LocalOraclePalette.current.textSecondary, fontSize = 10.sp)
+                Text("Local actions · manual or optional scheduled runs", color = LocalOraclePalette.current.textSecondary, fontSize = 10.sp)
             }
             if (tab == "WORKFLOWS" && selectedWorkflowId == null) {
                 OracleSolidAction(
@@ -266,7 +282,15 @@ fun WorkflowScreen(workspaceId: String) {
                                         Spacer(Modifier.width(10.dp))
                                         Column(Modifier.weight(1f)) {
                                             Text(workflow.title, color = LocalOraclePalette.current.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            Text(workflow.description.ifBlank { "Manual workflow · local only" }, color = LocalOraclePalette.current.textSecondary, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                            val scheduled = triggers.firstOrNull { it.workflowId == workflow.id && it.enabled }
+                                            Text(
+                                                scheduled?.let { "Scheduled · every ${WorkflowSchedulePolicy.intervalLabel(it.intervalMinutes)}" }
+                                                    ?: workflow.description.ifBlank { "Manual workflow · local only" },
+                                                color = LocalOraclePalette.current.textSecondary,
+                                                fontSize = 10.sp,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
                                         }
                                         OracleGlyphIcon(OracleGlyph.Back, Modifier.size(16.dp), LocalOraclePalette.current.textSecondary)
                                     }
@@ -308,7 +332,101 @@ fun WorkflowScreen(workspaceId: String) {
                                     Row(Modifier.fillMaxWidth().padding(9.dp), verticalAlignment = Alignment.CenterVertically) {
                                         OracleGlyphIcon(OracleGlyph.Settings, Modifier.size(16.dp), LocalOraclePalette.current.textSecondary)
                                         Spacer(Modifier.width(7.dp))
-                                        Text("MANUAL TRIGGER  ·  ON-DEVICE EXECUTION  ·  NO NETWORK", color = LocalOraclePalette.current.textSecondary, fontSize = 8.sp, letterSpacing = .35.sp)
+                                        Text("MANUAL RUN  ·  ON-DEVICE EXECUTION  ·  NO NETWORK", color = LocalOraclePalette.current.textSecondary, fontSize = 8.sp, letterSpacing = .35.sp)
+                                    }
+                                }
+                                Surface(
+                                    color = LocalOraclePalette.current.surface,
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.dp, LocalOraclePalette.current.outlineSoft),
+                                    modifier = Modifier.fillMaxWidth().animateContentSize()
+                                ) {
+                                    Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                                Text(
+                                                    if (selectedTrigger?.enabled == true) "SCHEDULED TRIGGER" else "OPTIONAL RECURRING TRIGGER",
+                                                    color = LocalOraclePalette.current.accent,
+                                                    fontSize = 8.sp,
+                                                    letterSpacing = 1.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                Text(
+                                                    if (selectedTrigger?.enabled == true)
+                                                        "Repeats every ${WorkflowSchedulePolicy.intervalLabel(selectedTrigger.intervalMinutes)}"
+                                                    else "Run this saved workflow automatically",
+                                                    color = LocalOraclePalette.current.text,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                            }
+                                            if (selectedTrigger?.enabled == true) RunStatus("SCHEDULED")
+                                            else Text("OFF", color = LocalOraclePalette.current.textTertiary, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Box {
+                                                OracleTextAction(
+                                                    label = "EVERY ${WorkflowSchedulePolicy.intervalLabel(scheduleInterval).uppercase()} ▾",
+                                                    onClick = { scheduleMenuExpanded = true },
+                                                    accent = true
+                                                )
+                                                DropdownMenu(
+                                                    expanded = scheduleMenuExpanded,
+                                                    onDismissRequest = { scheduleMenuExpanded = false }
+                                                ) {
+                                                    WorkflowSchedulePolicy.INTERVAL_OPTIONS_MINUTES.forEach { minutes ->
+                                                        DropdownMenuItem(
+                                                            text = {
+                                                                Text(
+                                                                    WorkflowSchedulePolicy.intervalLabel(minutes),
+                                                                    color = LocalOraclePalette.current.text,
+                                                                    fontSize = 12.sp
+                                                                )
+                                                            },
+                                                            onClick = {
+                                                                scheduleInterval = minutes
+                                                                scheduleMenuExpanded = false
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            Spacer(Modifier.weight(1f))
+                                            if (selectedTrigger?.enabled == true) {
+                                                OracleTextAction(
+                                                    label = "UPDATE",
+                                                    onClick = { showScheduleConfirmation = true },
+                                                    accent = true
+                                                )
+                                                OracleTextAction(
+                                                    label = "DISABLE",
+                                                    onClick = {
+                                                        val id = selectedWorkflowId ?: return@OracleTextAction
+                                                        scope.launch {
+                                                            try {
+                                                                scheduleManager.disable(id)
+                                                                status = "SCHEDULE DISABLED · WORKFLOW SAVED LOCALLY"
+                                                            } catch (_: Exception) {
+                                                                status = "COULD NOT DISABLE SCHEDULE"
+                                                            }
+                                                        }
+                                                    },
+                                                    accent = false
+                                                )
+                                            } else {
+                                                OracleSolidAction(
+                                                    label = "ENABLE SCHEDULE",
+                                                    onClick = { showScheduleConfirmation = true },
+                                                    enabled = !saving && !running && selectedWorkflow != null
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            "Android may defer periodic work; this is not an exact-time alarm. Repeated Create/Append steps can add duplicate notes. Runs stay on this device.",
+                                            color = LocalOraclePalette.current.textSecondary,
+                                            fontSize = 9.sp,
+                                            lineHeight = 13.sp
+                                        )
                                     }
                                 }
                             }
@@ -424,7 +542,8 @@ fun WorkflowScreen(workspaceId: String) {
                             repository.save(workflow.copy(title = draftTitle, description = draftDescription), steps)
                             val result = runner.execute(
                                 workflow.copy(title = draftTitle.trim().ifBlank { "Untitled workflow" }),
-                                steps
+                                steps,
+                                origin = WorkflowRunOrigin.MANUAL
                             )
                             status = result.summary
                             if (result.status == "SUCCEEDED") tab = "HISTORY"
@@ -442,6 +561,61 @@ fun WorkflowScreen(workspaceId: String) {
         )
     }
 
+
+    if (showScheduleConfirmation) {
+        val scheduleIsActive = selectedTrigger?.enabled == true
+        AlertDialog(
+            onDismissRequest = { showScheduleConfirmation = false },
+            containerColor = LocalOraclePalette.current.surface,
+            titleContentColor = LocalOraclePalette.current.text,
+            textContentColor = LocalOraclePalette.current.textSecondary,
+            title = { Text(if (scheduleIsActive) "Update recurring schedule?" else "Enable recurring schedule?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text("ORACLE will save this workflow and run it approximately every ${WorkflowSchedulePolicy.intervalLabel(scheduleInterval)}.")
+                    Text("This is a local opt-in. WorkManager runs without Gemini or network access, but Android may defer execution to protect battery.")
+                    Text("Create-note and append-note steps repeat too, so they may create duplicate notes or repeated text. Review the workflow before enabling it.", color = LocalOraclePalette.current.accent, fontSize = 10.sp)
+                    Text("You can disable the schedule at any time. No exact-time alarm or event trigger is created.", fontSize = 10.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showScheduleConfirmation = false
+                    val workflow = selectedWorkflow ?: return@TextButton
+                    scope.launch {
+                        saving = true
+                        try {
+                            repository.save(
+                                workflow.copy(
+                                    title = draftTitle.trim().ifBlank { "Untitled workflow" },
+                                    description = draftDescription.trim()
+                                ),
+                                steps
+                            )
+                            when (val result = scheduleManager.enable(workflow.id, scheduleInterval)) {
+                                is WorkflowScheduleResult.Success -> status = result.message
+                                is WorkflowScheduleResult.Failure -> status = result.message
+                            }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            status = "SCHEDULE UPDATE FAILED · CHECK THE WORKFLOW AND LOCAL STORAGE"
+                        } finally {
+                            saving = false
+                        }
+                    }
+                }) {
+                    Text(if (scheduleIsActive) "Update schedule" else "Enable schedule", color = LocalOraclePalette.current.accent)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showScheduleConfirmation = false }) {
+                    Text("Cancel", color = LocalOraclePalette.current.textSecondary)
+                }
+            }
+        )
+    }
+
     if (showDeleteConfirmation) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation = false },
@@ -455,6 +629,7 @@ fun WorkflowScreen(workspaceId: String) {
                     val id = selectedWorkflowId
                     showDeleteConfirmation = false
                     if (id != null) scope.launch {
+                        scheduleManager.disable(id)
                         repository.delete(id)
                         selectedWorkflowId = null
                         status = "WORKFLOW DELETED · NOTES PRESERVED"

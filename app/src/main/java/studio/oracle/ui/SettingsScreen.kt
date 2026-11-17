@@ -29,6 +29,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import studio.oracle.data.CrossMemoryStore
 import studio.oracle.data.GeminiApi
 import studio.oracle.data.GeminiConnectionResult
 import studio.oracle.security.SecureKeyStore
@@ -41,6 +42,8 @@ fun SettingsScreen() {
     val context = LocalContext.current
     val palette = LocalOraclePalette.current
     val store = remember { SecureKeyStore(context) }
+    val crossMemoryStore = remember(context) { CrossMemoryStore(context) }
+    var crossMemoryEnabled by remember { mutableStateOf(crossMemoryStore.isEnabled()) }
     val api = remember { GeminiApi() }
     val scope = rememberCoroutineScope()
 
@@ -97,6 +100,49 @@ fun SettingsScreen() {
                 fontSize = 13.sp,
                 lineHeight = 19.sp
             )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(palette.surface)
+                .border(1.dp, palette.outlineSoft, RoundedCornerShape(18.dp))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("CROSSMEMORY", color = palette.accent, fontFamily = OracleMono,
+                        fontSize = 9.sp, letterSpacing = 1.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Remember across conversations", color = palette.text,
+                        fontFamily = OracleSans, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+                androidx.compose.material3.Switch(
+                    checked = crossMemoryEnabled,
+                    onCheckedChange = {
+                        crossMemoryEnabled = it
+                        crossMemoryStore.setEnabled(it)
+                    }
+                )
+            }
+            Text(
+                "When enabled, ORACLE can save useful long-term preferences, project context and decisions locally, then reuse relevant memories in future chats. Gemini proposes memories; ORACLE validates and removes the hidden memory trailer before showing the answer.",
+                color = palette.textSecondary, fontFamily = OracleSans, fontSize = 11.sp, lineHeight = 16.sp
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Stored locally; relevant memory excerpts are included in Gemini requests",
+                    modifier = Modifier.weight(1f), color = palette.textTertiary,
+                    fontFamily = OracleSans, fontSize = 10.sp, lineHeight = 14.sp)
+                Text(
+                    "CLEAR",
+                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable {
+                        crossMemoryStore.clear()
+                    }.padding(horizontal = 10.dp, vertical = 8.dp),
+                    color = palette.error, fontFamily = OracleMono, fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
 
         Column(

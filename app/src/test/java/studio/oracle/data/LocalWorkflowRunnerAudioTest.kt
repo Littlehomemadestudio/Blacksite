@@ -3,6 +3,7 @@ package studio.oracle.data
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -106,5 +107,40 @@ class LocalWorkflowRunnerAudioTest {
         assertTrue(detail.contains("1 local audio memories"))
         assertTrue(!detail.contains("Private algebra meeting"))
         assertTrue(!detail.contains("another workspace"))
+    }
+    @Test
+    fun scheduledRunIsRecordedAsAnEnabledLocalTrigger() = runBlocking {
+        val workspaceId = "workspace-scheduled"
+        val workflow = WorkflowEntity(
+            id = "workflow-scheduled",
+            title = "Scheduled note",
+            description = "",
+            createdAt = 1L,
+            updatedAt = 1L,
+            workspaceId = workspaceId
+        )
+        database.workflowDao().insertWorkflow(workflow)
+        val step = WorkflowStepEntity(
+            id = "step-scheduled",
+            workflowId = workflow.id,
+            position = 0,
+            actionType = WorkflowAction.CREATE_NOTE.key,
+            title = "Daily review",
+            input = "Review today's priorities."
+        )
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val runner = LocalWorkflowRunner(
+            database.workflowDao(),
+            database.audioMemoryDao(),
+            DocumentRepository(context, database.documentDao(), workspaceId),
+            workspaceId
+        )
+
+        val result = runner.execute(workflow, listOf(step), origin = WorkflowRunOrigin.SCHEDULED)
+        val logs = database.workflowDao().logsForRun(result.runId, workspaceId)
+
+        assertEquals("SUCCEEDED", result.status)
+        assertTrue(logs.first().detail.contains("Scheduled trigger"))
+        assertEquals(1, database.workflowDao().observeNotes(workspaceId).first().size)
     }
 }

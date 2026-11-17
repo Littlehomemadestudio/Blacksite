@@ -6,7 +6,7 @@
 - Native Android, offline-first local workspace, Gemini API key supplied by the user.
 - API credentials are encrypted at rest with AES-GCM; the encryption key is held by Android Keystore.
 - Agent actions are transparent, permission-gated, auditable, and explicitly confirmed before external or destructive effects.
-- Original ORACLE identity: a dark-by-default graphite workbench, warm oxide accents, editorial typography, precise spacing, and progressive disclosure. Semantic tertiary text and light-theme accent colors are tuned for stronger contrast.
+- Original ORACLE identity: a light-by-default porcelain workbench, near-black editorial typography, restrained blue accents, precise spacing, and progressive disclosure. A semantic palette keeps contrast consistent across every workspace.
 
 ## Build
 Open this repository in Android Studio or run:
@@ -39,8 +39,9 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Identically named workflows and notes can exist independently in separate workspaces; a workspace cannot update or delete another workspace's workflows through repository operations.
 
 ### Document Library
-- Imports PDF with selectable text, UTF-8 plain text, and Markdown from Android's document picker; originals are copied into app-private storage.
-- PDF extraction preserves page numbers. TXT/Markdown are segmented into stable section citations; extracted text is chunked and indexed in Room.
+- Imports PDF with selectable text, UTF-8 plain text, Markdown, and Office Open XML DOCX/PPTX/XLSX from Android's document picker; originals are copied into app-private storage.
+- PDF extraction preserves page numbers. DOCX citations retain the document-body label; PPTX citations retain slide numbers; XLSX citations retain worksheet names. TXT/Markdown use stable section citations. Extracted text is chunked and indexed in Room.
+- Office extraction is offline and bounded: it reads only required XML parts from the archive, never executes macros, and does not extract embedded images, charts, comments, or tracked-change metadata.
 - Offline keyword retrieval, document reader, and Gemini library Q&A.
 - Library Q&A displays the exact retrieved excerpts and requires confirmation before sending them to Gemini.
 
@@ -66,9 +67,20 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 ### Workflow Studio
 - Create, edit, reorder, save, and delete workflows with up to 20 ordered steps.
 - Four explicit local actions: create a note, append to a note by exact title, search the on-device document index, and search the active workspace's audio titles/transcripts/summaries/tasks/decisions. Audio search never uploads recordings or transcripts.
-- Runs require a manual confirmation. Successful runs keep their execution trace on the assistant response; failed and cancelled runs attach permission decisions and completed tool events to the originating user turn, so retries retain the audit history.
+- Manual runs require an explicit confirmation. An optional recurring schedule can be enabled per workflow and workspace; enabling or changing it saves the current plan and requires a separate confirmation. Scheduled runs use Android WorkManager and execute the same allowlisted local actions without Gemini or network access.
+- Scheduled runs are labeled in the execution log. Invalid saved plans are recorded as skipped/invalid runs instead of being silently ignored. Schedules can be disabled at any time and are cancelled when their workflow is deleted.
+- WorkManager periodic schedules have a 15-minute minimum and are deferrable: Android may run them later to respect battery and system constraints. They are not exact alarms or event-based triggers. Repeated create/append steps can create duplicate notes or repeated text; the schedule confirmation calls this out before opt-in.
+- Successful runs keep their execution trace on the assistant response; failed and cancelled runs attach permission decisions and completed tool events to the originating user turn, so retries retain the audit history.
 - A failed step stops the run. Deleting a workflow removes its steps and run history but preserves notes created by previous runs.
 - Workflow execution is local-only: no Gemini request, network calls, shell access, arbitrary scripts, app launching, scheduled triggers, or background execution.
+
+### Examination Studio
+- Dedicated, user-initiated assessment authoring for practice, diagnostic, chapter, midterm, final, and mock examinations. Ordinary tutoring does not invoke exam generation.
+- Configurable subject, grade, topics, assessment format, difficulty, question count, duration, total marks, question-type mix, English/Persian language, answer-space density, school/class/teacher metadata, candidate instructions, source material, and answer-key generation.
+- Gemini returns a structured paper and a separate answer key/rubric. ORACLE validates supported question types, unique question IDs/numbers, positive marks, complete marking-scheme coverage when requested, and exact mark totals before saving.
+- The paper is rendered as a document-style examination sheet with institutional metadata, candidate fields, numbered sections, question marks, taxonomy tags, options, and written-answer space. Persian papers use right-to-left layout.
+- Papers and attempts are stored locally in Room and isolated by workspace. Candidates can begin, resume, save progress, submit, and review the marking scheme. Objective answers can be scored locally; constructed responses remain explicitly pending manual marking.
+- Chat supports a fenced `oracle-exam` structured output rendered as an examination document with an interactive attempt mode. The agent is instructed to use it only when the user explicitly asks for an exam or test paper; `oracle-choice` is reserved for explicitly requested short practice checks.
 
 ### Audio Memory Studio
 - Records microphone audio locally with Android AudioRecord as 16 kHz mono PCM, then wraps it in a standard WAV file for Gemini-compatible audio input.
@@ -80,11 +92,11 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - This is file-based, user-initiated transcription—not live transcription, background capture, or Gemini Live streaming.
 
 ### Verification
-- Unit tests cover conversation context, session naming, workspace-name normalization (including Persian text), document chunk boundaries, PDF citations, stable text sections, keyword ranking, workflow plan validation, audio-memory workflow execution and workspace isolation, and Room workspace-isolation queries/mutations under Robolectric.
+- Unit tests cover conversation context, session naming, workspace-name normalization (including Persian text), document chunk boundaries, PDF citations, stable text sections, keyword ranking, DOCX/PPTX/XLSX extraction and source labels, XLSX shared/inline cell values and unsafe relationship rejection, workflow plan validation, audio-memory workflow execution and workspace isolation, examination JSON validation, exact mark totals, objective grading, answer persistence codecs, and Room workspace-isolation queries/mutations under Robolectric.
 
 ## In progress / not yet available
-- Office document extraction, image OCR, scanned-PDF OCR, document summaries, flashcards, quizzes, semantic embeddings, and knowledge graph.
-- Scheduled, event-based, and background workflow triggers. Workflow runs are manual only.
+- Image OCR, scanned-PDF OCR, document summaries, flashcards, semantic embeddings, and knowledge graph. Legacy binary DOC/XLS/PPT formats remain unsupported. Exam Studio does not yet export PDFs or automatically grade constructed responses; its source-material field is manually supplied text rather than a live Library retrieval picker.
+- Event-based triggers, exact-time alarms, and arbitrary external integrations. Periodic schedules are available through Android WorkManager and remain subject to OS deferral.
 - Additional workflow actions such as export, file operations, notifications, and external integrations.
 - Persistent full-duplex Gemini Live audio streaming and interruption handling. Audio Memory provides saved recordings and file-based Gemini transcription, not live streaming.
 - Arbitrary OS-level shell/Termux access, app launching, UI automation, scheduled triggers, and background agents are not implemented. The Agent can use the scoped tools described above, subject to user-selected capabilities and per-session/action approval.
@@ -98,13 +110,13 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Library Q&A is opt-in: only the question and up to six retrieved excerpts are sent to the selected Gemini model after explicit confirmation. Audio transcription is also opt-in per recording; only that selected WAV is uploaded, and ORACLE attempts remote file deletion immediately after transcription.
 
 ## Document library scope and limits
-- Supported imports: PDF with selectable text, UTF-8 plain text, and Markdown. Maximum file size is 20 MB; PDFs are limited to 400 pages; extracted text is capped at 1.5 million characters per file.
-- PDFs with no selectable text are rejected; image-only pages in mixed PDFs are skipped. OCR, standalone images, DOC/DOCX, spreadsheets, and presentations are not supported yet.
-- Retrieval uses on-device lexical keyword matching, not embeddings or semantic vector search. PDF answers cite original page numbers; text and Markdown answers cite indexed sections.
+- Supported imports: PDF with selectable text, UTF-8 plain text, Markdown, DOCX, PPTX, and XLSX. Maximum source file size is 20 MB; PDFs and presentations are limited to 400 pages/slides; workbooks are limited to 100 worksheets; extracted text is capped at 1.5 million characters per file. Office XML parts are capped at 12 MB, archive expansion at 80 MB, and archives at 2,000 entries.
+- PDFs with no selectable text are rejected; image-only pages in mixed PDFs are skipped. DOCX currently indexes the main document body (not headers, footers, or footnotes); PPTX indexes slide text (not speaker notes); XLSX indexes cached/displayed cell values and does not evaluate formulas. Office embedded images/charts and scanned content are not OCR-extracted. Standalone images and legacy binary DOC/XLS/PPT are not supported.
+- Retrieval uses on-device lexical keyword matching, not embeddings or semantic vector search. PDF answers cite original page numbers; DOCX citations identify the document body; PPTX citations identify slide numbers; XLSX citations identify worksheet names; TXT/Markdown answers cite indexed sections.
 - User-facing thread deletion, workspace deletion, and full workspace export are not available yet. Uninstalling the app removes its app-private data.
 
 ## Database compatibility
-Room schema v7 retains existing agent, document, workflow, and workspace data. Migration 6→7 adds workspace-scoped Audio Memory records and search indexes without modifying existing rows. Earlier 3→4 compatibility remains idempotent across the two v3 layouts.
+Room schema v9 retains existing agent, document, workflow, audio, and workspace data. Migration 6→7 adds workspace-scoped Audio Memory records and search indexes; migration 7→8 adds workspace-scoped recurring workflow trigger records; migration 8→9 adds workspace-scoped examination papers and attempts without modifying existing rows. Earlier 3→4 compatibility remains idempotent across the two v3 layouts.
 
 
 ### Release polish
