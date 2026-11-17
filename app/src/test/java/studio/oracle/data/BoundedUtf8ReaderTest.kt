@@ -43,4 +43,21 @@ class BoundedUtf8ReaderTest {
         assertTrue(error is IOException)
         assertTrue(error?.message.orEmpty().contains("valid UTF-8"))
     }
+
+    @Test
+    fun boundedByteReaderPreservesBinaryPayloads() {
+        val expected = byteArrayOf(0, 1, 2, 0xFF.toByte())
+        val actual = BoundedInputReader.read(ByteArrayInputStream(expected), expected.size.toLong())
+        org.junit.Assert.assertArrayEquals(expected, actual)
+    }
+
+    @Test
+    fun boundedByteReaderRejectsOversizedBinaryPayloads() {
+        val error = runCatching {
+            BoundedInputReader.read(ByteArrayInputStream(ByteArray(129)), 128L)
+        }.exceptionOrNull()
+
+        assertTrue(error is IOException)
+        assertTrue(error?.message.orEmpty().contains("read limit"))
+    }
 }
