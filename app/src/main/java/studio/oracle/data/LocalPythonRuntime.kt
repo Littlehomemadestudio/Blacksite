@@ -19,7 +19,7 @@ class LocalPythonRuntime(private val context: Context) {
 
     suspend fun execute(source: String): String = withContext(Dispatchers.IO) {
         require(source.isNotBlank()) { "Python source cannot be empty." }
-        require(source.length <= 256 * 1024) { "Python source exceeds 256 KB." }
+        require(source.length <= 16 * 1024) { "Python source exceeds 16 KB." }
         if (!Python.isStarted()) Python.start(AndroidPlatform(context.applicationContext))
         Python.getInstance()
             .getModule("oracle_runner")
