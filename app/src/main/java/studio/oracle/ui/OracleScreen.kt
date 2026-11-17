@@ -86,6 +86,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import studio.oracle.data.CrossMemoryStore
 import studio.oracle.data.AgentConversationPolicy
 import studio.oracle.data.AgenticEvent
 import studio.oracle.data.AgenticResult
@@ -128,6 +129,7 @@ fun OracleScreen(
     val keyboard = LocalSoftwareKeyboardController.current
     val keyStore = remember { SecureKeyStore(context) }
     val api = remember { GeminiApi() }
+    val crossMemory = remember(context) { CrossMemoryStore(context) }
     val agenticRuntime = remember { GeminiAgenticRuntime() }
     val fileUploader = remember { GeminiFileUploader() }
     val imageGenerator = remember { GeminiImageGenerator() }
@@ -598,7 +600,7 @@ fun OracleScreen(
                     "Conversation history (use as context):\n" + priorContext + "\n\n"
                 val attachedText = if (textAttachmentContext.isEmpty()) "" else
                     "\n\n" + textAttachmentContext.joinToString("\n\n")
-                val agentPrompt = historyText +
+                val agentPrompt = crossMemory.contextBlock() + historyText +
                     "ORACLE RICH CHAT OUTPUT: When a useful question, poll, or choice is appropriate, render it as an interactive block using a fenced \`oracle-choice\` code block containing valid JSON with keys question (string), options (array of 2-8 strings), and optional multiple (boolean). Do not use this format for ordinary prose. ORACLE renders this block as selectable controls and submits the selection as a user message. Continue to use Markdown for headings, **bold**, *italic*, tables, lists, quotes, and code.\\n\\n" +
                     "Current user request:\\n" + submitted + attachedText
                 val tavilyKey = withContext(Dispatchers.IO) { runCatching { keyStore.readTavilyKey() }.getOrNull() }
@@ -709,10 +711,11 @@ fun OracleScreen(
                 )) {
                     is AgenticResult.Success -> {
                         val trace = synchronized(runEvents) { runEvents.toList() }
+                        val visibleReply = crossMemory.consumeReply(result.text)
                         repository.appendMessage(
                             sessionId = sessionId,
                             role = "assistant",
-                            content = result.text,
+                            content = visibleReply,
                             model = result.model,
                             agentTrace = AgenticEventCodec.encodeTrace(trace)
                         )
@@ -720,7 +723,7 @@ fun OracleScreen(
                         failedPromptPersisted = false
                         if (voiceReplyEnabled && ttsReady) {
                             textToSpeech.language = Locale.getDefault()
-                            textToSpeech.speak(result.text.take(5000), TextToSpeech.QUEUE_FLUSH, null, "oracle-voice-reply")
+                            textToSpeech.speak(visibleReply.take(5000), TextToSpeech.QUEUE_FLUSH, null, "oracle-voice-reply")
                         }
                     }
                     is AgenticResult.Failed -> {
