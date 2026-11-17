@@ -87,4 +87,12 @@ class AgenticSettingsTest {
         assertNotEquals(pythonGrant, AgenticPermissionPolicy.sessionGrantKey("chat-1", "web_search"))
         assertNotEquals(pythonGrant, AgenticPermissionPolicy.sessionGrantKey("chat-2", "python"))
     }
+
+    @Test
+    fun codeExecutionAndPhoneFileWritesCannotBeApprovedForAnEntireSession() {
+        assertFalse(AgenticPermissionPolicy.allowsSessionGrant("python"))
+        assertFalse(AgenticPermissionPolicy.allowsSessionGrant("phone_files_write"))
+        assertTrue(AgenticPermissionPolicy.allowsSessionGrant("phone_files_read"))
+        assertTrue(AgenticPermissionPolicy.allowsSessionGrant("web_search"))
+    }
 }
