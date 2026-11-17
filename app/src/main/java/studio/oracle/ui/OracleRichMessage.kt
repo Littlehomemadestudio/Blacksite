@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.sp
 import studio.oracle.ui.theme.LocalOraclePalette
 import studio.oracle.ui.theme.OracleMono
 import studio.oracle.ui.theme.OracleSans
+import studio.oracle.data.ExamBundle
+import studio.oracle.data.ExamPaperCodec
 
 private sealed interface RichBlock {
     data class Heading(val text: String, val level: Int) : RichBlock
@@ -50,6 +52,7 @@ private sealed interface RichBlock {
     data class Quote(val text: String) : RichBlock
     data class Table(val header: List<String>, val rows: List<List<String>>) : RichBlock
     data class Choice(val question: String, val options: List<String>, val multiple: Boolean) : RichBlock
+    data class Exam(val bundle: ExamBundle) : RichBlock
     data object Divider : RichBlock
 }
 
@@ -117,6 +120,7 @@ fun OracleRichMessage(
                     multiple = block.multiple,
                     onSubmit = onSubmitText
                 )
+                is RichBlock.Exam -> ExamRichArtifact(block.bundle, onSubmitText)
                 RichBlock.Divider -> Box(
                     Modifier.fillMaxWidth().padding(vertical = 4.dp).height(1.dp)
                         .background(LocalOraclePalette.current.outlineSoft)
@@ -329,7 +333,11 @@ private fun parseRichBlocks(source: String): List<RichBlock> {
             while (index < lines.size && !lines[index].trim().startsWith("```")) { code.add(lines[index]); index++ }
             if (index < lines.size) index++
             val source = code.joinToString("\n")
-            if (language.equals("oracle-choice", true)) {
+            if (language.equals("oracle-exam", true)) {
+                val exam = runCatching { ExamPaperCodec.parseBundle(source, requireAnswerKey = false) }
+                    .getOrNull()
+                result.add(exam?.let { RichBlock.Exam(it) } ?: RichBlock.Code(language, source))
+            } else if (language.equals("oracle-choice", true)) {
                 val choice = runCatching {
                     val json = org.json.JSONObject(source)
                     val question = json.getString("question")

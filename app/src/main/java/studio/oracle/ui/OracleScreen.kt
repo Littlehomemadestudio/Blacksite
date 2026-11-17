@@ -119,6 +119,7 @@ fun OracleScreen(
     onOpenSettings: () -> Unit,
     onOpenWorkflows: () -> Unit,
     onOpenAudio: () -> Unit,
+    onOpenExams: () -> Unit,
     workspaceId: String,
     workspaces: List<WorkspaceEntity>,
     onWorkspaceChange: (String) -> Unit,
@@ -601,7 +602,7 @@ fun OracleScreen(
                 val attachedText = if (textAttachmentContext.isEmpty()) "" else
                     "\n\n" + textAttachmentContext.joinToString("\n\n")
                 val agentPrompt = crossMemory.contextBlock() + historyText +
-                    "ORACLE RICH CHAT OUTPUT: When a useful question, poll, or choice is appropriate, render it as an interactive block using a fenced `oracle-choice` code block containing valid JSON with keys question (string), options (array of 2-8 strings), and optional multiple (boolean). Do not use this format for ordinary prose. ORACLE renders this block as selectable controls and submits the selection as a user message. Continue to use Markdown for headings, **bold**, *italic*, tables, lists, quotes, and code. When CrossMemory is enabled, append an <oracle-memory> JSON trailer only when a durable, useful, non-sensitive fact or preference should be remembered: {\"items\":[{\"category\":\"preference|project|decision|fact\",\"content\":\"concise standalone memory\"}]}. Never include transient details, guesses, secrets, or sensitive personal data. Do not mention the trailer in the visible answer.\n\n" +
+                    "EXAM STUDIO POLICY: Examination authoring is explicit opt-in. Never create an exam, mock examination, graded assessment, or exam paper during ordinary tutoring, explanations, summaries, homework help, or casual conversation. Do not overuse quizzes. Only when the user explicitly asks to create, make, or generate an exam, test paper, mock exam, or assessment, create a complete structured paper in exactly one fenced oracle-exam code block containing valid JSON. The JSON object must contain title, schoolName, subject, grade, className, teacherName, semester, examDate, durationMinutes, totalMarks, language, instructions array, sections array with title, instructions and questions, and answerKey array with questionId, expectedAnswer, acceptedAnswers and markingGuide. Each question must contain id, number, type, prompt, marks, options, topic, difficulty, cognitiveLevel and answerLines. Supported types: multiple_choice, true_false, short_answer, long_answer, fill_blank, matching, calculation, proof and essay. Make a real paper with sections, exact mark totals, question taxonomy and a separate marking scheme; never put answers in question prompts. Use supplied course materials and source citations when available; never invent source-specific claims. ORACLE renders this block as a document with answer spaces and attempt mode. Use oracle-choice only for a short interactive practice question when the user explicitly asks for a quick quiz or interactive check; do not insert it into ordinary explanations. Continue to use Markdown for headings, **bold**, *italic*, tables, lists, quotes, and code. When CrossMemory is enabled, append an <oracle-memory> JSON trailer only when a durable, useful, non-sensitive fact or preference should be remembered: {\"items\":[{\"category\":\"preference|project|decision|fact\",\"content\":\"concise standalone memory\"}]}. Never include transient details, guesses, secrets, or sensitive personal data. Do not mention the trailer in the visible answer.\n\n" +
                     "Current user request:\n" + submitted + attachedText
                 val tavilyKey = withContext(Dispatchers.IO) { runCatching { keyStore.readTavilyKey() }.getOrNull() }
                 val reportCreatedFile: (CreatedAgentFile) -> Unit = { file ->
@@ -1020,6 +1021,10 @@ fun OracleScreen(
                 onOpenAudio = {
                     drawerOpen = false
                     onOpenAudio()
+                },
+                onOpenExams = {
+                    drawerOpen = false
+                    onOpenExams()
                 }
             )
         }
@@ -2058,7 +2063,8 @@ private fun OracleThreadDrawer(
     onOpenLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenWorkflows: () -> Unit,
-    onOpenAudio: () -> Unit
+    onOpenAudio: () -> Unit,
+    onOpenExams: () -> Unit
  ) {
     val palette = LocalOraclePalette.current
     val scope = rememberCoroutineScope()
@@ -2177,6 +2183,7 @@ private fun OracleThreadDrawer(
                     DrawerAction(OracleGlyph.Library, "Library", onOpenLibrary)
                     DrawerAction(OracleGlyph.Spark, "Workflow Studio", onOpenWorkflows)
                     DrawerAction(OracleGlyph.Audio, "Audio Memory", onOpenAudio)
+                    DrawerAction(OracleGlyph.Library, "Exam Studio", onOpenExams)
                     DrawerAction(OracleGlyph.Settings, "Settings", onOpenSettings)
                 }
                 Spacer(Modifier.height(8.dp))
