@@ -598,7 +598,9 @@ fun OracleScreen(
                     "Conversation history (use as context):\n" + priorContext + "\n\n"
                 val attachedText = if (textAttachmentContext.isEmpty()) "" else
                     "\n\n" + textAttachmentContext.joinToString("\n\n")
-                val agentPrompt = historyText + "Current user request:\n" + submitted + attachedText
+                val agentPrompt = historyText +
+                    "ORACLE RICH CHAT OUTPUT: When a useful question, poll, or choice is appropriate, render it as an interactive block using a fenced \`oracle-choice\` code block containing valid JSON with keys question (string), options (array of 2-8 strings), and optional multiple (boolean). Do not use this format for ordinary prose. ORACLE renders this block as selectable controls and submits the selection as a user message. Continue to use Markdown for headings, **bold**, *italic*, tables, lists, quotes, and code.\\n\\n" +
+                    "Current user request:\\n" + submitted + attachedText
                 val tavilyKey = withContext(Dispatchers.IO) { runCatching { keyStore.readTavilyKey() }.getOrNull() }
                 val reportCreatedFile: (CreatedAgentFile) -> Unit = { file ->
                     val event = AgenticEvent(
@@ -1187,7 +1189,7 @@ private fun OracleMessageRow(
                     it.kind == "generated_image" || it.kind == "generated_audio" ||
                         it.kind == "generated_video" || it.kind == "generated_document"
                 }.forEach { event -> GeneratedMediaArtifact(event, onOpenFile) }
-                OracleRichMessage(message.content)
+                OracleRichMessage(message.content, onSubmitText = { answer -> prompt = answer; submitPrompt() })
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically) {
                     events.lastOrNull { it.kind == "usage" }?.let { TokenUsageChip(it.detail) }
