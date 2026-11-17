@@ -34,7 +34,7 @@ class OracleRunnerTest(unittest.TestCase):
 
     def test_rejects_oversized_source(self):
         with tempfile.TemporaryDirectory() as workspace:
-            result = run(" " * (16 * 1024 + 1), workspace)
+            result = run("x" * (16 * 1024 + 1), workspace)
         self.assertIn("16 KB execution limit", result)
 
 
