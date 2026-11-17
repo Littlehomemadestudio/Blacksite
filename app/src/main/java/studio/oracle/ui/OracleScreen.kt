@@ -20,6 +20,8 @@ import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import studio.oracle.data.AgentAttachmentRef
+import studio.oracle.data.BoundedInputReader
+import studio.oracle.data.BoundedUtf8Reader
 import studio.oracle.data.AgenticEventCodec
 import studio.oracle.data.AgentMediaInput
 import studio.oracle.data.CreatedAgentFile
@@ -302,7 +304,14 @@ fun OracleScreen(
             fileEditorError = null
             editingFileUri = uri
             try {
-                val localFile = if (uri.scheme == "file") File(uri.path.orEmpty()) else null
+                val localFile = if (uri.scheme == "file") {
+                    val candidate = File(uri.path.orEmpty()).canonicalFile
+                    val privateRoot = context.filesDir.canonicalFile.path + File.separator
+                    require(candidate.isFile && candidate.path.startsWith(privateRoot)) {
+                        "ORACLE can only open its own generated files inside app-private storage."
+                    }
+                    candidate
+                } else null
                 editingFileName = localFile?.name ?: runCatching {
                     context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
                         if (cursor.moveToFirst()) cursor.getString(0) else null
@@ -318,12 +327,10 @@ fun OracleScreen(
                     }
                 } else context.contentResolver.getType(uri) ?: "text/plain"
                 editingFileContent = withContext(Dispatchers.IO) {
-                    val bytes = if (localFile != null) localFile.readBytes() else {
-                        context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                            ?: error("Could not open this file.")
+                    val input = if (localFile != null) localFile.inputStream() else {
+                        context.contentResolver.openInputStream(uri) ?: error("Could not open this file.")
                     }
-                    require(bytes.size <= 2 * 1024 * 1024) { "In-app editor supports text files up to 2 MB." }
-                    bytes.toString(Charsets.UTF_8)
+                    input.use { BoundedUtf8Reader.read(it, 2L * 1024L * 1024L) }
                 }
             } catch (exception: Exception) {
                 fileEditorError = exception.message ?: "Could not open this file."
@@ -341,7 +348,12 @@ fun OracleScreen(
             try {
                 withContext(Dispatchers.IO) {
                     if (uri.scheme == "file") {
-                        File(uri.path.orEmpty()).writeText(editingFileContent, Charsets.UTF_8)
+                        val file = File(uri.path.orEmpty()).canonicalFile
+                        val privateRoot = context.filesDir.canonicalFile.path + File.separator
+                        require(file.isFile && file.path.startsWith(privateRoot)) {
+                            "ORACLE can only modify its own generated files inside app-private storage."
+                        }
+                        file.writeText(editingFileContent, Charsets.UTF_8)
                     } else {
                         context.contentResolver.openOutputStream(uri, "wt")?.use {
                             it.write(editingFileContent.toByteArray(Charsets.UTF_8))
@@ -546,15 +558,20 @@ fun OracleScreen(
                 val mediaInputs = try {
                     var totalBytes = 0L
                     val prepared = mutableListOf<AgentMediaInput>()
+                    val attachmentLimit = 30L * 1024L * 1024L
                     for (attachment in attachmentSnapshot) {
                         val uri = Uri.parse(attachment.uri)
-                        val bytes: ByteArray = withContext(Dispatchers.IO) {
-                            context.contentResolver.openInputStream(uri)?.use { stream -> stream.readBytes() }
-                        } ?: error("Could not read " + attachment.name)
-                        totalBytes += bytes.size.toLong()
-                        require(bytes.size <= 30 * 1024 * 1024 && totalBytes <= 30L * 1024 * 1024) {
+                        val remainingBytes = attachmentLimit - totalBytes
+                        require(remainingBytes > 0L) {
                             "Attachments exceed the 30 MB combined limit. Send fewer or smaller files."
                         }
+                        val bytes: ByteArray = withContext(Dispatchers.IO) {
+                            context.contentResolver.openInputStream(uri)?.use { stream ->
+                                BoundedInputReader.read(stream, remainingBytes)
+                            }
+                        } ?: error("Could not read " + attachment.name)
+                        require(bytes.isNotEmpty()) { "Attachment is empty: " + attachment.name }
+                        totalBytes += bytes.size.toLong()
                         val mime = attachment.mimeType.lowercase()
                         when {
                             mime.startsWith("video/") -> {
