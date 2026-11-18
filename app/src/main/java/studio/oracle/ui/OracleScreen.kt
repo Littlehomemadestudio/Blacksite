@@ -197,6 +197,7 @@ fun OracleScreen(
             .getString("phone_tree_uri", null)?.let(Uri::parse))
     }
     var pendingApproval by remember { mutableStateOf<String?>(null) }
+    var pendingApprovalAllowsSession by remember { mutableStateOf(true) }
     var approvalDeferred by remember { mutableStateOf<CompletableDeferred<String>?>(null) }
     val mediaPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         val added = uris.mapNotNull { uri ->
