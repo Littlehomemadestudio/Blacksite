@@ -1,7 +1,6 @@
 package studio.oracle.data
 
 import kotlinx.coroutines.flow.Flow
-import studio.oracle.data.local.DocumentDao
 import studio.oracle.data.local.DocumentEntity
 import studio.oracle.data.local.DocumentStudyDao
 import studio.oracle.data.local.DocumentStudySetEntity
@@ -9,7 +8,6 @@ import java.util.UUID
 
 /** Persists generated study aids locally and enforces workspace/source boundaries. */
 class DocumentStudyRepository(
-    private val documentDao: DocumentDao,
     private val studyDao: DocumentStudyDao,
     private val workspaceId: String
 ) {
