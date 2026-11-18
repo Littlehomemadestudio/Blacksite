@@ -1,5 +1,7 @@
 package studio.oracle.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,6 +32,7 @@ import studio.oracle.data.ExamBundle
 import studio.oracle.data.ExamGrade
 import studio.oracle.data.ExamPaper
 import studio.oracle.data.ExamPaperCodec
+import studio.oracle.data.ExamPdfExporter
 import studio.oracle.data.ExamQuestion
 import studio.oracle.data.ExamRepository
 import studio.oracle.data.GeminiApi
@@ -41,6 +44,8 @@ import studio.oracle.security.SecureKeyStore
 import studio.oracle.ui.theme.LocalOraclePalette
 import studio.oracle.ui.theme.OracleMono
 import studio.oracle.ui.theme.OracleSans
+
+private data class PendingExamPdfExport(val bundle: ExamBundle, val includeAnswerKey: Boolean)
 
 @Composable
 fun ExamStudioScreen(workspaceId: String) {
@@ -88,6 +93,47 @@ fun ExamStudioScreen(workspaceId: String) {
     var generating by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var notice by remember { mutableStateOf<String?>(null) }
+    var pendingPdfExport by remember { mutableStateOf<PendingExamPdfExport?>(null) }
+    var exportingPdf by remember { mutableStateOf(false) }
+
+    val pdfLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri ->
+        val request = pendingPdfExport
+        pendingPdfExport = null
+        if (uri == null) {
+            notice = "PDF export cancelled."
+        } else if (request != null) {
+            scope.launch {
+                exportingPdf = true
+                error = null
+                try {
+                    withContext(Dispatchers.IO) {
+                        val output = context.contentResolver.openOutputStream(uri, "w")
+                            ?: throw IllegalStateException("Android could not open the selected PDF destination.")
+                        output.use { ExamPdfExporter.write(request.bundle, it, request.includeAnswerKey) }
+                    }
+                    notice = if (request.includeAnswerKey) {
+                        "Examination and marking scheme exported as a PDF."
+                    } else {
+                        "Examination paper exported as a PDF."
+                    }
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    error = failure.message ?: "Could not export the examination PDF."
+                } finally {
+                    exportingPdf = false
+                }
+            }
+        }
+    }
+
+    fun requestPdfExport(bundle: ExamBundle, includeAnswerKey: Boolean) {
+        if (exportingPdf) return
+        pendingPdfExport = PendingExamPdfExport(bundle, includeAnswerKey)
+        pdfLauncher.launch(ExamPdfExporter.suggestedFileName(bundle.paper.title, includeAnswerKey))
+    }
 
     fun openPaper(entity: ExamPaperEntity) {
         runCatching {
@@ -392,6 +438,22 @@ fun ExamStudioScreen(workspaceId: String) {
                         }
                         ExamPaperDocument(bundle.paper, if (attemptMode) answers else null,
                             if (attemptMode) ::updateAnswer else null)
+                        if (!attemptMode) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ExamSecondaryButton(
+                                    if (exportingPdf) "PREPARING PDF…" else "EXPORT PAPER PDF",
+                                    Modifier.weight(1f),
+                                    enabled = !exportingPdf
+                                ) { requestPdfExport(bundle, includeAnswerKey = false) }
+                                if (bundle.answerKey.isNotEmpty()) {
+                                    ExamSecondaryButton(
+                                        "PAPER + KEY PDF",
+                                        Modifier.weight(1f),
+                                        enabled = !exportingPdf
+                                    ) { requestPdfExport(bundle, includeAnswerKey = true) }
+                                }
+                            }
+                        }
                         if (error != null) ExamNotice(error.orEmpty(), true)
                         if (notice != null) ExamNotice(notice.orEmpty(), false)
                         if (gradeResult != null) ExamGradePanel(gradeResult!!)
@@ -761,12 +823,20 @@ private fun ExamPrimaryButton(label: String, enabled: Boolean, modifier: Modifie
 }
 
 @Composable
-private fun ExamSecondaryButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun ExamSecondaryButton(
+    label: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
     val palette = LocalOraclePalette.current
-    Box(modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(palette.surfaceRaised)
-        .border(1.dp, palette.outlineSoft, RoundedCornerShape(8.dp)).clickable(onClick = onClick)
+    Box(modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+        .background(if (enabled) palette.surfaceRaised else palette.surface)
+        .border(1.dp, palette.outlineSoft, RoundedCornerShape(8.dp))
+        .clickable(enabled = enabled, onClick = onClick)
         .padding(horizontal = 10.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
-        Text(label, color = palette.textSecondary, fontFamily = OracleMono, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, color = if (enabled) palette.textSecondary else palette.textTertiary,
+            fontFamily = OracleMono, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
