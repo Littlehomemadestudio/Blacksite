@@ -480,6 +480,8 @@ fun SettingsScreen() {
             PrivacyLine("AES-GCM encryption; key material held by Android Keystore.")
             PrivacyLine("Credential is sent to Google's Gemini API over HTTPS when a model action is invoked.")
             PrivacyLine("No API key is embedded in the APK, source code, analytics, or logs.")
+            PrivacyLine("Local Python runs inside the app process with access to ORACLE app-private files and the network; it is not an OS security sandbox.")
+            PrivacyLine("Every Python run and phone-file write needs fresh approval. Python source is shown before execution, and printed output is returned to Gemini.")
         }
     }
 }

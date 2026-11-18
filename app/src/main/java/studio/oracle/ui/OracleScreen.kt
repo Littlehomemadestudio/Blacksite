@@ -243,22 +243,32 @@ fun OracleScreen(
         onDecision: (AgenticEvent) -> Unit = {}
     ): Boolean {
         val grantKey = AgenticPermissionPolicy.sessionGrantKey(authorizationSessionId, permissionGroup)
-        if (grantKey in approvedToolSessions) return true
+        val sessionGrantAllowed = AgenticPermissionPolicy.allowsSessionGrant(permissionGroup)
+        if (sessionGrantAllowed && grantKey in approvedToolSessions) return true
         val deferred = CompletableDeferred<String>()
         val scopeLabel = permissionGroup.replace('_', ' ').replaceFirstChar { it.uppercase() }
         withContext(Dispatchers.Main.immediate) {
+            pendingApprovalAllowsSession = sessionGrantAllowed
             pendingApproval = action + "\n\nScope: " + scopeLabel + " · this conversation only." +
-                "\nAllow for session authorizes this capability group for the rest of this conversation. It does not grant other capabilities."
+                if (sessionGrantAllowed) {
+                    "\nAllow for session authorizes this capability group for the rest of this conversation. It does not grant other capabilities."
+                } else {
+                    "\nThis high-impact action requires a fresh approval every time. Session approval is disabled for this capability."
+                }
             approvalDeferred = deferred
         }
         return try {
             val decision = deferred.await()
             val approved = when (decision) {
                 "session" -> {
-                    withContext(Dispatchers.Main.immediate) {
-                        approvedToolSessions = approvedToolSessions + grantKey
+                    if (!sessionGrantAllowed) {
+                        false
+                    } else {
+                        withContext(Dispatchers.Main.immediate) {
+                            approvedToolSessions = approvedToolSessions + grantKey
+                        }
+                        true
                     }
-                    true
                 }
                 "once" -> true
                 else -> false
@@ -1032,21 +1042,34 @@ fun OracleScreen(
             AlertDialog(
                 onDismissRequest = { approvalDeferred?.complete("deny"); approvalDeferred = null; pendingApproval = null },
                 title = { Text("ORACLE requests access") },
-                text = { Text(pendingApproval.orEmpty()) },
+                text = {
+                    Text(
+                        pendingApproval.orEmpty(),
+                        modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())
+                    )
+                },
                 confirmButton = {
                     TextButton(onClick = {
-                        approvalDeferred?.complete("session")
+                        approvalDeferred?.complete(if (pendingApprovalAllowsSession) "session" else "once")
                         approvalDeferred = null
                         pendingApproval = null
-                    }) { Text("ALLOW FOR SESSION") }
+                    }) { Text(if (pendingApprovalAllowsSession) "ALLOW FOR SESSION" else "ALLOW ONCE") }
                 },
                 dismissButton = {
-                    Row {
-                        TextButton(onClick = {
-                            approvalDeferred?.complete("once")
-                            approvalDeferred = null
-                            pendingApproval = null
-                        }) { Text("ONCE") }
+                    if (pendingApprovalAllowsSession) {
+                        Row {
+                            TextButton(onClick = {
+                                approvalDeferred?.complete("once")
+                                approvalDeferred = null
+                                pendingApproval = null
+                            }) { Text("ONCE") }
+                            TextButton(onClick = {
+                                approvalDeferred?.complete("deny")
+                                approvalDeferred = null
+                                pendingApproval = null
+                            }) { Text("DENY") }
+                        }
+                    } else {
                         TextButton(onClick = {
                             approvalDeferred?.complete("deny")
                             approvalDeferred = null
