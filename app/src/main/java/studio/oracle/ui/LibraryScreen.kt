@@ -63,9 +63,10 @@ fun LibraryScreen(workspaceId: String) {
     var searchHits by remember { mutableStateOf(emptyList<DocumentSearchHit>()) }
     var selectedDocumentId by remember { mutableStateOf<String?>(null) }
     var selectedChunks by remember { mutableStateOf(emptyList<DocumentChunkEntity>()) }
+    var studyToolsOpen by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = selectedDocumentId != null) {
-        selectedDocumentId = null
+    BackHandler(enabled = studyToolsOpen || selectedDocumentId != null) {
+        if (studyToolsOpen) studyToolsOpen = false else selectedDocumentId = null
     }
     var status by remember { mutableStateOf("LOCAL INDEX READY") }
     var importing by remember { mutableStateOf(false) }
@@ -98,6 +99,7 @@ fun LibraryScreen(workspaceId: String) {
     }
 
     LaunchedEffect(selectedDocumentId) {
+        studyToolsOpen = false
         selectedChunks = selectedDocumentId?.let { repository.chunksFor(it) }.orEmpty()
     }
 
@@ -192,31 +194,43 @@ fun LibraryScreen(workspaceId: String) {
     ) {
         if (selectedDocumentId != null) {
             val selected = documents.firstOrNull { it.id == selectedDocumentId }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OracleIconButton(OracleGlyph.Back, "Back to library", onClick = { selectedDocumentId = null }, tint = palette.accent, size = 36.dp)
-                Column(Modifier.weight(1f)) {
-                    Text("DOCUMENT READER", color = palette.accent, fontSize = 9.sp, letterSpacing = 1.5.sp)
-                    Text(selected?.title ?: "Document", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            Text(
-                "Extracted text · original file remains in app-private storage",
-                color = palette.textSecondary, fontSize = 9.sp
-            )
-            LazyColumn(
-                Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (selectedChunks.isEmpty()) {
-                    item {
-                        Text("No extracted passages are available for this document.", color = palette.textSecondary, fontSize = 11.sp)
+            if (studyToolsOpen && selected != null) {
+                DocumentStudyScreen(
+                    workspaceId = workspaceId,
+                    document = selected,
+                    chunks = selectedChunks,
+                    onBack = { studyToolsOpen = false }
+                )
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OracleIconButton(OracleGlyph.Back, "Back to library", onClick = { selectedDocumentId = null }, tint = palette.accent, size = 36.dp)
+                    Column(Modifier.weight(1f)) {
+                        Text("DOCUMENT READER", color = palette.accent, fontSize = 9.sp, letterSpacing = 1.5.sp)
+                        Text(selected?.title ?: "Document", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    if (selected != null) {
+                        OracleSolidAction("STUDY", onClick = { studyToolsOpen = true })
                     }
                 }
-                items(selectedChunks, key = { it.id }) { chunk ->
-                    LibraryCard(padding = 12.dp, radius = 13.dp) {
-                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                            Text(chunk.sectionLabel.uppercase(), color = palette.accent, fontFamily = OracleMono, fontSize = 8.sp, letterSpacing = 1.2.sp)
-                            Text(chunk.content, color = palette.text, fontFamily = OracleSans, fontSize = 13.sp, lineHeight = 19.sp)
+                Text(
+                    "Extracted text · original file remains in app-private storage",
+                    color = palette.textSecondary, fontSize = 9.sp
+                )
+                LazyColumn(
+                    Modifier.weight(1f).fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (selectedChunks.isEmpty()) {
+                        item {
+                            Text("No extracted passages are available for this document.", color = palette.textSecondary, fontSize = 11.sp)
+                        }
+                    }
+                    items(selectedChunks, key = { it.id }) { chunk ->
+                        LibraryCard(padding = 12.dp, radius = 13.dp) {
+                            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                Text(chunk.sectionLabel.uppercase(), color = palette.accent, fontFamily = OracleMono, fontSize = 8.sp, letterSpacing = 1.2.sp)
+                                Text(chunk.content, color = palette.text, fontFamily = OracleSans, fontSize = 13.sp, lineHeight = 19.sp)
+                            }
                         }
                     }
                 }
