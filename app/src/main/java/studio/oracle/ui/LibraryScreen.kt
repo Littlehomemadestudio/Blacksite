@@ -307,7 +307,7 @@ fun LibraryScreen(workspaceId: String) {
                         )
                     }
                     Text(
-                        "PDF · TXT · MD  /  Office, image OCR, and scanned-PDF OCR are not supported yet.",
+                        "PDF · TXT · MD · DOCX · PPTX · XLSX  /  OCR for images and scanned PDFs is not available yet.",
                         color = palette.textTertiary, fontFamily = OracleMono, fontSize = 8.sp, lineHeight = 12.sp
                     )
                 }
@@ -368,7 +368,7 @@ fun LibraryScreen(workspaceId: String) {
                             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OracleGlyphIcon(OracleGlyph.Library, Modifier.size(28.dp), palette.accent)
                                 Text("NO DOCUMENTS YET", color = palette.text, fontFamily = OracleMono, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                                Text("Import a PDF, plain-text file, or Markdown document. Extraction and indexing happen on this device.", color = palette.textSecondary, fontFamily = OracleSans, fontSize = 11.sp, lineHeight = 16.sp)
+                                Text("Import a PDF, text, Markdown, Word, PowerPoint or Excel file. Extraction and indexing happen on this device.", color = palette.textSecondary, fontFamily = OracleSans, fontSize = 11.sp, lineHeight = 16.sp)
                             }
                         }
                     }
@@ -433,7 +433,10 @@ private fun DocumentRow(document: DocumentEntity, onClick: () -> Unit) {
                 val type = when (document.mimeType) {
                     "application/pdf" -> "PDF · ${document.pageCount} pages"
                     "text/markdown" -> "MARKDOWN"
-                    else -> "PLAIN TEXT"
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> "WORD · DOCX"
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> "POWERPOINT · PPTX"
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> "EXCEL · XLSX"
+                    else -> "TEXT"
                 }
                 Text(
                     "$type · ${Formatter.formatShortFileSize(LocalContext.current, document.sizeBytes)} · ${document.extractedCharacters} chars",
