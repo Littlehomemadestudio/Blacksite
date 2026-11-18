@@ -1,6 +1,7 @@
 package studio.oracle.data
 
 import kotlinx.coroutines.flow.Flow
+import studio.oracle.data.local.DocumentDao
 import studio.oracle.data.local.DocumentEntity
 import studio.oracle.data.local.DocumentStudyDao
 import studio.oracle.data.local.DocumentStudySetEntity
@@ -8,6 +9,7 @@ import java.util.UUID
 
 /** Persists generated study aids locally and enforces workspace/source boundaries. */
 class DocumentStudyRepository(
+    private val documentDao: DocumentDao,
     private val studyDao: DocumentStudyDao,
     private val workspaceId: String
 ) {
@@ -21,8 +23,16 @@ class DocumentStudyRepository(
         payload: DocumentStudyPayload,
         sources: List<DocumentStudySource>
     ): DocumentStudySetEntity {
-        require(document.workspaceId == workspaceId) { "Document belongs to a different workspace." }
+        val currentDocument = documentDao.findDocument(document.id)
+            ?: throw IllegalArgumentException("The source document no longer exists.")
+        require(currentDocument.workspaceId == workspaceId && document.workspaceId == workspaceId) {
+            "Document belongs to a different workspace."
+        }
         require(sources.isNotEmpty()) { "A study aid needs at least one source excerpt." }
+        val availableChunkIds = documentDao.chunksForDocument(document.id).map { it.id }.toSet()
+        require(sources.all { it.chunkId in availableChunkIds }) {
+            "A study excerpt does not belong to the selected document."
+        }
         val allowedIds = sources.map { it.id }.toSet()
         val contentJson = DocumentStudyCodec.encode(kind, payload)
         DocumentStudyCodec.parse(kind, contentJson, allowedIds)
