@@ -52,13 +52,14 @@ import studio.oracle.ui.theme.OracleTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.navigationBarColor = android.graphics.Color.WHITE
+        window.statusBarColor = android.graphics.Color.rgb(17, 19, 21)
+        window.navigationBarColor = android.graphics.Color.rgb(17, 19, 21)
         androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
-            isAppearanceLightStatusBars = true
-            isAppearanceLightNavigationBars = true
+            isAppearanceLightStatusBars = false
+            isAppearanceLightNavigationBars = false
         }
         setContent {
-            OracleTheme(darkTheme = false) {
+            OracleTheme(darkTheme = true) {
                 OracleRoot()
             }
         }
@@ -93,7 +94,7 @@ private fun OracleRoot() {
 @Composable
 private fun OracleStartupSplash() {
     Box(
-        Modifier.fillMaxSize().background(Color(0xFFF8FAFC)),
+        Modifier.fillMaxSize().background(Color(0xFF111315)),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -102,16 +103,16 @@ private fun OracleStartupSplash() {
         ) {
             Text(
                 "ORACLE",
-                color = Color(0xFF17212B),
+                color = Color(0xFFF3F1EC),
                 fontFamily = OracleSans,
                 fontSize = 19.sp,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
                 letterSpacing = 3.2.sp
             )
-            Box(Modifier.width(24.dp).height(1.dp).background(Color(0xFF7EA9D4)))
+            Box(Modifier.width(24.dp).height(1.dp).background(Color(0xFFE58A43)))
             Text(
                 "PERSONAL INTELLIGENCE",
-                color = Color(0xFF7B8793),
+                color = Color(0xFF858B92),
                 fontFamily = OracleSans,
                 fontSize = 8.sp,
                 letterSpacing = 1.65.sp

@@ -8,7 +8,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 
 @Composable
 fun OracleTheme(
-    darkTheme: Boolean = false,
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
     val palette = if (darkTheme) OracleDarkPalette else OracleLightPalette

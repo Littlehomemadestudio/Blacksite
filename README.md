@@ -6,7 +6,7 @@
 - Native Android, offline-first local workspace, Gemini API key supplied by the user.
 - API credentials are encrypted at rest with AES-GCM; the encryption key is held by Android Keystore.
 - Agent actions are transparent, permission-gated, auditable, and explicitly confirmed before external or destructive effects.
-- Original ORACLE identity: a light-by-default porcelain workbench, near-black editorial typography, restrained blue accents, precise spacing, and progressive disclosure. A semantic palette keeps contrast consistent across every workspace.
+- Original ORACLE identity: a dark-by-default graphite workbench, warm oxide accents, editorial typography, precise spacing, and progressive disclosure. A semantic palette keeps contrast consistent across every workspace.
 
 ## Build
 Open this repository in Android Studio or run:
