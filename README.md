@@ -44,6 +44,8 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Office extraction is offline and bounded: it reads only required XML parts from the archive, never executes macros, and does not extract embedded images, charts, comments, or tracked-change metadata.
 - Offline keyword retrieval, document reader, and Gemini library Q&A.
 - Library Q&A displays the exact retrieved excerpts and requires confirmation before sending them to Gemini.
+- Document Study generates summaries with cited key points, tap-to-reveal flashcards, and interactive multiple-choice quizzes. It samples up to 12 source chunks across the document, caps the approved excerpt payload at 20,000 characters, validates every returned source ID against the selected excerpts, and stores the result in Room for offline revision.
+- Study generation is online and opt-in: the user reviews the exact excerpt set and selected Gemini model before sending. The original document and unselected passages remain local; generated study sets are workspace-scoped and cascade-delete with their source document.
 
 ### Agentic Operator
 - Gemini Interactions loop: model → tool call → execution → function result → model, with a hard limit of 16 model rounds and 32 combined tool calls per run; transient network failures retry with backoff and cancellation stops in-flight OkHttp calls.
@@ -72,7 +74,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - WorkManager periodic schedules have a 15-minute minimum and are deferrable: Android may run them later to respect battery and system constraints. They are not exact alarms or event-based triggers. Repeated create/append steps can create duplicate notes or repeated text; the schedule confirmation calls this out before opt-in.
 - Successful runs keep their execution trace on the assistant response; failed and cancelled runs attach permission decisions and completed tool events to the originating user turn, so retries retain the audit history.
 - A failed step stops the run. Deleting a workflow removes its steps and run history but preserves notes created by previous runs.
-- Workflow execution is local-only: no Gemini request, network calls, shell access, arbitrary scripts, app launching, scheduled triggers, or background execution.
+- Workflow execution is local-only: no Gemini request, network calls, shell access, arbitrary scripts, or app launching. Optional periodic WorkManager triggers are described above and remain subject to OS deferral.
 
 ### Examination Studio
 - Dedicated, user-initiated assessment authoring for practice, diagnostic, chapter, midterm, final, and mock examinations. Ordinary tutoring does not invoke exam generation.
@@ -93,10 +95,10 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - This is file-based, user-initiated transcription—not live transcription, background capture, or Gemini Live streaming.
 
 ### Verification
-- Unit tests cover conversation context, session naming, workspace-name normalization (including Persian text), document chunk boundaries, PDF citations, stable text sections, keyword ranking, DOCX/PPTX/XLSX extraction and source labels, XLSX shared/inline cell values and unsafe relationship rejection, workflow plan validation, audio-memory workflow execution and workspace isolation, examination JSON validation, exact mark totals, objective grading, answer persistence codecs, PDF export content planning and filename safety, and Room workspace-isolation queries/mutations under Robolectric.
+- Unit tests cover conversation context, session naming, workspace-name normalization (including Persian text), document chunk boundaries, PDF citations, stable text sections, keyword ranking, DOCX/PPTX/XLSX extraction and source labels, XLSX shared/inline cell values and unsafe relationship rejection, cited study-kit parsing/round-tripping, bounded source sampling, quiz answer-index validation, study-kit workspace/source isolation and cascade deletion, workflow plan validation, audio-memory workflow execution and workspace isolation, examination JSON validation, exact mark totals, objective grading, answer persistence codecs, PDF export content planning and filename safety, and Room workspace-isolation queries/mutations under Robolectric.
 
 ## In progress / not yet available
-- Image OCR, scanned-PDF OCR, document summaries, flashcards, semantic embeddings, and knowledge graph. Legacy binary DOC/XLS/PPT formats remain unsupported. Exam Studio does not directly invoke Android's print service or automatically grade constructed responses; its source-material field is manually supplied text rather than a live Library retrieval picker.
+- Image OCR, scanned-PDF OCR, semantic embeddings, and knowledge graph. Legacy binary DOC/XLS/PPT formats remain unsupported. Study aids require a Gemini connection and explicit excerpt approval; they cannot be generated offline. Exam Studio does not directly invoke Android's print service or automatically grade constructed responses; its source-material field is manually supplied text rather than a live Library retrieval picker.
 - Event-based triggers, exact-time alarms, and arbitrary external integrations. Periodic schedules are available through Android WorkManager and remain subject to OS deferral.
 - Additional workflow actions such as export, file operations, notifications, and external integrations.
 - Persistent full-duplex Gemini Live audio streaming and interruption handling. Audio Memory provides saved recordings and file-based Gemini transcription, not live streaming.
@@ -117,7 +119,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - User-facing thread deletion, workspace deletion, and full workspace export are not available yet. Uninstalling the app removes its app-private data.
 
 ## Database compatibility
-Room schema v9 retains existing agent, document, workflow, audio, and workspace data. Migration 6→7 adds workspace-scoped Audio Memory records and search indexes; migration 7→8 adds workspace-scoped recurring workflow trigger records; migration 8→9 adds workspace-scoped examination papers and attempts without modifying existing rows. Earlier 3→4 compatibility remains idempotent across the two v3 layouts.
+Room schema v10 retains existing agent, document, workflow, audio, examination, and workspace data. Migration 6→7 adds workspace-scoped Audio Memory records and search indexes; migration 7→8 adds workspace-scoped recurring workflow trigger records; migration 8→9 adds workspace-scoped examination papers and attempts; migration 9→10 adds workspace-scoped document study sets with source-document cascade deletion without modifying existing rows. Earlier 3→4 compatibility remains idempotent across the two v3 layouts.
 
 
 ### Release polish
