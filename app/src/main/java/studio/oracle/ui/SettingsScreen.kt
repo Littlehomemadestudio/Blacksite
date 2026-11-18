@@ -22,7 +22,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.CancellationException
@@ -44,6 +46,7 @@ fun SettingsScreen() {
     val store = remember { SecureKeyStore(context) }
     val crossMemoryStore = remember(context) { CrossMemoryStore(context) }
     var crossMemoryEnabled by remember { mutableStateOf(crossMemoryStore.isEnabled()) }
+    var confirmClearCrossMemory by remember { mutableStateOf(false) }
     val api = remember { GeminiApi() }
     val scope = rememberCoroutineScope()
 
@@ -127,7 +130,7 @@ fun SettingsScreen() {
                 )
             }
             Text(
-                "When enabled, ORACLE can save useful long-term preferences, project context and decisions locally, then reuse relevant memories in future chats. Gemini proposes memories; ORACLE validates and removes the hidden memory trailer before showing the answer.",
+                "Off by default. When enabled, ORACLE can save useful long-term preferences, project context and decisions locally. Only keyword-relevant entries are included with later Gemini requests. Gemini proposes memories; ORACLE validates and removes the hidden memory trailer before showing the answer.",
                 color = palette.textSecondary, fontFamily = OracleSans, fontSize = 11.sp, lineHeight = 16.sp
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -137,7 +140,7 @@ fun SettingsScreen() {
                 Text(
                     "CLEAR",
                     modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable {
-                        crossMemoryStore.clear()
+                        confirmClearCrossMemory = true
                     }.padding(horizontal = 10.dp, vertical = 8.dp),
                     color = palette.error, fontFamily = OracleMono, fontSize = 9.sp,
                     fontWeight = FontWeight.SemiBold
@@ -480,8 +483,30 @@ fun SettingsScreen() {
             PrivacyLine("AES-GCM encryption; key material held by Android Keystore.")
             PrivacyLine("Credential is sent to Google's Gemini API over HTTPS when a model action is invoked.")
             PrivacyLine("No API key is embedded in the APK, source code, analytics, or logs.")
+            PrivacyLine("CrossMemory is off by default; when enabled, only keyword-relevant entries may be sent with Gemini requests. Memory entries are not encrypted at rest.")
             PrivacyLine("Local Python runs inside the app process with access to ORACLE app-private files and the network; it is not an OS security sandbox.")
             PrivacyLine("Every Python run and phone-file write needs fresh approval. Python source is shown before execution, and printed output is returned to Gemini.")
+        }
+        if (confirmClearCrossMemory) {
+            AlertDialog(
+                onDismissRequest = { confirmClearCrossMemory = false },
+                title = { Text("Clear saved memories?") },
+                text = {
+                    Text("This permanently removes local CrossMemory entries. Chat history, documents, notes, and recordings are unchanged.")
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        crossMemoryStore.clear()
+                        confirmClearCrossMemory = false
+                    }) { Text("CLEAR MEMORIES", color = palette.error) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { confirmClearCrossMemory = false }) { Text("CANCEL") }
+                },
+                containerColor = palette.surface,
+                titleContentColor = palette.text,
+                textContentColor = palette.textSecondary
+            )
         }
     }
 }

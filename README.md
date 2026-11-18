@@ -51,6 +51,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - Gemini Interactions loop: model → tool call → execution → function result → model, with a hard limit of 16 model rounds and 32 combined tool calls per run; transient network failures retry with backoff and cancellation stops in-flight OkHttp calls.
 - Built-in Gemini capabilities: URL Context and hosted Python. Both are disabled by default and require explicit opt-in in the composer quick switches. Gemini Google Search grounding is not enabled.
 - Independent live web research via Tavily and a separately encrypted API key stored through Android Keystore.
+- CrossMemory is off by default. When enabled, model-proposed memories stay in local SharedPreferences; only keyword-relevant entries (up to six) are included with a later request. This store is not encrypted at rest and can be cleared from Settings.
 - Composer quick switches independently enable web search, phone files, local Python, hosted Python, URL Context, image generation and all custom tools. Hosted Python and URL Context start off until the user enables them.
 - The main agent exposes a DRAW tool that calls Gemini 3.1 Flash Image as a separate service. Generated PNGs are saved in the app workspace and displayed inline. The direct image model can also be selected in the Model Atlas; direct image mode omits tool payloads because the model does not support function calling.
 - Phone files are accessed through a user-selected Storage Access Framework folder. Paths are scoped, traversal is rejected, and text read/write operations have size limits.
@@ -109,6 +110,7 @@ Use JDK 17 and Android SDK 36. The debug APK is produced at `app/build/outputs/a
 - The API key is stored locally as AES-GCM ciphertext; its non-exportable encryption key is managed by Android Keystore.
 - The Gemini key is sent over HTTPS only to Google's Gemini API when a user invokes validation, model discovery, or generation. The separate Tavily key is sent only to Tavily when the user approves a web-search query.
 - Agent threads, workflows, notes, run history, and document data are stored in the app-private Room database; they are not uploaded automatically.
+- CrossMemory is opt-in/off by default. When enabled, only keyword-relevant local entries are sent with the current Gemini request; its SharedPreferences store is not encrypted at rest and can be cleared from Settings.
 - Workflow actions run locally. A document-search step queries the on-device index; it does not send excerpts to Gemini.
 - The Room database, imported originals, and Audio Memory WAV files are app-private but are **not encrypted at the database/file layer**. Do not store highly sensitive content until encrypted local-data storage is implemented.
 - Library Q&A is opt-in: only the question and up to six retrieved excerpts are sent to the selected Gemini model after explicit confirmation. Audio transcription is also opt-in per recording; only that selected WAV is uploaded, and ORACLE attempts remote file deletion immediately after transcription.
