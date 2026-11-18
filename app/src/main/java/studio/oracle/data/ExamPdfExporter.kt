@@ -57,7 +57,7 @@ object ExamPdfContentPlanner {
             if (paper.instructions.isNotEmpty()) {
                 add(ExamPdfBlock(ExamPdfBlockType.INSTRUCTIONS_HEADING, if (rtl) "دستورالعمل" else "CANDIDATE INSTRUCTIONS"))
                 paper.instructions.forEachIndexed { index, instruction ->
-                    add(ExamPdfBlock(ExamPdfBlockType.INSTRUCTION, "$"+(index + 1)+". $"+instruction))
+                    add(ExamPdfBlock(ExamPdfBlockType.INSTRUCTION, "${index + 1}. $instruction))
                 }
             }
 
@@ -71,12 +71,12 @@ object ExamPdfContentPlanner {
                     add(
                         ExamPdfBlock(
                             ExamPdfBlockType.QUESTION,
-                            "$"+question.number+". $"+question.prompt+"    [$"+question.marks.toPdfMarks()+" $"+marksLabel+"]"
+                            "${question.number}. ${question.prompt}    [${question.marks.toPdfMarks()} $marksLabel]"
                         )
                     )
                     question.options.forEachIndexed { index, option ->
                         val optionLabel = ('A'.code + index).toChar()
-                        add(ExamPdfBlock(ExamPdfBlockType.OPTION, "$"+optionLabel+". $"+option))
+                        add(ExamPdfBlock(ExamPdfBlockType.OPTION, "$optionLabel. $option))
                     }
                     if (question.options.isEmpty() && question.answerLines > 0) {
                         add(ExamPdfBlock(ExamPdfBlockType.ANSWER_SPACE, "", question.answerLines.coerceIn(0, 12)))
@@ -92,9 +92,9 @@ object ExamPdfContentPlanner {
                     val answerLabel = if (rtl) "پاسخ مورد انتظار" else "Expected answer"
                     val acceptedLabel = if (rtl) "پاسخ‌های پذیرفته‌شده" else "Accepted answers"
                     val guideLabel = if (rtl) "راهنمای تصحیح" else "Marking guide"
-                    val parts = mutableListOf("Q$"+number+" · $"+answerLabel+": $"+key.expectedAnswer)
-                    if (key.acceptedAnswers.isNotEmpty()) parts += "$"+acceptedLabel+": $"+key.acceptedAnswers.joinToString(", ")
-                    if (key.markingGuide.isNotBlank()) parts += "$"+guideLabel+": $"+key.markingGuide
+                    val parts = mutableListOf("Q$number · $answerLabel: ${key.expectedAnswer})
+                    if (key.acceptedAnswers.isNotEmpty()) parts += "$acceptedLabel: ${key.acceptedAnswers.joinToString(", ")}"
+                    if (key.markingGuide.isNotBlank()) parts += "$guideLabel: ${key.markingGuide}"
                     add(ExamPdfBlock(ExamPdfBlockType.ANSWER_KEY_ITEM, parts.joinToString("\n")))
                 }
             }
@@ -110,7 +110,7 @@ object ExamPdfExporter {
             .take(48)
             .ifBlank { "oracle-exam" }
         val suffix = if (includeAnswerKey) "-with-marking-scheme" else ""
-        return "$"+safeTitle+suffix+".pdf"
+        return "$safeTitle$suffix.pdf"
     }
 
     /** Writes a paginated A4 PDF. The caller owns and closes the supplied stream. */
@@ -324,7 +324,7 @@ private class ExamPdfPageComposer(
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
         }
         canvas.drawText("ORACLE STUDIO  ·  EXAMINATION", PAGE_MARGIN.toFloat(), (PAGE_HEIGHT - 18).toFloat(), footerPaint)
-        val pageLabel = "PAGE $"+pageNumber
+        val pageLabel = "PAGE $pageNumber"
         canvas.drawText(pageLabel, PAGE_WIDTH - PAGE_MARGIN - footerPaint.measureText(pageLabel), (PAGE_HEIGHT - 18).toFloat(), footerPaint)
         document.finishPage(activePage)
         page = null
