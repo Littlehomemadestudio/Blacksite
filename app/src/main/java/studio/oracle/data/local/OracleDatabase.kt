@@ -106,6 +106,33 @@ data class DocumentChunkEntity(
 )
 
 @Entity(
+    tableName = "document_study_sets",
+    foreignKeys = [
+        ForeignKey(
+            entity = DocumentEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["documentId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index(value = ["workspaceId", "documentId", "createdAt"]),
+        Index(value = ["documentId"])
+    ]
+)
+data class DocumentStudySetEntity(
+    @PrimaryKey val id: String,
+    val workspaceId: String,
+    val documentId: String,
+    val kind: String,
+    val title: String,
+    val model: String,
+    val contentJson: String,
+    val sourceManifestJson: String,
+    val createdAt: Long
+)
+
+@Entity(
     tableName = "workflows",
     indices = [Index(value = ["workspaceId", "updatedAt"])]
 )
@@ -298,6 +325,18 @@ interface DocumentDao {
 
     @Query("DELETE FROM documents WHERE id = :documentId")
     suspend fun deleteDocument(documentId: String)
+}
+
+@Dao
+interface DocumentStudyDao {
+    @Query("SELECT * FROM document_study_sets WHERE documentId = :documentId AND workspaceId = :workspaceId ORDER BY createdAt DESC")
+    fun observeForDocument(documentId: String, workspaceId: String): Flow<List<DocumentStudySetEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(studySet: DocumentStudySetEntity)
+
+    @Query("DELETE FROM document_study_sets WHERE id = :id AND workspaceId = :workspaceId")
+    suspend fun delete(id: String, workspaceId: String): Int
 }
 
 @Dao
@@ -572,9 +611,10 @@ interface ExamPaperDao {
         WorkflowRunLogEntity::class,
         WorkflowTriggerEntity::class,
         AudioMemoryEntity::class,
-        ExamPaperEntity::class
+        ExamPaperEntity::class,
+        DocumentStudySetEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 abstract class OracleDatabase : RoomDatabase() {
@@ -585,6 +625,7 @@ abstract class OracleDatabase : RoomDatabase() {
     abstract fun workflowTriggerDao(): WorkflowTriggerDao
     abstract fun audioMemoryDao(): AudioMemoryDao
     abstract fun examPaperDao(): ExamPaperDao
+    abstract fun documentStudyDao(): DocumentStudyDao
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -813,6 +854,28 @@ abstract class OracleDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS document_study_sets (" +
+                        "id TEXT NOT NULL, workspaceId TEXT NOT NULL, documentId TEXT NOT NULL, " +
+                        "kind TEXT NOT NULL, title TEXT NOT NULL, model TEXT NOT NULL, " +
+                        "contentJson TEXT NOT NULL, sourceManifestJson TEXT NOT NULL, " +
+                        "createdAt INTEGER NOT NULL, PRIMARY KEY(id), " +
+                        "FOREIGN KEY(documentId) REFERENCES documents(id) " +
+                        "ON UPDATE NO ACTION ON DELETE CASCADE)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_document_study_sets_workspaceId_documentId_createdAt " +
+                        "ON document_study_sets(workspaceId, documentId, createdAt)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_document_study_sets_documentId " +
+                        "ON document_study_sets(documentId)"
+                )
+            }
+        }
+
         private fun SupportSQLiteDatabase.hasColumn(table: String, column: String): Boolean =
             query("PRAGMA table_info($table)").use { cursor ->
                 val nameIndex = cursor.getColumnIndex("name")
@@ -832,7 +895,7 @@ abstract class OracleDatabase : RoomDatabase() {
                     OracleDatabase::class.java,
                     "oracle_studio.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                     .build()
                     .also { instance = it }
             }
