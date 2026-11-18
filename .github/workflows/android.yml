@@ -1,5 +1,7 @@
 name: Android CI
 
+# Every branch push runs verification; only main publishes the rolling APK release.
+
 on:
   push:
   pull_request:
