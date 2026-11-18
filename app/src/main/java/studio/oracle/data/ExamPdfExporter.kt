@@ -57,7 +57,7 @@ object ExamPdfContentPlanner {
             if (paper.instructions.isNotEmpty()) {
                 add(ExamPdfBlock(ExamPdfBlockType.INSTRUCTIONS_HEADING, if (rtl) "دستورالعمل" else "CANDIDATE INSTRUCTIONS"))
                 paper.instructions.forEachIndexed { index, instruction ->
-                    add(ExamPdfBlock(ExamPdfBlockType.INSTRUCTION, "${index + 1}. $instruction))
+                    add(ExamPdfBlock(ExamPdfBlockType.INSTRUCTION, "${index + 1}. $instruction"))
                 }
             }
 
@@ -76,7 +76,7 @@ object ExamPdfContentPlanner {
                     )
                     question.options.forEachIndexed { index, option ->
                         val optionLabel = ('A'.code + index).toChar()
-                        add(ExamPdfBlock(ExamPdfBlockType.OPTION, "$optionLabel. $option))
+                        add(ExamPdfBlock(ExamPdfBlockType.OPTION, "$optionLabel. $option"))
                     }
                     if (question.options.isEmpty() && question.answerLines > 0) {
                         add(ExamPdfBlock(ExamPdfBlockType.ANSWER_SPACE, "", question.answerLines.coerceIn(0, 12)))
@@ -92,7 +92,7 @@ object ExamPdfContentPlanner {
                     val answerLabel = if (rtl) "پاسخ مورد انتظار" else "Expected answer"
                     val acceptedLabel = if (rtl) "پاسخ‌های پذیرفته‌شده" else "Accepted answers"
                     val guideLabel = if (rtl) "راهنمای تصحیح" else "Marking guide"
-                    val parts = mutableListOf("Q$number · $answerLabel: ${key.expectedAnswer})
+                    val parts = mutableListOf("Q$number · $answerLabel: ${key.expectedAnswer}")
                     if (key.acceptedAnswers.isNotEmpty()) parts += "$acceptedLabel: ${key.acceptedAnswers.joinToString(", ")}"
                     if (key.markingGuide.isNotBlank()) parts += "$guideLabel: ${key.markingGuide}"
                     add(ExamPdfBlock(ExamPdfBlockType.ANSWER_KEY_ITEM, parts.joinToString("\n")))
@@ -104,7 +104,7 @@ object ExamPdfContentPlanner {
 
 object ExamPdfExporter {
     fun suggestedFileName(title: String, includeAnswerKey: Boolean = false): String {
-        val safeTitle = title.trim()
+        val safeTitle = title.trim().lowercase(Locale.ROOT)
             .replace(Regex("[^\\p{L}\\p{N}]+"), "-")
             .trim('-')
             .take(48)
