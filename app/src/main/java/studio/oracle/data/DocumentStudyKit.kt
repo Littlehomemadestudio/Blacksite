@@ -2,7 +2,6 @@ package studio.oracle.data
 
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.LinkedHashSet
 import kotlin.math.roundToInt
 
 enum class DocumentStudyKind(val wireName: String, val label: String) {
