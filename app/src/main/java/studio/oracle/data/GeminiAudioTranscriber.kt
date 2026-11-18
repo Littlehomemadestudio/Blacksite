@@ -2,6 +2,7 @@ package studio.oracle.data
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -70,45 +71,17 @@ class GeminiAudioTranscriber(
         fileUri: String,
         mimeType: String
     ): String {
-        val body = JSONObject()
-            .put(
-                "contents",
-                JSONArray().put(
-                    JSONObject().put(
-                        "parts",
-                        JSONArray().put(
-                            JSONObject().put(
-                                "fileData",
-                                JSONObject()
-                                    .put("fileUri", fileUri)
-                                    .put("mimeType", mimeType)
-                            )
-                        )
-                    )
-                )
-            )
-            .put(
-                "generationConfig",
-                JSONObject().put(
-                    "audioTranscriptionConfig",
-                    JSONObject()
-                        .put("languageCodes", JSONArray())
-                        .put("mode", "VERBATIM")
-                )
-            )
+        val body = buildTranscriptionRequestBody(fileUri, mimeType)
         val request = Request.Builder()
-            .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-transcribe:generateContent")
+            .url(GEMINI_INTERACTIONS_ENDPOINT)
             .header("x-goog-api-key", apiKey)
             .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
 
-        return http.newCall(request).await().use { response ->
-            val raw = response.body?.string().orEmpty()
-            if (!response.isSuccessful) throw IOException(apiError(response.code, raw))
-            val text = extractCandidateText(raw)
-            if (text.isBlank()) throw IOException("Gemini Transcribe returned an empty transcript.")
-            text.trim()
-        }
+        val raw = executeWithRetry(request)
+        val text = extractInteractionText(raw)
+        if (text.isBlank()) throw IOException("Gemini Transcribe returned an empty transcript.")
+        return text.trim()
     }
 
     private suspend fun summarizeTranscript(
@@ -150,11 +123,118 @@ class GeminiAudioTranscriber(
             .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
 
-        return http.newCall(request).await().use { response ->
-            val raw = response.body?.string().orEmpty()
-            if (!response.isSuccessful) throw IOException(apiError(response.code, raw))
-            parseAnalysis(extractCandidateText(raw), transcript)
+        val raw = executeWithRetry(request)
+        return parseAnalysis(extractCandidateText(raw), transcript)
+    }
+
+    internal fun buildTranscriptionRequestBody(fileUri: String, mimeType: String): JSONObject {
+        require(fileUri.isNotBlank()) { "Gemini did not provide an audio file URI." }
+        require(mimeType.startsWith("audio/", ignoreCase = true)) { "The uploaded file is not an audio file." }
+        return JSONObject()
+            .put("model", GEMINI_TRANSCRIPTION_MODEL)
+            .put(
+                "input",
+                JSONArray().put(
+                    JSONObject()
+                        .put("type", "audio")
+                        .put("uri", fileUri)
+                        .put("mime_type", mimeType)
+                )
+            )
+            .put(
+                "generation_config",
+                JSONObject().put(
+                    "transcription_config",
+                    JSONObject().put("language_codes", JSONArray())
+                )
+            )
+    }
+
+    /** Reads only model output from the Interactions API; thought summaries are never transcript text. */
+    internal fun extractInteractionText(raw: String): String {
+        val root = try {
+            JSONObject(raw)
+        } catch (_: Exception) {
+            throw IOException("Gemini Transcribe returned an unreadable interaction response.")
         }
+        val status = root.optString("status")
+        if (status.isNotBlank() && status != "completed") {
+            throw IOException("Gemini Transcribe did not complete (status: " + status.take(32) + ").")
+        }
+        root.optString("output_text").trim()
+            .takeIf { it.isNotBlank() && it != "null" }
+            ?.let { return it }
+
+        val steps = root.optJSONArray("steps") ?: JSONArray()
+        return buildString {
+            for (index in 0 until steps.length()) {
+                val step = steps.optJSONObject(index) ?: continue
+                if (step.optString("type") != "model_output") continue
+                val content = step.optJSONArray("content") ?: continue
+                for (partIndex in 0 until content.length()) {
+                    val part = content.optJSONObject(partIndex) ?: continue
+                    val partType = part.optString("type")
+                    if (partType.isNotBlank() && partType != "text") continue
+                    val text = part.optString("text").trimEnd()
+                    if (text.isNotBlank() && text != "null") {
+                        if (isNotEmpty()) append('\n')
+                        append(text)
+                    }
+                }
+            }
+        }.trim()
+    }
+
+    internal fun isRetryableHttpStatus(code: Int): Boolean =
+        code == 408 || code == 425 || code == 429 || code in 500..599
+
+    private suspend fun executeWithRetry(request: Request): String {
+        var retry = 0
+        while (true) {
+            val response = try {
+                http.newCall(request).await()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (network: IOException) {
+                if (retry >= MAX_TRANSIENT_RETRIES) {
+                    throw IOException("Gemini request failed after " + (retry + 1) + " attempts.", network)
+                }
+                delay(retryDelayMs(retry))
+                retry++
+                continue
+            }
+
+            val result = try {
+                response.use { current ->
+                    Triple(current.code, current.body?.string().orEmpty(), current.header("Retry-After"))
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (network: IOException) {
+                if (retry >= MAX_TRANSIENT_RETRIES) {
+                    throw IOException("Gemini response could not be read after " + (retry + 1) + " attempts.", network)
+                }
+                delay(retryDelayMs(retry))
+                retry++
+                continue
+            }
+
+            val (code, body, retryAfter) = result
+            if (code in 200..299) return body
+            if (isRetryableHttpStatus(code) && retry < MAX_TRANSIENT_RETRIES) {
+                val serverDelay = retryAfter?.toLongOrNull()?.times(1_000L)?.coerceIn(0L, 30_000L)
+                delay(serverDelay ?: retryDelayMs(retry))
+                retry++
+                continue
+            }
+            throw IOException(apiError(code, body))
+        }
+    }
+
+    private fun retryDelayMs(attempt: Int): Long = when (attempt.coerceIn(0, 2)) {
+        0 -> 1_000L
+        1 -> 2_000L
+        else -> 4_000L
     }
 
     internal fun parseAnalysis(responseText: String, sourceTranscript: String = ""): AudioAnalysis {
@@ -205,6 +285,12 @@ class GeminiAudioTranscriber(
                 }
             }
         }
+    }
+
+    private companion object {
+        const val GEMINI_TRANSCRIPTION_MODEL = "gemini-3.5-transcribe"
+        const val GEMINI_INTERACTIONS_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/interactions"
+        const val MAX_TRANSIENT_RETRIES = 2
     }
 
     private fun apiError(code: Int, raw: String): String = when (code) {
