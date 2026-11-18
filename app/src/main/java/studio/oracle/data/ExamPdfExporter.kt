@@ -185,7 +185,7 @@ private class ExamPdfPageComposer(
             .setTextDirection(direction)
             .setIncludePad(false)
             .setLineSpacing(2f, 1f)
-            .setBreakStrategy(Layout.BREAK_STRATEGY_HIGH_QUALITY)
+            // StaticLayout's default break strategy is high quality.
             .build()
         drawLayout(layout, indent, gapAfter)
     }
