@@ -34,23 +34,23 @@ object ExamPdfContentPlanner {
 
             val metadataRows = if (rtl) {
                 listOf(
-                    "درس: ${{paper.subject}    پایه: ${{paper.grade}    کلاس: ${{paper.className}",
-                    "مدت: ${{paper.durationMinutes} دقیقه    مجموع بارم: ${{paper.totalMarks.toPdfMarks()}    تاریخ: ${{paper.examDate}",
-                    "دبیر: ${{paper.teacherName}    نیمسال: ${{paper.semester}"
+                    "درس: ${paper.subject}    پایه: ${paper.grade}    کلاس: ${paper.className}",
+                    "مدت: ${paper.durationMinutes} دقیقه    مجموع بارم: ${paper.totalMarks.toPdfMarks()}    تاریخ: ${paper.examDate}",
+                    "دبیر: ${paper.teacherName}    نیمسال: ${paper.semester}"
                 )
             } else {
                 listOf(
-                    "Subject: ${{paper.subject}    Grade: ${{paper.grade}    Class: ${{paper.className}",
-                    "Duration: ${{paper.durationMinutes} min    Total marks: ${{paper.totalMarks.toPdfMarks()}    Date: ${{paper.examDate}",
-                    "Teacher: ${{paper.teacherName}    Term: ${{paper.semester}"
+                    "Subject: ${paper.subject}    Grade: ${paper.grade}    Class: ${paper.className}",
+                    "Duration: ${paper.durationMinutes} min    Total marks: ${paper.totalMarks.toPdfMarks()}    Date: ${paper.examDate}",
+                    "Teacher: ${paper.teacherName}    Term: ${paper.semester}"
                 )
             }
             metadataRows.forEach { add(ExamPdfBlock(ExamPdfBlockType.METADATA, it)) }
 
             val candidateFields = if (rtl) {
-                "نام و نام خانوادگی: ____________________    شماره دانش‌آموزی: ____________    کلاس: ${{paper.className}"
+                "نام و نام خانوادگی: ____________________    شماره دانش‌آموزی: ____________    کلاس: ${paper.className}"
             } else {
-                "Student name: __________________________    Student ID: ______________    Class: ${{paper.className}"
+                "Student name: __________________________    Student ID: ______________    Class: ${paper.className}"
             }
             add(ExamPdfBlock(ExamPdfBlockType.CANDIDATE_FIELDS, candidateFields))
 
