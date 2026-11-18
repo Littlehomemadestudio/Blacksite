@@ -19,7 +19,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import android.content.Context
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -53,7 +52,7 @@ fun DocumentStudyScreen(
     val context = LocalContext.current
     val database = remember(context) { OracleDatabase.get(context) }
     val repository = remember(database, workspaceId) {
-        DocumentStudyRepository(database.documentStudyDao(), workspaceId)
+        DocumentStudyRepository(database.documentDao(), database.documentStudyDao(), workspaceId)
     }
     val studySets by remember(repository, document.id) {
         repository.observe(document.id)
