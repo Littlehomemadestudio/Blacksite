@@ -42,14 +42,14 @@ class KnowledgeGraphRepositoryTest {
         documentDao.saveDocumentWithChunks(
             own,
             listOf(
-                chunk(own.id, 0, "Neural networks learn patterns. Neural networks need training data."),
-                chunk(own.id, 1, "Neural networks improve with training data.")
+                chunk(own.id, 0, "Page 1", "Neural networks learn patterns. Neural networks need training data."),
+                chunk(own.id, 1, "Page 2", "Neural networks improve with training data.")
             )
         )
         documentDao.saveDocumentWithChunks(
             foreign,
             listOf(
-                chunk(foreign.id, 0, "Neural networks learn patterns. Neural networks need training data.")
+                chunk(foreign.id, 0, "Page 1", "Neural networks learn patterns. Neural networks need training data.")
             )
         )
 
