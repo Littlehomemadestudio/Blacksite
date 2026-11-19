@@ -69,6 +69,7 @@ fun LibraryScreen(workspaceId: String) {
         if (studyToolsOpen) studyToolsOpen = false else selectedDocumentId = null
     }
     var status by remember { mutableStateOf("LOCAL INDEX READY") }
+    var importNotice by remember { mutableStateOf<String?>(null) }
     var importing by remember { mutableStateOf(false) }
     var asking by remember { mutableStateOf(false) }
     var askJob by remember { mutableStateOf<Job?>(null) }
@@ -83,15 +84,22 @@ fun LibraryScreen(workspaceId: String) {
             scope.launch {
                 importing = true
                 status = "COPYING AND INDEXING DOCUMENT"
+                importNotice = null
                 searchHits = emptyList()
                 answer = null
                 answerError = null
                 when (val result = repository.importFrom(uri)) {
                     is DocumentImportResult.Success -> {
                         status = "INDEXED · ${result.chunkCount} PASSAGES"
+                        importNotice = result.ocrWarning ?: if (result.ocrPageCount > 0) {
+                            "Offline OCR indexed text from ${result.ocrPageCount} source page(s) or image(s). OCR ran on-device; no network request was made."
+                        } else null
                         selectedDocumentId = result.document.id
                     }
-                    is DocumentImportResult.Failure -> status = result.message
+                    is DocumentImportResult.Failure -> {
+                        status = result.message
+                        importNotice = result.message
+                    }
                 }
                 importing = false
             }
@@ -249,7 +257,8 @@ fun LibraryScreen(workspaceId: String) {
                             "application/pdf", "text/plain", "text/markdown", "text/x-markdown",
                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                             "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            "image/jpeg", "image/png", "image/webp"
                         ))
                     },
                     enabled = !importing && !asking
@@ -307,9 +316,15 @@ fun LibraryScreen(workspaceId: String) {
                         )
                     }
                     Text(
-                        "PDF · TXT · MD · DOCX · PPTX · XLSX  /  OCR for images and scanned PDFs is not available yet.",
+                        "PDF · TXT · MD · DOCX · PPTX · XLSX · JPG · PNG · WEBP  /  OFFLINE LATIN-SCRIPT OCR",
                         color = palette.textTertiary, fontFamily = OracleMono, fontSize = 8.sp, lineHeight = 12.sp
                     )
+                }
+            }
+
+            if (importNotice != null) {
+                LibraryCard(padding = 10.dp, radius = 13.dp) {
+                    Text(importNotice!!, color = palette.textSecondary, fontFamily = OracleSans, fontSize = 10.sp, lineHeight = 15.sp)
                 }
             }
 
@@ -368,7 +383,7 @@ fun LibraryScreen(workspaceId: String) {
                             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OracleGlyphIcon(OracleGlyph.Library, Modifier.size(28.dp), palette.accent)
                                 Text("NO DOCUMENTS YET", color = palette.text, fontFamily = OracleMono, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                                Text("Import a PDF, text, Markdown, Word, PowerPoint or Excel file. Extraction and indexing happen on this device.", color = palette.textSecondary, fontFamily = OracleSans, fontSize = 11.sp, lineHeight = 16.sp)
+                                Text("Import a PDF, text, Office document, or an image containing readable text. Extraction, OCR and indexing happen on this device.", color = palette.textSecondary, fontFamily = OracleSans, fontSize = 11.sp, lineHeight = 16.sp)
                             }
                         }
                     }
@@ -436,6 +451,7 @@ private fun DocumentRow(document: DocumentEntity, onClick: () -> Unit) {
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> "WORD · DOCX"
                     "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> "POWERPOINT · PPTX"
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> "EXCEL · XLSX"
+                    "image/jpeg", "image/png", "image/webp" -> "IMAGE · OFFLINE OCR"
                     else -> "TEXT"
                 }
                 Text(

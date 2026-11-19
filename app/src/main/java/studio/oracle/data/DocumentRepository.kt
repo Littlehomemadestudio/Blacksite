@@ -29,7 +29,12 @@ data class DocumentSearchHit(
 )
 
 sealed interface DocumentImportResult {
-    data class Success(val document: DocumentEntity, val chunkCount: Int) : DocumentImportResult
+    data class Success(
+        val document: DocumentEntity,
+        val chunkCount: Int,
+        val ocrPageCount: Int = 0,
+        val ocrWarning: String? = null
+    ) : DocumentImportResult
     data class Failure(val message: String) : DocumentImportResult
 }
 
@@ -51,6 +56,8 @@ class DocumentRepository(
         var temporaryFile: File? = null
         var storedFile: File? = null
         var committed = false
+        var ocrPageCount = 0
+        var ocrWarning: String? = null
         try {
             val displayName = resolveDisplayName(uri)
             val mimeType = appContext.contentResolver.getType(uri).orEmpty()
@@ -94,7 +101,29 @@ class DocumentRepository(
             }
 
             val pages = when (format) {
-                SupportedFormat.PDF -> extractPdf(destination)
+                SupportedFormat.PDF -> {
+                    val selectablePages = extractPdf(destination)
+                    val ocr = OnDeviceOcr.recognizeBlankPdfPages(destination, selectablePages)
+                    ocrPageCount = ocr.recognizedPageCount
+                    ocrWarning = buildPdfOcrWarning(ocr)
+                    ocr.pages
+                }
+                SupportedFormat.IMAGE_JPEG, SupportedFormat.IMAGE_PNG, SupportedFormat.IMAGE_WEBP -> {
+                    val text = try {
+                        OnDeviceOcr.recognizeImage(destination)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        throw DocumentImportException("Offline OCR could not decode this image. Supported image types are JPG, PNG, and WebP.")
+                    }
+                    if (text.isBlank()) {
+                        throw DocumentImportException(
+                            "No readable Latin-script text was detected. The bundled offline OCR model does not recognize Persian/Arabic-only or handwritten text."
+                        )
+                    }
+                    ocrPageCount = 1
+                    listOf(ExtractedPage(pageNumber = null, label = "Image OCR", text = text))
+                }
                 SupportedFormat.TEXT, SupportedFormat.MARKDOWN -> extractText(destination)
                 SupportedFormat.DOCX -> OfficeDocumentExtractor.extract(destination, OfficeDocumentFormat.DOCX)
                 SupportedFormat.PPTX -> OfficeDocumentExtractor.extract(destination, OfficeDocumentFormat.PPTX)
@@ -104,7 +133,9 @@ class DocumentRepository(
             if (extractedCharacters == 0) {
                 throw DocumentImportException(
                     when (format) {
-                        SupportedFormat.PDF -> "No selectable text was found. Scanned/image-only PDFs need OCR, which is not available yet."
+                        SupportedFormat.PDF -> "No selectable text or readable Latin-script OCR text was found. Handwriting and Persian/Arabic-only scans are not recognized by the bundled offline OCR model."
+                        SupportedFormat.IMAGE_JPEG, SupportedFormat.IMAGE_PNG, SupportedFormat.IMAGE_WEBP ->
+                            "No readable Latin-script text was found in this image. Handwriting and Persian/Arabic-only text are not recognized by the bundled offline OCR model."
                         SupportedFormat.DOCX, SupportedFormat.PPTX, SupportedFormat.XLSX -> "No readable text was found in this Office file. Embedded images, charts, and scanned content are not OCR-extracted."
                         else -> "This file contains no readable text."
                     }
@@ -139,7 +170,7 @@ class DocumentRepository(
 
             dao.saveDocumentWithChunks(entity, chunks)
             committed = true
-            DocumentImportResult.Success(entity, chunks.size)
+            DocumentImportResult.Success(entity, chunks.size, ocrPageCount, ocrWarning)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: DocumentImportException) {
@@ -199,6 +230,21 @@ class DocumentRepository(
             ?: "Imported document"
     }
 
+    private fun buildPdfOcrWarning(result: PdfOcrResult): String? {
+        val warnings = buildList {
+            if (result.skippedPageCount > 0) {
+                add("OCR is capped at ${OcrImportPolicy.MAX_PDF_OCR_PAGES} image-only pages per import; ${result.skippedPageCount} page(s) were skipped.")
+            }
+            if (result.failedPageCount > 0) {
+                add("OCR could not process ${result.failedPageCount} scanned page(s); selectable text and successful OCR pages remain indexed.")
+            }
+            if (result.unreadablePageCount > 0) {
+                add("No Latin-script text was detected on ${result.unreadablePageCount} image-only page(s). Handwriting and Persian/Arabic-only scans are not supported by the bundled model.")
+            }
+        }
+        return warnings.takeIf { it.isNotEmpty() }?.joinToString(" ")
+    }
+
     private fun detectFormat(name: String, mimeType: String): SupportedFormat? {
         val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
         return when {
@@ -213,6 +259,9 @@ class DocumentRepository(
             extension == "docx" || mimeType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document", ignoreCase = true) -> SupportedFormat.DOCX
             extension == "pptx" || mimeType.equals("application/vnd.openxmlformats-officedocument.presentationml.presentation", ignoreCase = true) -> SupportedFormat.PPTX
             extension == "xlsx" || mimeType.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ignoreCase = true) -> SupportedFormat.XLSX
+            extension in setOf("jpg", "jpeg") || mimeType.equals("image/jpeg", ignoreCase = true) || mimeType.equals("image/jpg", ignoreCase = true) -> SupportedFormat.IMAGE_JPEG
+            extension == "png" || mimeType.equals("image/png", ignoreCase = true) -> SupportedFormat.IMAGE_PNG
+            extension == "webp" || mimeType.equals("image/webp", ignoreCase = true) -> SupportedFormat.IMAGE_WEBP
             else -> null
         }
     }
@@ -289,7 +338,10 @@ class DocumentRepository(
         MARKDOWN("md", "text/markdown"),
         DOCX("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
         PPTX("pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
-        XLSX("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        XLSX("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        IMAGE_JPEG("jpg", "image/jpeg"),
+        IMAGE_PNG("png", "image/png"),
+        IMAGE_WEBP("webp", "image/webp")
     }
 
     private class DocumentImportException(message: String) : Exception(message)

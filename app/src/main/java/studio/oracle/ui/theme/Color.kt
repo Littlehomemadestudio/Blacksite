@@ -22,6 +22,7 @@ data class OraclePalette(
     val accentSoft: Color,
     val error: Color,
     val success: Color,
+    val warning: Color,
     val scrim: Color,
     val isDark: Boolean
 )
@@ -41,6 +42,7 @@ val OracleDarkPalette = OraclePalette(
     accentSoft = Color(0xFF3C291B),
     error = Color(0xFFFF8E83),
     success = Color(0xFF73B895),
+    warning = Color(0xFFF0B56B),
     scrim = Color(0x99000000),
     isDark = true
 )
@@ -60,6 +62,7 @@ val OracleLightPalette = OraclePalette(
     accentSoft = Color(0xFFEAF4FD),
     error = Color(0xFFB43B32),
     success = Color(0xFF287A55),
+    warning = Color(0xFF8A5200),
     scrim = Color(0x660D1115),
     isDark = false
 )
