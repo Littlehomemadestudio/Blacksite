@@ -109,6 +109,7 @@ class AudioMemoryRepositoryTest {
             assertArrayEquals(plaintext, materialized!!.readBytes())
             assertTrue(materialized.delete())
             repository.delete(id)
+            Unit
         } finally {
             database.close()
         }

@@ -1,7 +1,7 @@
 package studio.oracle.security
 
 import java.io.File
-import java.io.IOException
+import java.security.GeneralSecurityException
 import java.nio.file.Files
 import javax.crypto.spec.SecretKeySpec
 import org.junit.Assert.assertArrayEquals
@@ -44,7 +44,7 @@ class LocalAudioFileCipherTest {
             val restored = File(directory, "restored.wav")
             cipher.encrypt(source, encrypted, "12345678-1234-1234-1234-123456789012")
 
-            assertThrows(IOException::class.java) {
+            assertThrows(GeneralSecurityException::class.java) {
                 cipher.decrypt(encrypted, restored, "87654321-4321-4321-4321-210987654321")
             }
             assertFalse(restored.exists())
@@ -65,7 +65,7 @@ class LocalAudioFileCipherTest {
             bytes[bytes.lastIndex] = (bytes.last().toInt() xor 0x40).toByte()
             encrypted.writeBytes(bytes)
 
-            assertThrows(IOException::class.java) {
+            assertThrows(GeneralSecurityException::class.java) {
                 cipher.decrypt(encrypted, restored, "12345678-1234-1234-1234-123456789012")
             }
             assertFalse(restored.exists())

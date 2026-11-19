@@ -79,6 +79,7 @@ fun AudioMemoryScreen(workspaceId: String) {
     val scope = rememberCoroutineScope()
 
     var isRecording by remember { mutableStateOf(false) }
+    var archiveReady by remember { mutableStateOf(false) }
     var finishingRecording by remember { mutableStateOf(false) }
     var elapsedMs by remember { mutableLongStateOf(0L) }
     var recordingStartedAt by remember { mutableLongStateOf(0L) }
@@ -92,6 +93,7 @@ fun AudioMemoryScreen(workspaceId: String) {
     var confirmDeleteFor by remember { mutableStateOf<AudioMemoryEntity?>(null) }
     var transcribingId by remember { mutableStateOf<String?>(null) }
     var transcriptionJob by remember { mutableStateOf<Job?>(null) }
+    var playbackPreparationJob by remember { mutableStateOf<Job?>(null) }
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
     var playbackTempFile by remember { mutableStateOf<java.io.File?>(null) }
     var playbackRecordId by remember { mutableStateOf<String?>(null) }
@@ -105,6 +107,10 @@ fun AudioMemoryScreen(workspaceId: String) {
     val selectedRecord = records.firstOrNull { it.id == selectedRecordId }
 
     suspend fun beginRecording() {
+        if (!archiveReady) {
+            status = "SECURING AUDIO ARCHIVE · PLEASE WAIT"
+            return
+        }
         if (isRecording || finishingRecording || finalizationStarted.get()) return
         error = null
         status = "INITIALIZING MICROPHONE"
@@ -232,6 +238,8 @@ fun AudioMemoryScreen(workspaceId: String) {
     }
 
     fun stopPlayback() {
+        playbackPreparationJob?.cancel()
+        playbackPreparationJob = null
         runCatching { player?.release() }
         player = null
         playbackTempFile?.delete()
@@ -255,7 +263,7 @@ fun AudioMemoryScreen(workspaceId: String) {
         stopPlayback()
         playbackRecordId = record.id
         playbackLoading = true
-        scope.launch {
+        playbackPreparationJob = scope.launch {
             var file: java.io.File? = null
             try {
                 file = repository.materializeForRead(record)
@@ -277,6 +285,12 @@ fun AudioMemoryScreen(workspaceId: String) {
                 }
                 player = next
                 next.prepareAsync()
+                playbackPreparationJob = null
+            } catch (cancelled: CancellationException) {
+                file?.delete()
+                if (playbackTempFile == file) playbackTempFile = null
+                playbackPreparationJob = null
+                throw cancelled
             } catch (failure: Exception) {
                 file?.delete()
                 if (playbackTempFile == file) playbackTempFile = null
@@ -289,8 +303,10 @@ fun AudioMemoryScreen(workspaceId: String) {
     val stopPlaybackNow by rememberUpdatedState<() -> Unit> { { stopPlayback() } }
 
     LaunchedEffect(workspaceId) {
+        archiveReady = false
         try {
             val migration = repository.migrateLegacyRecordings()
+            archiveReady = true
             if (migration.migrated > 0) {
                 status = "SECURED " + migration.migrated + " LEGACY RECORDING(S) · AES-GCM"
             }
@@ -300,6 +316,10 @@ fun AudioMemoryScreen(workspaceId: String) {
         } catch (failure: Exception) {
             error = failure.message ?: "Could not secure the local audio archive."
         }
+    }
+
+    LaunchedEffect(selectedRecordId) {
+        if (playbackRecordId != null && playbackRecordId != selectedRecordId) stopPlayback()
     }
 
     LaunchedEffect(searchQuery, records) {
@@ -348,6 +368,7 @@ fun AudioMemoryScreen(workspaceId: String) {
     DisposableEffect(recorder) {
         onDispose {
             if (!finalizationStarted.get()) recorder.cancel()
+            playbackPreparationJob?.cancel()
             runCatching { playerNow?.release() }
             playbackFileNow?.delete()
         }
@@ -390,11 +411,11 @@ fun AudioMemoryScreen(workspaceId: String) {
             confirmButton = {
                 TextButton(onClick = {
                     confirmDeleteFor = null
+                    if (playbackRecordId == record.id) stopPlayback()
                     scope.launch {
                         val result = repository.delete(record.id)
                         if (result.recordRemoved) {
                             if (selectedRecordId == record.id) selectedRecordId = null
-                            if (playbackRecordId == record.id) stopPlayback()
                             status = "RECORDING REMOVED"
                             if (!result.fileRemoved) error = "The record was removed, but its local audio file could not be deleted."
                         }

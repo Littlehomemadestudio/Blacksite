@@ -12,7 +12,6 @@ import java.io.OutputStream
 import java.security.KeyStore
 import java.util.UUID
 import javax.crypto.Cipher
-import javax.crypto.CipherInputStream
 import javax.crypto.CipherOutputStream
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -74,10 +73,8 @@ class LocalAudioFileCipher(
                 val cipher = Cipher.getInstance(TRANSFORMATION)
                 cipher.init(Cipher.DECRYPT_MODE, keyProvider(), GCMParameterSpec(GCM_TAG_BITS, iv))
                 cipher.updateAAD(authenticatedData(recordId))
-                CipherInputStream(raw, cipher).use { decrypted ->
-                    FileOutputStream(temporary).use { output ->
-                        copyBounded(decrypted, output, MAX_PLAINTEXT_BYTES)
-                    }
+                FileOutputStream(temporary).use { output ->
+                    decryptAuthenticated(raw, output, cipher)
                 }
             }
         }
@@ -112,6 +109,27 @@ class LocalAudioFileCipher(
             copied += count
             if (copied > maximum) throw IOException("The audio payload exceeds the local encryption limit.")
             output.write(buffer, 0, count)
+        }
+    }
+
+    private fun decryptAuthenticated(input: InputStream, output: OutputStream, cipher: Cipher) {
+        val buffer = ByteArray(COPY_BUFFER_BYTES)
+        var copied = 0L
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            if (count == 0) continue
+            val plaintext = cipher.update(buffer, 0, count) ?: continue
+            copied += plaintext.size
+            if (copied > MAX_PLAINTEXT_BYTES) throw IOException("The decrypted audio exceeds the supported limit.")
+            output.write(plaintext)
+        }
+        // GCM authentication is only final after the tag is checked by doFinal().
+        val finalBytes = cipher.doFinal()
+        if (finalBytes.isNotEmpty()) {
+            copied += finalBytes.size
+            if (copied > MAX_PLAINTEXT_BYTES) throw IOException("The decrypted audio exceeds the supported limit.")
+            output.write(finalBytes)
         }
     }
 

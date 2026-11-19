@@ -5,6 +5,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import studio.oracle.data.local.AudioMemoryDao
 import studio.oracle.data.local.AudioMemoryEntity
@@ -40,12 +42,15 @@ class AudioMemoryRepository(
     private val audioDirectory = File(appContext.filesDir, "audio")
     private val pendingDirectory = File(appContext.cacheDir, "oracle-audio-pending")
     private val decryptedDirectory = File(appContext.cacheDir, "oracle-audio-decrypted")
+    private val storageMutex = Mutex()
 
     val records: Flow<List<AudioMemoryEntity>> = dao.observeRecords(workspaceId)
 
     /** Creates a disposable capture target; it is not placed in persistent filesDir. */
     fun newRecordingFile(): File {
         ensureDirectory(pendingDirectory, "temporary audio capture")
+        val staleFiles = clearTemporaryFiles(pendingDirectory)
+        if (staleFiles > 0) throw IOException("Could not clean an abandoned temporary audio capture.")
         val file = File(pendingDirectory, UUID.randomUUID().toString() + ".wav")
         if (!file.createNewFile()) throw IOException("Could not reserve a temporary audio recording.")
         return file
@@ -112,22 +117,24 @@ class AudioMemoryRepository(
      * plaintext capture/decryption cache files left by a process termination.
      */
     suspend fun migrateLegacyRecordings(): AudioStorageMigrationResult = withContext(Dispatchers.IO) {
-        var failures = clearTemporaryFiles(pendingDirectory)
-        failures += clearTemporaryFiles(decryptedDirectory)
-        var migrated = 0
-        val snapshot = dao.recordsSnapshot(workspaceId)
-        for (record in snapshot) {
-            val wasLegacy = !record.storagePath.endsWith(ENCRYPTED_SUFFIX)
-            try {
-                ensureEncrypted(record)
-                if (wasLegacy) migrated++
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                failures++
+        storageMutex.withLock {
+            var failures = clearTemporaryFiles(pendingDirectory)
+            failures += clearTemporaryFiles(decryptedDirectory)
+            var migrated = 0
+            val snapshot = dao.recordsSnapshot(workspaceId)
+            for (record in snapshot) {
+                val wasLegacy = !record.storagePath.endsWith(ENCRYPTED_SUFFIX)
+                try {
+                    ensureEncrypted(record)
+                    if (wasLegacy) migrated++
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    failures++
+                }
             }
+            AudioStorageMigrationResult(migrated, failures)
         }
-        AudioStorageMigrationResult(migrated, failures)
     }
 
     /**
@@ -136,20 +143,22 @@ class AudioMemoryRepository(
      */
     suspend fun materializeForRead(record: AudioMemoryEntity): File? = withContext(Dispatchers.IO) {
         if (record.workspaceId != workspaceId) return@withContext null
-        val securedRecord = ensureEncrypted(record)
-        val encrypted = storedFileFor(securedRecord)
-            ?: throw IOException("The encrypted audio file is missing from this workspace.")
-        if (!encrypted.name.endsWith(ENCRYPTED_SUFFIX)) {
-            throw IOException("The audio archive has not been encrypted successfully.")
-        }
-        ensureDirectory(decryptedDirectory, "temporary audio playback")
-        val temporary = File(decryptedDirectory, record.id + "-" + UUID.randomUUID() + ".wav")
-        try {
-            cipher.decrypt(encrypted, temporary, record.id)
-            temporary
-        } catch (failure: Exception) {
-            temporary.delete()
-            throw failure
+        storageMutex.withLock {
+            val securedRecord = ensureEncrypted(record)
+            val encrypted = storedFileFor(securedRecord)
+                ?: throw IOException("The encrypted audio file is missing from this workspace.")
+            if (!encrypted.name.endsWith(ENCRYPTED_SUFFIX)) {
+                throw IOException("The audio archive has not been encrypted successfully.")
+            }
+            ensureDirectory(decryptedDirectory, "temporary audio playback")
+            val temporary = File(decryptedDirectory, record.id + "-" + UUID.randomUUID() + ".wav")
+            try {
+                cipher.decrypt(encrypted, temporary, record.id)
+                temporary
+            } catch (failure: Exception) {
+                temporary.delete()
+                throw failure
+            }
         }
     }
 
@@ -171,43 +180,49 @@ class AudioMemoryRepository(
     }
 
     suspend fun delete(recordId: String): AudioDeleteResult = withContext(Dispatchers.IO) {
-        val record = dao.findRecord(recordId, workspaceId)
-            ?: return@withContext AudioDeleteResult(false, false)
-        val removed = dao.delete(recordId, workspaceId) == 1
-        if (!removed) return@withContext AudioDeleteResult(false, false)
+        storageMutex.withLock {
+            val record = dao.findRecord(recordId, workspaceId)
+                ?: return@withLock AudioDeleteResult(false, false)
+            require(record.id.matches(RECORD_ID_PATTERN)) { "Recording identifier is invalid." }
+            val removed = dao.delete(recordId, workspaceId) == 1
+            if (!removed) return@withLock AudioDeleteResult(false, false)
 
-        val stored = storedFileFor(record)
-        val legacy = File(audioDirectory, record.id + ".wav")
-        val targets = listOfNotNull(stored, legacy).distinctBy { it.absolutePath }
-        val fileRemoved = targets.all { !it.exists() || it.delete() }
-        AudioDeleteResult(true, fileRemoved)
+            val stored = storedFileFor(record)
+            val legacy = File(audioDirectory, record.id + ".wav")
+            val targets = listOfNotNull(stored, legacy).distinctBy { it.absolutePath }
+            val fileRemoved = targets.all { !it.exists() || it.delete() }
+            AudioDeleteResult(true, fileRemoved)
+        }
     }
 
     private suspend fun ensureEncrypted(record: AudioMemoryEntity): AudioMemoryEntity {
         require(record.workspaceId == workspaceId) {
             "This recording does not belong to the active workspace."
         }
+        require(record.id.matches(RECORD_ID_PATTERN)) { "Recording identifier is invalid." }
+        val current = dao.findRecord(record.id, workspaceId)
+            ?: throw IOException("This recording was removed from the active workspace.")
         ensureDirectory(audioDirectory, "private audio archive")
-        if (record.storagePath.endsWith(ENCRYPTED_SUFFIX)) {
-            val legacyCopy = File(audioDirectory, record.id + ".wav")
+        if (current.storagePath.endsWith(ENCRYPTED_SUFFIX)) {
+            val legacyCopy = File(audioDirectory, current.id + ".wav")
             if (legacyCopy.exists() && !legacyCopy.delete()) {
                 throw IOException("An older unencrypted copy could not be removed. Retry securing this recording.")
             }
-            val encrypted = storedFileFor(record)
+            val encrypted = storedFileFor(current)
                 ?: throw IOException("The encrypted audio file is missing from this workspace.")
-            return record.copy(sizeBytes = encrypted.length())
+            return current.copy(sizeBytes = encrypted.length())
         }
 
-        val source = storedFileFor(record)
+        val source = storedFileFor(current)
             ?: throw IOException("The legacy audio file is missing from this workspace.")
-        val target = encryptedFileFor(record.id)
+        val target = encryptedFileFor(current.id)
         if (target.exists() && !target.delete()) {
             throw IOException("Could not replace an incomplete encrypted audio file.")
         }
-        cipher.encrypt(source, target, record.id)
+        cipher.encrypt(source, target, current.id)
 
         val updatedPath = "audio/" + target.name
-        val updated = dao.updateStoragePath(record.id, workspaceId, updatedPath, target.length())
+        val updated = dao.updateStoragePath(current.id, workspaceId, updatedPath, target.length())
         if (updated != 1) {
             target.delete()
             throw IOException("The recording changed while it was being secured. Retry from the archive.")
@@ -215,7 +230,7 @@ class AudioMemoryRepository(
         if (!source.delete()) {
             throw IOException("The encrypted copy is saved, but the older plaintext WAV could not be removed. Retry securing this recording.")
         }
-        return record.copy(storagePath = updatedPath, sizeBytes = target.length())
+        return current.copy(storagePath = updatedPath, sizeBytes = target.length())
     }
 
     private fun storedFileFor(record: AudioMemoryEntity): File? {
