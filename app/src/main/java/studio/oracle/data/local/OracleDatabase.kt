@@ -132,6 +132,86 @@ data class DocumentStudySetEntity(
     val createdAt: Long
 )
 
+
+@Entity(
+    tableName = "knowledge_concepts",
+    indices = [
+        Index(value = ["workspaceId", "normalizedKey"], unique = true),
+        Index(value = ["workspaceId", "updatedAt"])
+    ]
+)
+data class KnowledgeConceptEntity(
+    @PrimaryKey val id: String,
+    val workspaceId: String,
+    val normalizedKey: String,
+    val label: String,
+    val occurrenceCount: Int,
+    val documentCount: Int,
+    val updatedAt: Long
+)
+
+@Entity(
+    tableName = "knowledge_mentions",
+    foreignKeys = [
+        ForeignKey(
+            entity = DocumentEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["documentId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = KnowledgeConceptEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["conceptId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index(value = ["workspaceId", "conceptId"]),
+        Index(value = ["conceptId"]),
+        Index(value = ["documentId"])
+    ]
+)
+data class KnowledgeMentionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val workspaceId: String,
+    val conceptId: String,
+    val documentId: String,
+    val chunkId: Long,
+    val sourceLabel: String,
+    val excerpt: String
+)
+
+@Entity(
+    tableName = "knowledge_edges",
+    foreignKeys = [
+        ForeignKey(
+            entity = KnowledgeConceptEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["sourceConceptId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = KnowledgeConceptEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["targetConceptId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index(value = ["workspaceId", "sourceConceptId", "targetConceptId"], unique = true),
+        Index(value = ["sourceConceptId"]),
+        Index(value = ["targetConceptId"])
+    ]
+)
+data class KnowledgeEdgeEntity(
+    @PrimaryKey val id: String,
+    val workspaceId: String,
+    val sourceConceptId: String,
+    val targetConceptId: String,
+    val weight: Int
+)
+
 @Entity(
     tableName = "workflows",
     indices = [Index(value = ["workspaceId", "updatedAt"])]
@@ -325,6 +405,55 @@ interface DocumentDao {
 
     @Query("DELETE FROM documents WHERE id = :documentId")
     suspend fun deleteDocument(documentId: String)
+}
+
+
+@Dao
+interface KnowledgeGraphDao {
+    @Query("SELECT * FROM knowledge_concepts WHERE workspaceId = :workspaceId ORDER BY documentCount DESC, occurrenceCount DESC, label COLLATE NOCASE ASC")
+    suspend fun conceptsSnapshot(workspaceId: String): List<KnowledgeConceptEntity>
+
+    @Query("SELECT * FROM knowledge_edges WHERE workspaceId = :workspaceId ORDER BY weight DESC")
+    suspend fun edgesSnapshot(workspaceId: String): List<KnowledgeEdgeEntity>
+
+    @Query("SELECT * FROM knowledge_concepts WHERE id = :conceptId AND workspaceId = :workspaceId LIMIT 1")
+    suspend fun findConcept(conceptId: String, workspaceId: String): KnowledgeConceptEntity?
+
+    @Query("SELECT * FROM knowledge_mentions WHERE conceptId = :conceptId AND workspaceId = :workspaceId ORDER BY documentId ASC, sourceLabel ASC, id ASC")
+    suspend fun mentionsForConcept(conceptId: String, workspaceId: String): List<KnowledgeMentionEntity>
+
+    @Query("DELETE FROM knowledge_edges WHERE workspaceId = :workspaceId")
+    suspend fun deleteEdgesForWorkspace(workspaceId: String)
+
+    @Query("DELETE FROM knowledge_mentions WHERE workspaceId = :workspaceId")
+    suspend fun deleteMentionsForWorkspace(workspaceId: String)
+
+    @Query("DELETE FROM knowledge_concepts WHERE workspaceId = :workspaceId")
+    suspend fun deleteConceptsForWorkspace(workspaceId: String)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertConcepts(concepts: List<KnowledgeConceptEntity>)
+
+    @Insert
+    suspend fun insertMentions(mentions: List<KnowledgeMentionEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEdges(edges: List<KnowledgeEdgeEntity>)
+
+    @Transaction
+    suspend fun replaceWorkspaceGraph(
+        workspaceId: String,
+        concepts: List<KnowledgeConceptEntity>,
+        mentions: List<KnowledgeMentionEntity>,
+        edges: List<KnowledgeEdgeEntity>
+    ) {
+        deleteEdgesForWorkspace(workspaceId)
+        deleteMentionsForWorkspace(workspaceId)
+        deleteConceptsForWorkspace(workspaceId)
+        if (concepts.isNotEmpty()) insertConcepts(concepts)
+        if (mentions.isNotEmpty()) insertMentions(mentions)
+        if (edges.isNotEmpty()) insertEdges(edges)
+    }
 }
 
 @Dao
@@ -618,9 +747,12 @@ interface ExamPaperDao {
         WorkflowTriggerEntity::class,
         AudioMemoryEntity::class,
         ExamPaperEntity::class,
-        DocumentStudySetEntity::class
+        DocumentStudySetEntity::class,
+        KnowledgeConceptEntity::class,
+        KnowledgeMentionEntity::class,
+        KnowledgeEdgeEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class OracleDatabase : RoomDatabase() {
@@ -632,6 +764,7 @@ abstract class OracleDatabase : RoomDatabase() {
     abstract fun audioMemoryDao(): AudioMemoryDao
     abstract fun examPaperDao(): ExamPaperDao
     abstract fun documentStudyDao(): DocumentStudyDao
+    abstract fun knowledgeGraphDao(): KnowledgeGraphDao
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -882,6 +1015,60 @@ abstract class OracleDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS knowledge_concepts (" +
+                        "id TEXT NOT NULL, workspaceId TEXT NOT NULL, normalizedKey TEXT NOT NULL, " +
+                        "label TEXT NOT NULL, occurrenceCount INTEGER NOT NULL, documentCount INTEGER NOT NULL, " +
+                        "updatedAt INTEGER NOT NULL, PRIMARY KEY(id))"
+                )
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_knowledge_concepts_workspaceId_normalizedKey " +
+                        "ON knowledge_concepts(workspaceId, normalizedKey)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_knowledge_concepts_workspaceId_updatedAt " +
+                        "ON knowledge_concepts(workspaceId, updatedAt)"
+                )
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS knowledge_mentions (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, workspaceId TEXT NOT NULL, " +
+                        "conceptId TEXT NOT NULL, documentId TEXT NOT NULL, chunkId INTEGER NOT NULL, " +
+                        "sourceLabel TEXT NOT NULL, excerpt TEXT NOT NULL, " +
+                        "FOREIGN KEY(documentId) REFERENCES documents(id) ON UPDATE NO ACTION ON DELETE CASCADE, " +
+                        "FOREIGN KEY(conceptId) REFERENCES knowledge_concepts(id) ON UPDATE NO ACTION ON DELETE CASCADE)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_knowledge_mentions_workspaceId_conceptId " +
+                        "ON knowledge_mentions(workspaceId, conceptId)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_knowledge_mentions_conceptId ON knowledge_mentions(conceptId)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_knowledge_mentions_documentId ON knowledge_mentions(documentId)"
+                )
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS knowledge_edges (" +
+                        "id TEXT NOT NULL, workspaceId TEXT NOT NULL, sourceConceptId TEXT NOT NULL, " +
+                        "targetConceptId TEXT NOT NULL, weight INTEGER NOT NULL, PRIMARY KEY(id), " +
+                        "FOREIGN KEY(sourceConceptId) REFERENCES knowledge_concepts(id) ON UPDATE NO ACTION ON DELETE CASCADE, " +
+                        "FOREIGN KEY(targetConceptId) REFERENCES knowledge_concepts(id) ON UPDATE NO ACTION ON DELETE CASCADE)"
+                )
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_knowledge_edges_workspaceId_sourceConceptId_targetConceptId " +
+                        "ON knowledge_edges(workspaceId, sourceConceptId, targetConceptId)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_knowledge_edges_sourceConceptId ON knowledge_edges(sourceConceptId)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_knowledge_edges_targetConceptId ON knowledge_edges(targetConceptId)"
+                )
+            }
+        }
+
         private fun SupportSQLiteDatabase.hasColumn(table: String, column: String): Boolean =
             query("PRAGMA table_info($table)").use { cursor ->
                 val nameIndex = cursor.getColumnIndex("name")
@@ -901,7 +1088,7 @@ abstract class OracleDatabase : RoomDatabase() {
                     OracleDatabase::class.java,
                     "oracle_studio.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                     .build()
                     .also { instance = it }
             }

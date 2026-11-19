@@ -64,9 +64,14 @@ fun LibraryScreen(workspaceId: String) {
     var selectedDocumentId by remember { mutableStateOf<String?>(null) }
     var selectedChunks by remember { mutableStateOf(emptyList<DocumentChunkEntity>()) }
     var studyToolsOpen by remember { mutableStateOf(false) }
+    var knowledgeMapOpen by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = studyToolsOpen || selectedDocumentId != null) {
-        if (studyToolsOpen) studyToolsOpen = false else selectedDocumentId = null
+    BackHandler(enabled = knowledgeMapOpen || studyToolsOpen || selectedDocumentId != null) {
+        when {
+            knowledgeMapOpen -> knowledgeMapOpen = false
+            studyToolsOpen -> studyToolsOpen = false
+            else -> selectedDocumentId = null
+        }
     }
     var status by remember { mutableStateOf("LOCAL INDEX READY") }
     var importNotice by remember { mutableStateOf<String?>(null) }
@@ -200,7 +205,17 @@ fun LibraryScreen(workspaceId: String) {
         Modifier.fillMaxSize().background(palette.canvas).padding(horizontal = 13.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(9.dp)
     ) {
-        if (selectedDocumentId != null) {
+        if (knowledgeMapOpen) {
+            KnowledgeMapScreen(
+                workspaceId = workspaceId,
+                documents = documents,
+                onBack = { knowledgeMapOpen = false },
+                onOpenDocument = { documentId ->
+                    knowledgeMapOpen = false
+                    selectedDocumentId = documentId
+                }
+            )
+        } else if (selectedDocumentId != null) {
             val selected = documents.firstOrNull { it.id == selectedDocumentId }
             if (studyToolsOpen && selected != null) {
                 DocumentStudyScreen(
@@ -250,6 +265,12 @@ fun LibraryScreen(workspaceId: String) {
                     Text("Your knowledge, indexed.", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                     Text("${documents.size} local documents · searchable offline", color = palette.textSecondary, fontSize = 10.sp)
                 }
+                OracleTextAction(
+                    label = "MAP",
+                    onClick = { knowledgeMapOpen = true },
+                    enabled = documents.isNotEmpty() && !importing && !asking
+                )
+                Spacer(Modifier.width(5.dp))
                 OracleSolidAction(
                     label = if (importing) "INDEXING…" else "IMPORT",
                     onClick = {
