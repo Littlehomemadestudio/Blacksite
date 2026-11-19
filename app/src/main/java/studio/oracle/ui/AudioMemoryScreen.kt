@@ -93,11 +93,13 @@ fun AudioMemoryScreen(workspaceId: String) {
     var transcribingId by remember { mutableStateOf<String?>(null) }
     var transcriptionJob by remember { mutableStateOf<Job?>(null) }
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
+    var playbackTempFile by remember { mutableStateOf<java.io.File?>(null) }
     var playbackRecordId by remember { mutableStateOf<String?>(null) }
     var playbackPlaying by remember { mutableStateOf(false) }
     var playbackLoading by remember { mutableStateOf(false) }
     val recordingNow by rememberUpdatedState(isRecording)
     val playerNow by rememberUpdatedState(player)
+    val playbackFileNow by rememberUpdatedState(playbackTempFile)
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val selectedRecord = records.firstOrNull { it.id == selectedRecordId }
@@ -158,7 +160,7 @@ fun AudioMemoryScreen(workspaceId: String) {
                 repository.saveRecording(title, stoppedFile, duration).also { recordSaved = true }
             }
             selectedRecordId = record.id
-            status = "SAVED LOCALLY · " + formatDuration(duration)
+            status = "SAVED LOCALLY · AES-GCM ENCRYPTED · " + formatDuration(duration)
         } catch (cancelled: CancellationException) {
             if (!recordSaved) {
                 withContext(NonCancellable + Dispatchers.IO) {
@@ -194,12 +196,15 @@ fun AudioMemoryScreen(workspaceId: String) {
         transcriptionJob = scope.launch {
             transcribingId = record.id
             error = null
-            status = "UPLOADING APPROVED AUDIO TO GEMINI"
+            status = "PREPARING ENCRYPTED AUDIO"
+            var materializedFile: java.io.File? = null
             try {
                 val apiKey = withContext(Dispatchers.IO) { keyStore.read().orEmpty() }
                 if (apiKey.isBlank()) throw IOException("Connect a Gemini API key in Settings before transcribing.")
-                val file = repository.fileFor(record)
-                    ?: throw IOException("The local audio file is missing. This record cannot be transcribed.")
+                val file = repository.materializeForRead(record)
+                    ?: throw IOException("This recording does not belong to the active workspace.")
+                materializedFile = file
+                status = "UPLOADING APPROVED AUDIO TO GEMINI"
                 val result = transcriber.analyze(apiKey, model, file)
                 if (!repository.saveAnalysis(record.id, result.analysis)) {
                     throw IOException("The recording was removed before its analysis could be saved.")
@@ -219,6 +224,7 @@ fun AudioMemoryScreen(workspaceId: String) {
                 error = failure.message ?: "Audio transcription failed. Retry when ready."
                 status = "TRANSCRIPTION FAILED"
             } finally {
+                withContext(NonCancellable + Dispatchers.IO) { materializedFile?.delete() }
                 transcribingId = null
                 transcriptionJob = null
             }
@@ -228,6 +234,8 @@ fun AudioMemoryScreen(workspaceId: String) {
     fun stopPlayback() {
         runCatching { player?.release() }
         player = null
+        playbackTempFile?.delete()
+        playbackTempFile = null
         playbackRecordId = null
         playbackPlaying = false
         playbackLoading = false
@@ -244,34 +252,53 @@ fun AudioMemoryScreen(workspaceId: String) {
             }
             return
         }
-        val file = repository.fileFor(record)
-        if (file == null) {
-            error = "The local recording file is unavailable."
-            return
-        }
         stopPlayback()
-        try {
-            val next = MediaPlayer()
-            next.setDataSource(file.absolutePath)
-            next.setOnPreparedListener { media ->
-                media.start()
-                playbackRecordId = record.id
-                playbackPlaying = true
-                playbackLoading = false
-            }
-            next.setOnCompletionListener { stopPlayback() }
-            next.setOnErrorListener { _, _, _ ->
-                error = "Android could not play this recording."
+        playbackRecordId = record.id
+        playbackLoading = true
+        scope.launch {
+            var file: java.io.File? = null
+            try {
+                file = repository.materializeForRead(record)
+                    ?: throw IOException("The local recording file is unavailable in this workspace.")
+                playbackTempFile = file
+                val next = MediaPlayer()
+                next.setDataSource(file.absolutePath)
+                next.setOnPreparedListener { media ->
+                    media.start()
+                    playbackRecordId = record.id
+                    playbackPlaying = true
+                    playbackLoading = false
+                }
+                next.setOnCompletionListener { stopPlayback() }
+                next.setOnErrorListener { _, _, _ ->
+                    error = "Android could not play this recording."
+                    stopPlayback()
+                    true
+                }
+                player = next
+                next.prepareAsync()
+            } catch (failure: Exception) {
+                file?.delete()
+                if (playbackTempFile == file) playbackTempFile = null
                 stopPlayback()
-                true
+                error = failure.message ?: "Could not play this recording."
             }
-            player = next
-            playbackRecordId = record.id
-            playbackLoading = true
-            next.prepareAsync()
+        }
+    }
+
+    val stopPlaybackNow by rememberUpdatedState<() -> Unit> { { stopPlayback() } }
+
+    LaunchedEffect(workspaceId) {
+        try {
+            val migration = repository.migrateLegacyRecordings()
+            if (migration.migrated > 0) {
+                status = "SECURED " + migration.migrated + " LEGACY RECORDING(S) · AES-GCM"
+            }
+            if (migration.failures > 0) {
+                error = migration.failures.toString() + " temporary or legacy audio file(s) could not be cleaned or encrypted. Retry by reopening this archive."
+            }
         } catch (failure: Exception) {
-            stopPlayback()
-            error = failure.message ?: "Could not play this recording."
+            error = failure.message ?: "Could not secure the local audio archive."
         }
     }
 
@@ -309,7 +336,10 @@ fun AudioMemoryScreen(workspaceId: String) {
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             // Android microphone capture is foreground-only; finalize instead of continuing silently in background.
-            if (event == Lifecycle.Event.ON_STOP && recordingNow) finishRecordingNow()
+            if (event == Lifecycle.Event.ON_STOP) {
+                if (recordingNow) finishRecordingNow()
+                stopPlaybackNow()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -319,6 +349,7 @@ fun AudioMemoryScreen(workspaceId: String) {
         onDispose {
             if (!finalizationStarted.get()) recorder.cancel()
             runCatching { playerNow?.release() }
+            playbackFileNow?.delete()
         }
     }
 
@@ -363,7 +394,7 @@ fun AudioMemoryScreen(workspaceId: String) {
                         val result = repository.delete(record.id)
                         if (result.recordRemoved) {
                             if (selectedRecordId == record.id) selectedRecordId = null
-                            stopPlayback()
+                            if (playbackRecordId == record.id) stopPlayback()
                             status = "RECORDING REMOVED"
                             if (!result.fileRemoved) error = "The record was removed, but its local audio file could not be deleted."
                         }
@@ -383,6 +414,15 @@ fun AudioMemoryScreen(workspaceId: String) {
         Modifier.fillMaxSize().background(palette.canvas).padding(horizontal = 13.dp, vertical = 11.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        AudioPanel {
+            Text(
+                "AES-GCM ENCRYPTED AT REST · PLAINTEXT CACHE IS TEMPORARY",
+                color = palette.success,
+                fontFamily = OracleMono,
+                fontSize = 8.sp,
+                letterSpacing = 0.65.sp
+            )
+        }
         if (selectedRecord != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OracleIconButton(
@@ -406,7 +446,7 @@ fun AudioMemoryScreen(workspaceId: String) {
                 AudioPanel {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("LOCAL WAV", color = palette.accent, fontFamily = OracleMono, fontSize = 8.sp, letterSpacing = 1.2.sp)
+                            Text("LOCAL WAV · ENCRYPTED AT REST", color = palette.accent, fontFamily = OracleMono, fontSize = 8.sp, letterSpacing = 1.0.sp)
                             Text(
                                 formatDuration(selectedRecord.durationMs) + " · " +
                                     DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(selectedRecord.createdAt)),

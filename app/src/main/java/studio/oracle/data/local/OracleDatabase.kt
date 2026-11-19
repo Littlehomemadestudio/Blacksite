@@ -513,6 +513,12 @@ interface AudioMemoryDao {
     @Query("SELECT * FROM audio_memories WHERE id = :id AND workspaceId = :workspaceId LIMIT 1")
     suspend fun findRecord(id: String, workspaceId: String): AudioMemoryEntity?
 
+    @Query("SELECT * FROM audio_memories WHERE workspaceId = :workspaceId ORDER BY createdAt DESC")
+    suspend fun recordsSnapshot(workspaceId: String): List<AudioMemoryEntity>
+
+    @Query("UPDATE audio_memories SET storagePath = :storagePath, sizeBytes = :sizeBytes WHERE id = :id AND workspaceId = :workspaceId")
+    suspend fun updateStoragePath(id: String, workspaceId: String, storagePath: String, sizeBytes: Long): Int
+
     @Query(
         "SELECT * FROM audio_memories WHERE workspaceId = :workspaceId AND (" +
             "title LIKE '%' || :query || '%' COLLATE NOCASE OR " +
