@@ -80,6 +80,7 @@ fun AudioMemoryScreen(workspaceId: String) {
 
     var isRecording by remember { mutableStateOf(false) }
     var archiveReady by remember { mutableStateOf(false) }
+    var archiveEncryptionWarning by remember { mutableStateOf(false) }
     var finishingRecording by remember { mutableStateOf(false) }
     var elapsedMs by remember { mutableLongStateOf(0L) }
     var recordingStartedAt by remember { mutableLongStateOf(0L) }
@@ -307,13 +308,17 @@ fun AudioMemoryScreen(workspaceId: String) {
         try {
             val migration = repository.migrateLegacyRecordings()
             archiveReady = true
+            archiveEncryptionWarning = migration.failures > 0
             if (migration.migrated > 0) {
                 status = "SECURED " + migration.migrated + " LEGACY RECORDING(S) · AES-GCM"
             }
             if (migration.failures > 0) {
                 error = migration.failures.toString() + " temporary or legacy audio file(s) could not be cleaned or encrypted. Retry by reopening this archive."
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (failure: Exception) {
+            archiveEncryptionWarning = true
             error = failure.message ?: "Could not secure the local audio archive."
         }
     }
@@ -437,8 +442,12 @@ fun AudioMemoryScreen(workspaceId: String) {
     ) {
         AudioPanel {
             Text(
-                "AES-GCM ENCRYPTED AT REST · PLAINTEXT CACHE IS TEMPORARY",
-                color = palette.success,
+                when {
+                    !archiveReady -> "SECURING AUDIO ARCHIVE · PLEASE WAIT"
+                    archiveEncryptionWarning -> "AES-GCM ACTIVE · LEGACY FILES NEED ATTENTION"
+                    else -> "AES-GCM ENCRYPTED AT REST · PLAINTEXT CACHE IS TEMPORARY"
+                },
+                color = if (archiveEncryptionWarning) palette.warning else palette.success,
                 fontFamily = OracleMono,
                 fontSize = 8.sp,
                 letterSpacing = 0.65.sp
@@ -467,7 +476,13 @@ fun AudioMemoryScreen(workspaceId: String) {
                 AudioPanel {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("LOCAL WAV · ENCRYPTED AT REST", color = palette.accent, fontFamily = OracleMono, fontSize = 8.sp, letterSpacing = 1.0.sp)
+                            Text(
+                                if (selectedRecord.storagePath.endsWith(".enc")) "LOCAL WAV · ENCRYPTED AT REST" else "LOCAL WAV · MIGRATION PENDING",
+                                color = palette.accent,
+                                fontFamily = OracleMono,
+                                fontSize = 8.sp,
+                                letterSpacing = 1.0.sp
+                            )
                             Text(
                                 formatDuration(selectedRecord.durationMs) + " · " +
                                     DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(selectedRecord.createdAt)),
