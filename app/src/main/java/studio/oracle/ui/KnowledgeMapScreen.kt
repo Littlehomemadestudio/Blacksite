@@ -86,7 +86,7 @@ fun KnowledgeMapScreen(
                 selectedConceptId = snapshot.concepts.firstOrNull()?.id
                 status = "MAP READY · ${result.conceptCount} CONCEPTS · ${result.edgeCount} LINKS"
                 if (result.truncated) {
-                    error = "The map reached its local processing limit. It includes the newest indexed passages only."
+                    error = "The map reached a local processing cap. It retains a bounded subset of concepts, links, and source passages."
                 } else if (result.conceptCount == 0) {
                     status = "NO REPEATED CONCEPTS FOUND"
                 }

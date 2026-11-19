@@ -59,13 +59,27 @@ class KnowledgeGraphBuilderTest {
     fun graphOutputRespectsNodeEdgeAndMentionLimits() {
         val source = document("doc-large", "workspace-a", 1L)
         val chunks = (0 until 200).map { index ->
-            val terms = (0 until 12).joinToString(" ") { term -> "concept${index}_${term} concept${index}_${term}" }
+            val terms = (0 until 12).joinToString(" ") { term -> "concept${index}term${term} concept${index}term${term}" }
             chunk(index + 1L, source.id, index, "Section ${index + 1}", terms)
         }
         val result = KnowledgeGraphBuilder.build("workspace-a", listOf(source), mapOf(source.id to chunks))
 
         assertTrue(result.concepts.size <= KnowledgeGraphBuilder.MAX_CONCEPTS)
         assertTrue(result.edges.size <= KnowledgeGraphBuilder.MAX_EDGES)
+        assertTrue(result.mentions.size <= KnowledgeGraphBuilder.MAX_MENTIONS)
+    }
+
+    @Test
+    fun candidateConceptCollectionStopsAtItsMemoryBound() {
+        val source = document("doc-capped", "workspace-a", 1L)
+        val chunks = (0 until KnowledgeGraphBuilder.MAX_CANDIDATE_CONCEPTS + 1).map { index ->
+            chunk(index + 1L, source.id, index, "Section ${index + 1}", "uniqueconcept${index} uniqueconcept${index}")
+        }
+
+        val result = KnowledgeGraphBuilder.build("workspace-a", listOf(source), mapOf(source.id to chunks))
+
+        assertTrue(result.truncated)
+        assertTrue(result.concepts.size <= KnowledgeGraphBuilder.MAX_CONCEPTS)
         assertTrue(result.mentions.size <= KnowledgeGraphBuilder.MAX_MENTIONS)
     }
 

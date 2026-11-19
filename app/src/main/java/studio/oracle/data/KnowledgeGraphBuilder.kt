@@ -42,10 +42,13 @@ data class KnowledgeGraphDraft(
  */
 object KnowledgeGraphBuilder {
     const val MAX_GRAPH_CHUNKS = 20_000
+    const val MAX_CANDIDATE_CONCEPTS = 2_000
+    const val MAX_CANDIDATE_EDGES = 10_000
     const val MAX_CONCEPTS = 120
     const val MAX_EDGES = 240
     const val MAX_TERMS_PER_CHUNK = 14
     const val MAX_MENTIONS = 6_000
+    const val MAX_MENTIONS_PER_CONCEPT = 3
     const val MAX_EXCERPT_CHARS = 220
 
     private val tokenPattern = Regex("[\\p{L}\\p{N}]+")
@@ -81,6 +84,7 @@ object KnowledgeGraphBuilder {
 
         val concepts = linkedMapOf<String, MutableConcept>()
         val mentions = linkedMapOf<Pair<String, Long>, KnowledgeMentionDraft>()
+        val mentionCounts = hashMapOf<String, Int>()
         val edgeWeights = linkedMapOf<Pair<String, String>, Int>()
         var processedChunks = 0
         var truncated = false
@@ -125,26 +129,42 @@ object KnowledgeGraphBuilder {
 
                 selectedTerms.forEach { entry ->
                     val key = entry.key
-                    val stat = concepts.getOrPut(key) { MutableConcept(key, displayLabel(entry.value.first)) }
+                    val stat = concepts[key] ?: run {
+                        if (concepts.size >= MAX_CANDIDATE_CONCEPTS) {
+                            truncated = true
+                            return@forEach
+                        }
+                        MutableConcept(key, displayLabel(entry.value.first)).also { concepts[key] = it }
+                    }
                     stat.occurrences += entry.value.second
                     stat.documents += document.id
-                    mentions.putIfAbsent(
-                        key to chunk.id,
-                        KnowledgeMentionDraft(
+
+                    if ((mentionCounts[key] ?: 0) < MAX_MENTIONS_PER_CONCEPT) {
+                        val mention = KnowledgeMentionDraft(
                             conceptId = stableId(workspaceId, "concept:$key"),
                             documentId = document.id,
                             chunkId = chunk.id,
                             sourceLabel = chunk.sectionLabel.take(100),
                             excerpt = chunk.content.trim().take(MAX_EXCERPT_CHARS)
                         )
-                    )
+                        if (mentions.putIfAbsent(key to chunk.id, mention) == null) {
+                            mentionCounts[key] = (mentionCounts[key] ?: 0) + 1
+                        }
+                    }
                 }
 
-                val keys = selectedTerms.map { it.key }.sorted()
+                val keys = selectedTerms.map { it.key }.filter { it in concepts }.sorted()
                 for (leftIndex in keys.indices) {
                     for (rightIndex in leftIndex + 1 until keys.size) {
                         val pair = keys[leftIndex] to keys[rightIndex]
-                        edgeWeights[pair] = (edgeWeights[pair] ?: 0) + 1
+                        val currentWeight = edgeWeights[pair]
+                        if (currentWeight != null) {
+                            edgeWeights[pair] = currentWeight + 1
+                        } else if (edgeWeights.size < MAX_CANDIDATE_EDGES) {
+                            edgeWeights[pair] = 1
+                        } else {
+                            truncated = true
+                        }
                     }
                 }
             }
